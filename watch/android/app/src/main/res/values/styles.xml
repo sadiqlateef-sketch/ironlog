@@ -1,0 +1,11 @@
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <!-- Customize your theme here. -->
+        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Black while the app starts, instead of a white flash on the watch. -->
+        <item name="android:windowBackground">#0b0b0b</item>
+    </style>
+
+</resources>

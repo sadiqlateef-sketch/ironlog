@@ -227,6 +227,12 @@ export async function generatePlan(input: PlanInput): Promise<{ program_id: stri
   return data;
 }
 
+/** Phase 6: link a watch by entering the 6-digit code it shows. */
+export async function claimWatchCode(code: string): Promise<void> {
+  const { error } = await getSupabase().functions.invoke("watch-pair", { body: { action: "claim", code } });
+  if (error) throw await functionError(error);
+}
+
 export async function listRoutinesWithExercises(): Promise<RoutineWithExercises[]> {
   return unwrap(
     await getSupabase()

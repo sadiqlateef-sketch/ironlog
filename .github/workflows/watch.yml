@@ -1,0 +1,72 @@
+# Builds the Wear OS watch app (watch/) into an APK you can install on the watch.
+# Run it from the Actions tab ("Run workflow"); it also runs when watch/ changes on main.
+# Uses the same two repository secrets as the phone app:
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+name: Watch APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["watch/**", ".github/workflows/watch.yml"]
+  # On pull requests it just checks that everything builds (secrets aren't needed).
+  pull_request:
+    paths: ["watch/**", ".github/workflows/watch.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: watch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: watch/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: npm ci
+
+      - name: Point the watch at your Supabase project
+        env:
+          URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "::notice::No Supabase secrets: build check only, no APK uploaded."
+              URL=https://example.supabase.co KEY=placeholder
+              echo "CHECK_ONLY=1" >> "$GITHUB_ENV"
+            else
+              echo "::error::Add the NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY repository secrets first."
+              exit 1
+            fi
+          fi
+          node -e 'require("fs").writeFileSync("config.json", JSON.stringify({ supabaseUrl: process.env.URL, supabasePublishableKey: process.env.KEY }, null, 2))'
+
+      - name: Check
+        run: |
+          npm run typecheck
+          npm test
+
+      # A release build has the app's code bundled inside, so it runs on the
+      # watch without a computer attached. It's signed with the debug key,
+      # which is fine for installing on your own watch.
+      - name: Build APK
+        working-directory: watch/android
+        run: ./gradlew assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ env.CHECK_ONLY != '1' }}
+        with:
+          name: ironlog-watch-apk
+          path: watch/android/app/build/outputs/apk/release/app-release.apk
