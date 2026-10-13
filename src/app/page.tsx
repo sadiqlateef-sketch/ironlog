@@ -6,6 +6,7 @@ import { Calculator, Dumbbell, Heart, LogOut, Play, Sparkles, Watch } from "luci
 import { AppShell } from "@/components/app-shell";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { useAuth } from "@/components/providers/auth-provider";
+import { UpNext, useActiveProgram } from "@/components/up-next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatWeight } from "@/lib/units";
@@ -25,6 +26,7 @@ function Dashboard() {
   const [active, setActive] = useState<WorkoutSession | null>(null);
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
   const [plates, setPlates] = useState(false);
+  const program = useActiveProgram();
 
   useEffect(() => {
     getActiveSession().then(setActive).catch(() => {});
@@ -46,11 +48,21 @@ function Dashboard() {
         </Button>
       </header>
 
-      <Button asChild size="lg">
-        <Link href="/workout/">
-          <Play /> {active ? "Resume workout" : "Start workout"}
-        </Link>
-      </Button>
+      {active ? (
+        <Button asChild size="lg">
+          <Link href="/workout/">
+            <Play /> Resume workout
+          </Link>
+        </Button>
+      ) : program ? (
+        <UpNext progress={program} />
+      ) : (
+        <Button asChild size="lg">
+          <Link href="/workout/">
+            <Play /> Start workout
+          </Link>
+        </Button>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Button asChild variant="secondary">

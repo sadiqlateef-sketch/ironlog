@@ -66,9 +66,10 @@ export async function listRecentSessions(limit = 5): Promise<WorkoutSession[]> {
   );
 }
 
+/** Your own routines. Program workouts are reached through their program. */
 export async function listRoutines(): Promise<Routine[]> {
   return unwrap(
-    await getSupabase().from("routines").select("*").eq("archived", false).order("position"),
+    await getSupabase().from("routines").select("*").eq("archived", false).is("program_id", null).order("position"),
   );
 }
 
@@ -189,20 +190,11 @@ export interface PlanInput {
   goal: "strength" | "hypertrophy" | "powerbuilding" | "general";
   methodology: "auto" | "531" | "sheiko" | "rp" | "linear";
   days_per_week: number;
+  weeks: number;
   session_minutes: number;
   experience: "beginner" | "intermediate" | "advanced";
   equipment: string[];
   notes: string;
-}
-
-export interface ProgramMeta {
-  program_id: string;
-  program_name: string;
-  methodology: string;
-  summary: string;
-  progression_rule: string;
-  day_index: number;
-  generated_at: string;
 }
 
 export type RoutineWithExercises = Routine & {
@@ -239,9 +231,168 @@ export async function listRoutinesWithExercises(): Promise<RoutineWithExercises[
       .from("routines")
       .select("*, routine_exercises(*, exercises(name, equipment))")
       .eq("archived", false)
+      .is("program_id", null)
       .order("position")
       .order("position", { referencedTable: "routine_exercises" }),
   ) as unknown as RoutineWithExercises[];
+}
+
+// ---------- Programs ----------
+
+export type Program = Tables<"programs">;
+export type ProgramWithWorkouts = Program & { routines: RoutineWithExercises[] };
+export type ProgramProgress = Database["public"]["Functions"]["program_progress"]["Returns"][number];
+
+export async function listPrograms(): Promise<ProgramWithWorkouts[]> {
+  return unwrap(
+    await getSupabase()
+      .from("programs")
+      .select("*, routines(*, routine_exercises(*, exercises(name, equipment)))")
+      .order("is_active", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("program_week", { referencedTable: "routines" })
+      .order("program_day", { referencedTable: "routines" }),
+  ) as unknown as ProgramWithWorkouts[];
+}
+
+/** Where you are in a program (your active one when no id is given). */
+export async function getProgramProgress(programId?: string): Promise<ProgramProgress | null> {
+  const rows = unwrap(await getSupabase().rpc("program_progress", programId ? { p_program_id: programId } : {}));
+  return rows[0] ?? null;
+}
+
+/** Make this your one active program and start it from week 1, day 1. */
+export async function startProgram(id: string): Promise<void> {
+  unwrap(await getSupabase().rpc("start_program", { p_id: id }));
+}
+
+export async function stopProgram(id: string): Promise<void> {
+  unwrap(await getSupabase().rpc("stop_program", { p_id: id }));
+}
+
+export async function deleteProgram(id: string): Promise<void> {
+  unwrap(await getSupabase().from("programs").delete().eq("id", id).select("id"));
+}
+
+export async function getRoutine(id: string): Promise<Routine> {
+  return unwrap(await getSupabase().from("routines").select("*").eq("id", id).single());
+}
+
+/** One exercise in the workout editor. `id` is null for a newly added one. */
+export interface EditableItem {
+  id: string | null;
+  exercise_id: string;
+  name: string;
+  target_sets: number;
+  target_reps: number;
+  target_reps_max: number | null;
+  target_weight_kg: number | null;
+}
+
+/**
+ * Save edits to a workout. With `laterWeeks`, the same changes carry over to
+ * this day in every later week of the program: swaps, removals and additions
+ * as-is, sets and reps set to the new values, and weight moved by the same
+ * amount so each week keeps its place in the progression.
+ */
+export async function saveWorkoutEdits(
+  routine: RoutineWithExercises,
+  edited: EditableItem[],
+  laterWeeks: boolean,
+): Promise<void> {
+  const supabase = getSupabase();
+  const before = new Map(routine.routine_exercises.map((x) => [x.id, x]));
+  const kept = new Set(edited.filter((e) => e.id).map((e) => e.id!));
+  const removed = routine.routine_exercises.filter((x) => !kept.has(x.id));
+  const added = edited.filter((e) => !e.id);
+  const changed = edited.filter((e) => {
+    const b = e.id ? before.get(e.id) : undefined;
+    return (
+      b &&
+      (b.exercise_id !== e.exercise_id ||
+        b.target_sets !== e.target_sets ||
+        b.target_reps !== e.target_reps ||
+        b.target_reps_max !== e.target_reps_max ||
+        b.target_weight_kg !== e.target_weight_kg)
+    );
+  });
+
+  type Target = { routine_id: string; rows: RoutineExercise[] };
+  const targets: Target[] = [{ routine_id: routine.id, rows: routine.routine_exercises }];
+  if (laterWeeks && routine.program_id) {
+    const later = unwrap(
+      await supabase
+        .from("routines")
+        .select("id, routine_exercises(*)")
+        .eq("program_id", routine.program_id)
+        .eq("program_day", routine.program_day!)
+        .gt("program_week", routine.program_week!),
+    ) as unknown as { id: string; routine_exercises: RoutineExercise[] }[];
+    targets.push(...later.map((r) => ({ routine_id: r.id, rows: r.routine_exercises })));
+  }
+
+  for (const t of targets) {
+    const isThis = t.routine_id === routine.id;
+    // In a later week, find the matching row: same exercise, nearest position.
+    const match = (orig: RoutineExercise) =>
+      isThis
+        ? orig
+        : t.rows
+            .filter((r) => r.exercise_id === orig.exercise_id)
+            .sort((a, b) => Math.abs(a.position - orig.position) - Math.abs(b.position - orig.position))[0];
+
+    for (const e of changed) {
+      const orig = before.get(e.id!)!;
+      const row = match(orig);
+      if (!row) continue;
+      const weightChanged = orig.target_weight_kg !== e.target_weight_kg;
+      let weight = row.target_weight_kg;
+      if (weightChanged) {
+        weight =
+          isThis || e.target_weight_kg == null || orig.target_weight_kg == null || row.target_weight_kg == null
+            ? e.target_weight_kg
+            : Math.max(0, row.target_weight_kg + (e.target_weight_kg - orig.target_weight_kg));
+      }
+      unwrap(
+        await supabase
+          .from("routine_exercises")
+          .update({
+            exercise_id: e.exercise_id,
+            target_sets: e.target_sets,
+            target_reps: e.target_reps,
+            target_reps_max: e.target_reps_max,
+            target_weight_kg: weight,
+            // A weight you set yourself replaces the percent-of-max target.
+            ...(weightChanged ? { target_percent_1rm: null } : {}),
+          })
+          .eq("id", row.id)
+          .select("id"),
+      );
+    }
+
+    const gone = removed.map(match).filter((r): r is RoutineExercise => !!r).map((r) => r.id);
+    if (gone.length) unwrap(await supabase.from("routine_exercises").delete().in("id", gone).select("id"));
+
+    if (added.length) {
+      let position = Math.max(0, ...t.rows.map((r) => r.position));
+      unwrap(
+        await supabase
+          .from("routine_exercises")
+          .insert(
+            added.map((e) => ({
+              routine_id: t.routine_id,
+              exercise_id: e.exercise_id,
+              position: ++position,
+              target_sets: e.target_sets,
+              target_reps: e.target_reps,
+              target_reps_max: e.target_reps_max,
+              target_weight_kg: e.target_weight_kg,
+            })),
+          )
+          .select("id"),
+      );
+    }
+  }
 }
 
 export async function deleteRoutines(ids: string[]): Promise<void> {

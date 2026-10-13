@@ -11,6 +11,7 @@ import { PlateCalculator } from "@/components/plate-calculator";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { UpNext, useActiveProgram } from "@/components/up-next";
 import { useWorkout } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
@@ -171,6 +172,7 @@ export function WorkoutScreen() {
 function StartWorkout({ onStart, error }: { onStart: (r?: Routine) => Promise<void>; error: string | null }) {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [busy, setBusy] = useState(false);
+  const program = useActiveProgram();
 
   useEffect(() => {
     listRoutines().then(setRoutines).catch(() => {});
@@ -186,15 +188,17 @@ function StartWorkout({ onStart, error }: { onStart: (r?: Routine) => Promise<vo
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold">Workout</h1>
       {error && <p className="text-destructive text-sm">{error}</p>}
-      <Button size="lg" onClick={() => go()} disabled={busy}>
+      {program && <UpNext progress={program} />}
+      <Button size={program ? "default" : "lg"} variant={program ? "secondary" : "default"} onClick={() => go()} disabled={busy}>
         <Play /> Start empty workout
       </Button>
       <Button asChild variant="secondary">
         <Link href="/plans/">
-          <Sparkles /> {routines.length ? "Programs & routines" : "Build a program with Claude"}
+          <Sparkles /> {program || routines.length ? "Programs & routines" : "Build a program with Claude"}
         </Link>
       </Button>
-      {routines.length > 0 && (
+      {/* With a program running, its next workout is the one to do. */}
+      {!program && routines.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Your routines</h2>
           {routines.map((r) => (

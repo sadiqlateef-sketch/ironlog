@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, View } from "react-native";
-import { listRoutines, loadActive, queue, signOut, startRoutine, type ActiveWorkout, type RoutineSummary } from "../api";
+import { listRoutines, loadActive, loadUpNext, queue, signOut, startRoutine, type ActiveWorkout, type RoutineSummary, type UpNext } from "../api";
 import { Btn, C, Screen, T } from "../ui";
 
 export function HomeScreen({ onOpenWorkout, onSignedOut }: { onOpenWorkout: () => void; onSignedOut: () => void }) {
   const [active, setActive] = useState<ActiveWorkout | null | undefined>(undefined);
   const [routines, setRoutines] = useState<RoutineSummary[]>([]);
+  const [upNext, setUpNext] = useState<UpNext | null>(null);
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export function HomeScreen({ onOpenWorkout, onSignedOut }: { onOpenWorkout: () =
         setError("Offline");
       });
     listRoutines().then(setRoutines).catch(() => {});
+    loadUpNext().then(setUpNext).catch(() => {});
   }, []);
 
   useEffect(refresh, [refresh]);
@@ -69,6 +71,22 @@ export function HomeScreen({ onOpenWorkout, onSignedOut }: { onOpenWorkout: () =
             In progress
           </T>
           <Btn big label={`▶ ${active.name ?? "Workout"}`} onPress={onOpenWorkout} />
+        </>
+      ) : upNext ? (
+        <>
+          <T center muted small numberOfLines={1}>
+            Up next · Week {upNext.week} of {upNext.weeks}
+          </T>
+          <Btn
+            big
+            label={busy === upNext.routineId ? "Starting…" : `▶ Day ${upNext.day}`}
+            accessibilityLabel={`Start week ${upNext.week} day ${upNext.day}`}
+            disabled={!!busy}
+            onPress={() => start(upNext.routineId)}
+          />
+          <T center small numberOfLines={2}>
+            {upNext.name}
+          </T>
         </>
       ) : (
         <>

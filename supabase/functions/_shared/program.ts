@@ -18,6 +18,8 @@ export const PlanRequest = z.object({
   goal: z.enum(["strength", "hypertrophy", "powerbuilding", "general"]),
   methodology: z.enum(Object.keys(METHODOLOGIES) as [keyof typeof METHODOLOGIES, ...(keyof typeof METHODOLOGIES)[]]),
   days_per_week: z.number().int().min(2).max(6),
+  // How long the program runs. Older app versions don't send it.
+  weeks: z.number().int().min(1).max(16).optional().default(8),
   session_minutes: z.number().int().min(30).max(150),
   experience: z.enum(["beginner", "intermediate", "advanced"]),
   equipment: z.array(z.string().max(30)).max(12),
@@ -42,12 +44,19 @@ export function programSchema(slugs: [string, ...string[]]) {
     intensity_value: z.number().nullable().describe("Percent of estimated 1RM (e.g. 75) or RPE (e.g. 8); null when intensity_type is none"),
     superset_group: z.number().int().nullable().describe("Same number pairs exercises as a superset within the day; null otherwise"),
     notes: z.string().describe("One short cue, e.g. 'AMRAP on last set' or 'pause 1s on chest'; empty if none"),
+    // Week-by-week plan. Entry i is week i+1. The exercise itself stays the
+    // same every week; only the load, sets and reps move.
+    sets_by_week: z.array(z.number().int()).describe("Working sets for each week of the program, one entry per week"),
+    reps_by_week: z.array(z.number().int()).describe("Low end of the rep target for each week, one entry per week"),
+    intensity_by_week: z
+      .array(z.number().nullable())
+      .describe("intensity_value for each week (percent of 1RM or RPE, matching intensity_type; null when none), one entry per week. Include deload weeks where the methodology calls for them"),
   });
   return z.object({
     program_name: z.string().describe("Short name, e.g. '5/3/1 Boring But Big, 4 days'"),
     methodology: z.string().describe("Which methodology this follows"),
     summary: z.string().describe("2-3 plain sentences explaining the plan to the lifter"),
-    progression_rule: z.string().describe("How to progress week to week, in one or two sentences"),
+    progression_rule: z.string().describe("How the weeks progress, in one or two sentences"),
     days: z.array(
       z.object({
         name: z.string().describe("Day name, e.g. 'Day 1 - Squat'"),
@@ -76,7 +85,8 @@ Rules:
 - Use percent_1rm only for barbell lifts where an estimated 1RM is given; otherwise use rpe.
 - Never prescribe more than 10 working sets of one exercise or intensities above 100% of 1RM.
 - Put the heaviest compound lift first each day.
-- Keep notes short and practical.`;
+- Keep notes short and practical.
+- The program runs for a fixed number of weeks. Each day keeps the same exercises every week; plan the progression in sets_by_week, reps_by_week and intensity_by_week (one entry per week, with deloads where the methodology uses them). The single sets, reps_min and intensity_value fields are week 1.`;
 
 export interface LiftHistory {
   slug: string;
@@ -99,6 +109,7 @@ export function buildPlanPrompt(req: PlanRequest, ctx: {
 Goal: ${req.goal}
 Methodology: ${METHODOLOGIES[req.methodology]}
 Days per week: ${req.days_per_week} (return exactly ${req.days_per_week} days)
+Program length: ${req.weeks} weeks (every *_by_week array has exactly ${req.weeks} entries)
 Session length: about ${req.session_minutes} minutes
 Experience: ${req.experience}
 Equipment available: ${req.equipment.length ? req.equipment.join(", ") : "full gym"}
@@ -115,6 +126,55 @@ ${library}`;
 // ---------- Post-processing (guardrails) ----------
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)));
+
+type PlannedExercise = Program["days"][number]["exercises"][number];
+
+/** A week's value from a per-week list. A short list repeats as a wave (week 5 of a 4-entry list is week 1 again). */
+function pick<T>(list: T[] | undefined, week: number, fallback: T): T {
+  if (!list?.length) return fallback;
+  return list[(week - 1) % list.length] ?? fallback;
+}
+
+/** The exercise as planned for one week (week 1 = the base fields). */
+export function forWeek(ex: PlannedExercise, week: number): PlannedExercise {
+  // The base intensity type still decides what the number means; a null week
+  // keeps the base value rather than dropping the load.
+  const intensity = pick(ex.intensity_by_week, week, ex.intensity_value);
+  // Rep ranges keep their width as the low end moves.
+  const reps = pick(ex.reps_by_week, week, ex.reps_min);
+  const width = ex.reps_max != null ? ex.reps_max - ex.reps_min : null;
+  return {
+    ...ex,
+    sets: pick(ex.sets_by_week, week, ex.sets),
+    reps_min: reps,
+    reps_max: width != null ? reps + width : null,
+    intensity_value: intensity ?? ex.intensity_value,
+  };
+}
+
+export interface ProgramWorkout {
+  week: number;
+  day: number;
+  name: string;
+  focus: string;
+  rows: RoutineExerciseRow[];
+}
+
+/** Every workout of the program, week by week, ready to save. */
+export function toProgramWorkouts(
+  program: Program,
+  ctx: { unit: UnitSystem; exerciseIds: Map<string, string>; e1rmBySlug: Map<string, number> },
+  weeks: number,
+  daysPerWeek: number,
+): ProgramWorkout[] {
+  const out: ProgramWorkout[] = [];
+  for (let week = 1; week <= weeks; week++) {
+    toRoutineRows(program, ctx, week)
+      .slice(0, daysPerWeek)
+      .forEach((d, i) => out.push({ week, day: i + 1, name: d.name, focus: d.focus, rows: d.rows }));
+  }
+  return out;
+}
 
 export interface RoutineExerciseRow {
   exercise_id: string;
@@ -139,12 +199,14 @@ export interface RoutineExerciseRow {
 export function toRoutineRows(
   program: Program,
   ctx: { unit: UnitSystem; exerciseIds: Map<string, string>; e1rmBySlug: Map<string, number> },
+  week = 1,
 ): { name: string; focus: string; rows: RoutineExerciseRow[] }[] {
   return program.days.map((day) => {
     const rows: RoutineExerciseRow[] = [];
-    for (const ex of day.exercises) {
-      const exercise_id = ctx.exerciseIds.get(ex.slug);
+    for (const base of day.exercises) {
+      const exercise_id = ctx.exerciseIds.get(base.slug);
       if (!exercise_id) continue;
+      const ex = forWeek(base, week);
       const reps = clamp(ex.reps_min, 1, 30);
       const repsMax = ex.reps_max != null && ex.reps_max > reps ? clamp(ex.reps_max, reps + 1, 50) : null;
       let percent: number | null = null;

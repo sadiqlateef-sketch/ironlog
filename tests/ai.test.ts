@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { roundLoadKg } from "../supabase/functions/_shared/units.ts";
-import { programSchema, toRoutineRows, PlanRequest, type Program } from "../supabase/functions/_shared/program.ts";
+import { programSchema, toRoutineRows, toProgramWorkouts, PlanRequest, type Program } from "../supabase/functions/_shared/program.ts";
 import { clampSuggestion, ruleFor, type Target } from "../supabase/functions/_shared/adjust.ts";
 
 const kgOf = (lb: number) => lb / 2.2046226218;
@@ -17,11 +17,13 @@ test("plan request validation rejects junk", () => {
   assert.equal(PlanRequest.safeParse({ goal: "strength", methodology: "531", days_per_week: 9, session_minutes: 60, experience: "beginner", equipment: [] }).success, false);
   const ok = PlanRequest.parse({ goal: "strength", methodology: "531", days_per_week: 4, session_minutes: 60, experience: "intermediate", equipment: ["barbell"] });
   assert.equal(ok.notes, "");
+  assert.equal(ok.weeks, 8, "older apps that don't send weeks get 8");
+  assert.equal(PlanRequest.safeParse({ ...ok, weeks: 40 }).success, false);
 });
 
 test("program schema tolerates one unknown slug instead of failing the plan", () => {
   const schema = programSchema(["bench-press", "back-squat"]);
-  const day = { name: "D1", focus: "x", exercises: [{ slug: "made-up", sets: 3, reps_min: 5, reps_max: null, warmup_sets: 0, rest_seconds: 120, intensity_type: "none", intensity_value: null, superset_group: null, notes: "" }] };
+  const day = { name: "D1", focus: "x", exercises: [{ slug: "made-up", sets: 3, reps_min: 5, reps_max: null, warmup_sets: 0, rest_seconds: 120, intensity_type: "none", intensity_value: null, superset_group: null, notes: "", sets_by_week: [3], reps_by_week: [5], intensity_by_week: [null] }] };
   assert.equal(schema.safeParse({ program_name: "p", methodology: "m", summary: "s", progression_rule: "r", days: [day] }).success, true);
   assert.match(JSON.stringify(schema.toJSONSchema?.() ?? ""), /bench-press|^""$/);
 });
@@ -31,10 +33,10 @@ const program: Program = {
   days: [{
     name: "Day 1", focus: "Bench",
     exercises: [
-      { slug: "bench-press", sets: 3, reps_min: 5, reps_max: null, warmup_sets: 2, rest_seconds: 180, intensity_type: "percent_1rm", intensity_value: 77, superset_group: null, notes: "AMRAP last set" },
-      { slug: "back-squat", sets: 40, reps_min: 0, reps_max: 99, warmup_sets: 12, rest_seconds: 5000, intensity_type: "percent_1rm", intensity_value: 130, superset_group: null, notes: "" },
-      { slug: "dip", sets: 3, reps_min: 8, reps_max: 12, warmup_sets: 0, rest_seconds: 90, intensity_type: "rpe", intensity_value: 8.3, superset_group: 1, notes: "" },
-      { slug: "unknown", sets: 3, reps_min: 8, reps_max: 12, warmup_sets: 0, rest_seconds: 90, intensity_type: "none", intensity_value: null, superset_group: null, notes: "" },
+      { slug: "bench-press", sets: 3, reps_min: 5, reps_max: null, warmup_sets: 2, rest_seconds: 180, intensity_type: "percent_1rm", intensity_value: 77, superset_group: null, notes: "AMRAP last set", sets_by_week: [], reps_by_week: [], intensity_by_week: [] },
+      { slug: "back-squat", sets: 40, reps_min: 0, reps_max: 99, warmup_sets: 12, rest_seconds: 5000, intensity_type: "percent_1rm", intensity_value: 130, superset_group: null, notes: "", sets_by_week: [], reps_by_week: [], intensity_by_week: [] },
+      { slug: "dip", sets: 3, reps_min: 8, reps_max: 12, warmup_sets: 0, rest_seconds: 90, intensity_type: "rpe", intensity_value: 8.3, superset_group: 1, notes: "", sets_by_week: [], reps_by_week: [], intensity_by_week: [] },
+      { slug: "unknown", sets: 3, reps_min: 8, reps_max: 12, warmup_sets: 0, rest_seconds: 90, intensity_type: "none", intensity_value: null, superset_group: null, notes: "", sets_by_week: [], reps_by_week: [], intensity_by_week: [] },
     ],
   }],
 };
@@ -100,4 +102,40 @@ test("clamp: Claude can't jump more than +10% / -20%, and a deload must go down"
   assert.equal(lbOf(up.suggested_weight_kg!), 165, "a 'deload' that goes up falls back to the rule");
   const reps = clampSuggestion({ routine_exercise_id: "re1", action: "adjust_reps", suggested_weight_kg: kgOf(185), suggested_reps: 6, suggested_reps_max: 8, reason: "x" }, rule, "imperial");
   assert.deepEqual([reps.suggested_reps, reps.suggested_reps_max], [6, 8]);
+});
+
+test("a program maps out every week: same exercises, the load moves", () => {
+  const p: Program = {
+    program_name: "5/3/1", methodology: "5/3/1", summary: "s", progression_rule: "r",
+    days: [
+      { name: "Day 1 - Bench", focus: "Bench", exercises: [
+        { slug: "bench-press", sets: 3, reps_min: 5, reps_max: null, warmup_sets: 2, rest_seconds: 180, intensity_type: "percent_1rm", intensity_value: 65, superset_group: null, notes: "",
+          sets_by_week: [3, 3, 3, 3], reps_by_week: [5, 3, 1, 5], intensity_by_week: [65, 70, 76, 40] },
+        { slug: "dip", sets: 3, reps_min: 8, reps_max: 12, warmup_sets: 0, rest_seconds: 90, intensity_type: "rpe", intensity_value: 7, superset_group: null, notes: "",
+          sets_by_week: [3, 4], reps_by_week: [8, 10], intensity_by_week: [7, null] },
+      ] },
+      { name: "Day 2 - Squat", focus: "Squat", exercises: [
+        { slug: "back-squat", sets: 5, reps_min: 5, reps_max: null, warmup_sets: 2, rest_seconds: 180, intensity_type: "rpe", intensity_value: 8, superset_group: null, notes: "",
+          sets_by_week: [], reps_by_week: [], intensity_by_week: [] },
+      ] },
+    ],
+  };
+  const ws = toProgramWorkouts(p, {
+    unit: "imperial",
+    exerciseIds: new Map([["bench-press", "b"], ["dip", "d"], ["back-squat", "s"]]),
+    e1rmBySlug: new Map([["bench-press", kgOf(300)]]),
+  }, 6, 2);
+  assert.equal(ws.length, 12, "6 weeks x 2 days");
+  assert.deepEqual(ws.slice(0, 3).map((w) => [w.week, w.day]), [[1, 1], [1, 2], [2, 1]]);
+  const bench = (week: number) => ws.find((w) => w.week === week && w.day === 1)!.rows[0];
+  assert.deepEqual([1, 2, 3, 4].map((w) => lbOf(bench(w).target_weight_kg!)), [195, 210, 230, 120]); // deload in week 4
+  assert.deepEqual([1, 2, 3, 4].map((w) => bench(w).target_reps), [5, 3, 1, 5]);
+  assert.deepEqual([5, 6].map((w) => lbOf(bench(w).target_weight_kg!)), [195, 210], "a short plan repeats as a wave, not stuck on the deload");
+  const dip = (week: number) => ws.find((w) => w.week === week && w.day === 1)!.rows[1];
+  assert.equal(dip(2).target_sets, 4);
+  assert.deepEqual([dip(2).target_reps, dip(2).target_reps_max], [10, 14], "rep range keeps its width");
+  assert.equal(dip(2).target_rpe, 7, "a null week keeps the base intensity");
+  assert.ok(ws.every((w) => w.rows.every((r) => r.exercise_id === (w.day === 1 ? r.exercise_id : "s"))));
+  // No per-week plan at all: every week is week 1.
+  assert.equal(ws.filter((w) => w.day === 2).every((w) => w.rows[0].target_sets === 5), true);
 });
