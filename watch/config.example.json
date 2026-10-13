@@ -1,0 +1,4 @@
+{
+  "supabaseUrl": "https://YOUR-PROJECT.supabase.co",
+  "supabasePublishableKey": "YOUR-PUBLISHABLE-KEY"
+}

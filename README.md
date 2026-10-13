@@ -10,7 +10,48 @@ backend protected by Row Level Security.
 | 3 | Volume & 1RM charts, 1RM calculator, muscle recovery heatmap | Done |
 | 4 | AI workout generation (Claude API) | Done |
 | 5 | Android app (Capacitor) | Done |
-| 6 | Wear OS watch companion | Next |
+| 6 | Wear OS watch app | Done |
+
+## Wear OS watch app (Phase 6)
+
+A standalone watch app in `watch/` (React Native). It talks to the same
+Supabase database as the phone, so a workout started on either shows up on both.
+
+- **Link once, no typing on the watch.** The watch shows a 6-digit code. On
+  your phone, go to Home > **Link watch** and enter it. Codes last 10 minutes
+  and work once, and 10 wrong tries locks code entry for a while.
+- **Log from the wrist.** Start a routine or continue the phone's workout.
+  Each set shows big **−/+** buttons for weight (5 lb or 2.5 kg) and reps,
+  pre-filled from the plan or your last set, then **✓ Done**. Tap the
+  exercise name to jump to the next exercise. **+ Add set** adds a bonus set.
+- **Rest timer** with the same rules as the phone, −15 / +15 / Skip, and a
+  buzz when rest is over.
+- **Heart rate** from the watch sensor (Wear OS Health Services), shown in
+  zone colors and saved every 15 seconds. The workout's average and max heart
+  rate show on the phone's home screen.
+- **Works without signal.** Every change is saved on the watch first and
+  sent when the connection returns, without duplicates.
+
+The screen stays on during a workout so heart rate keeps recording.
+Recording with the screen off would need a Wear OS "exercise session", which
+is a possible later upgrade.
+
+Build and install: see [watch/README.md](watch/README.md).
+
+## Putting it online (no command line)
+
+The repo includes three buttons under GitHub's **Actions** tab:
+
+| Workflow | What it does | Secrets it needs |
+| -------- | ------------ | ---------------- |
+| Deploy database and functions | Creates the tables and deploys the server functions (AI programs, watch linking) in your Supabase project | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, optional `ANTHROPIC_API_KEY` |
+| Android APK | Builds the phone app | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| Watch APK | Builds the watch app | the same two as Android APK |
+
+Add secrets under the repo's Settings > Secrets and variables > Actions.
+Run "Deploy database and functions" first. On the first run, tick "load the
+starter exercises". If you already pasted the first three migration files
+into the SQL Editor by hand, also tick "I already ran the first 3 migration files".
 
 ## Android app (Phase 5)
 
@@ -197,7 +238,9 @@ next.config.ts            Static export (Capacitor wraps the `out/` folder)
 capacitor.config.ts       Android app settings (app id, splash, notifications)
 android/                  The native Android project (open in Android Studio)
 assets/                   Source images for the app icon and splash screen
-.github/workflows/        Cloud build that produces the APK
+.github/workflows/        Cloud builds (phone APK, watch APK) and Supabase deploy
+watch/                    Wear OS watch app (React Native), see watch/README.md
+src/app/link-watch/       Phone screen for entering the watch's code
 src/lib/native.ts         Phone-only extras (haptics, rest alerts, screen-on)
 components.json           shadcn/ui config, so `npx shadcn add <name>` works
 src/app/                  Pages: / (home), /login, /workout, /exercises, /progress, /plans
@@ -220,6 +263,7 @@ supabase/migrations/      The schema: tables, enums, triggers, RLS policies
 supabase/seed.sql         30 starter exercises (squat, bench, deadlift, ...)
 supabase/functions/       Edge Functions that call Claude (Phase 4)
   generate-plan/          Builds a program and saves it as routines
+  watch-pair/             Links a watch to an account with a one-time code
   suggest-adjustments/    Post-workout "next time" suggestions
   _shared/                Prompts, output schemas, clamps, progression rules
 src/app/plans/            Programs screen (generator, program cards)
@@ -316,5 +360,8 @@ Authentication > Providers > Email while you're developing.
   `ai_usage` (one row per Claude call; users can read only their own rows).
   AI programs are ordinary routines with `ai_generated = true`, grouped by
   `ai_metadata.program_id`.
-- `heart_rate_samples` is ready for the Wear OS watch in Phase 6.
+- Phase 6 (`20261013030000_watch_pairing.sql`) adds `watch_pairings` and
+  `watch_pair_attempts`, which only the watch-pair function can read. It also
+  adds a trigger that keeps `workout_sessions.avg_hr` / `max_hr` up to date as
+  `heart_rate_samples` arrive from the watch.
 - Only one unfinished workout per user is allowed at a time.

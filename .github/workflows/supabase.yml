@@ -1,0 +1,70 @@
+# Sets up your online Supabase project from this repo: database tables
+# (supabase/migrations) and the server functions (AI programs, watch linking).
+# It changes your live database, so it only runs when you click "Run workflow".
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_ACCESS_TOKEN  supabase.com > Account > Access Tokens > Generate
+#   SUPABASE_PROJECT_REF   the id in your project URL: https://<ref>.supabase.co
+#   SUPABASE_DB_PASSWORD   the database password you chose when creating the project
+#   ANTHROPIC_API_KEY      optional: turns on Claude for AI programs
+name: Deploy database and functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Also load the 30 starter exercises (first time only)"
+        type: boolean
+        default: false
+      pasted_by_hand:
+        description: "I already ran the first 3 migration files in the SQL Editor"
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Check secrets
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD PROJECT_REF; do
+            if [ -z "${!v}" ]; then echo "::error::Missing repository secret for $v (see the top of this file)."; exit 1; fi
+          done
+
+      - name: Link project
+        run: npx supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      # Tell Supabase those files are already in, so they aren't run twice.
+      - name: Record migrations pasted by hand
+        if: ${{ inputs.pasted_by_hand }}
+        run: npx supabase migration repair --status applied 20261013000000 20261013010000 20261013020000 --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Update database
+        run: |
+          if [ "${{ inputs.seed }}" = "true" ]; then
+            npx supabase db push --include-seed --password "$SUPABASE_DB_PASSWORD" --yes
+          else
+            npx supabase db push --password "$SUPABASE_DB_PASSWORD" --yes
+          fi
+
+      - name: Deploy functions
+        run: npx supabase functions deploy generate-plan suggest-adjustments watch-pair --project-ref "$PROJECT_REF" --use-api
+
+      - name: Set Claude API key
+        if: ${{ env.ANTHROPIC_API_KEY != '' }}
+        run: npx supabase secrets set ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" --project-ref "$PROJECT_REF"

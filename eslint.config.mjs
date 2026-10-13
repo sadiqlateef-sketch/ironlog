@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Native Android project (holds a generated copy of out/).
     "android/**",
+    // The watch app has its own lint and TypeScript setup.
+    "watch/**",
   ]),
 ]);
 

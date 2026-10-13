@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calculator, Dumbbell, LogOut, Play, Sparkles } from "lucide-react";
+import { Calculator, Dumbbell, Heart, LogOut, Play, Sparkles, Watch } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -52,11 +52,18 @@ function Dashboard() {
         </Link>
       </Button>
 
-      <Button asChild variant="secondary">
-        <Link href="/plans/">
-          <Sparkles /> Programs
-        </Link>
-      </Button>
+      <div className="grid grid-cols-2 gap-3">
+        <Button asChild variant="secondary">
+          <Link href="/plans/">
+            <Sparkles /> Programs
+          </Link>
+        </Button>
+        <Button asChild variant="secondary">
+          <Link href="/link-watch/">
+            <Watch /> Link watch
+          </Link>
+        </Button>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Button variant="secondary" onClick={() => setPlates(true)}>
@@ -94,6 +101,11 @@ function Dashboard() {
                 <p className="text-muted-foreground text-xs">
                   {new Date(s.start_time).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
                   {s.end_time && ` · ${Math.round((+new Date(s.end_time) - +new Date(s.start_time)) / 60000)} min`}
+                  {s.avg_hr != null && (
+                    <span className="ml-1 inline-flex items-center gap-0.5" title={`Max ${s.max_hr} bpm`}>
+                      · <Heart className="size-3" aria-hidden /> {s.avg_hr} bpm avg
+                    </span>
+                  )}
                 </p>
               </div>
               <p className="shrink-0 font-mono text-sm font-semibold">{formatWeight(s.volume, unit)}</p>
