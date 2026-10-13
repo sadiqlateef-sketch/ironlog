@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for the rest timer notification: a white barbell. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M8,47h84v6h-84z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M18,30h9v40h-9z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M29,36h7v28h-7z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M73,30h9v40h-9z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M64,36h7v28h-7z" />
+</vector>

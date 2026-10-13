@@ -1,0 +1,106 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Dark-first, high-contrast theme. Gym lighting is harsh and screens get
+   sweaty, so numbers must pop. Add class="light" to <html> for light mode. */
+@custom-variant light (&:is(.light *));
+
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.13 0 0);
+  --foreground: oklch(0.98 0 0);
+  --card: oklch(0.18 0 0);
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.18 0 0);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.86 0.2 128);          /* electric lime: "do this now" */
+  --primary-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.25 0 0);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.72 0 0);
+  --accent: oklch(0.28 0 0);
+  --accent-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.86 0.2 128);
+
+  /* Set-type colours used by the logger in Phase 2 */
+  --set-warmup: oklch(0.8 0.15 85);
+  --set-drop: oklch(0.72 0.17 250);
+  --set-failure: oklch(0.68 0.22 25);
+
+  /* Charts (validated against the dark card surface: in the 0.48-0.67 L band, >= 3:1) */
+  --chart-1: oklch(0.66 0.17 130);
+  --chart-grid: oklch(1 0 0 / 8%);
+  --chart-axis: oklch(1 0 0 / 18%);
+  /* Recovery heatmap: one hue (red, 25deg); low fatigue recedes, high fatigue glows */
+  --heat-hue: 25;
+}
+
+.light {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.13 0 0);
+  --card: oklch(0.97 0 0);
+  --card-foreground: oklch(0.13 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.13 0 0);
+  --primary: oklch(0.45 0.15 135);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.93 0 0);
+  --secondary-foreground: oklch(0.13 0 0);
+  --muted: oklch(0.93 0 0);
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: oklch(0.9 0 0);
+  --accent-foreground: oklch(0.13 0 0);
+  --border: oklch(0 0 0 / 14%);
+  --input: oklch(0 0 0 / 18%);
+  --ring: oklch(0.45 0.15 135);
+  --chart-1: oklch(0.55 0.15 135);
+  --chart-grid: oklch(0 0 0 / 8%);
+  --chart-axis: oklch(0 0 0 / 20%);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-set-warmup: var(--set-warmup);
+  --color-set-drop: var(--set-drop);
+  --color-set-failure: var(--set-failure);
+  --color-chart-1: var(--chart-1);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Weights and reps line up in columns */
+    font-variant-numeric: tabular-nums;
+  }
+}

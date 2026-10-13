@@ -1,0 +1,363 @@
+// Types for the Phase 1 schema. Once your Supabase project is running, you can
+// regenerate this file from the live database with:
+//   npx supabase gen types typescript --local > src/types/database.ts
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+export type SetType = "warmup" | "normal" | "drop" | "failure";
+export type MuscleGroup =
+  | "chest" | "upper_back" | "lats" | "lower_back" | "traps"
+  | "front_delts" | "side_delts" | "rear_delts"
+  | "biceps" | "triceps" | "forearms"
+  | "abs" | "obliques"
+  | "quads" | "hamstrings" | "glutes" | "adductors" | "abductors" | "calves"
+  | "neck";
+export type EquipmentType =
+  | "barbell" | "dumbbell" | "kettlebell" | "machine" | "cable"
+  | "bodyweight" | "band" | "smith_machine" | "ez_bar" | "trap_bar" | "other";
+export type ExerciseMechanic = "compound" | "isolation";
+export type UnitSystem = "metric" | "imperial";
+export type SessionSource = "web" | "phone" | "watch";
+export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
+export type AdjustmentStatus = "pending" | "applied" | "dismissed";
+
+/** Shape of users.physical_stats (all optional). */
+export interface PhysicalStats {
+  height_cm?: number;
+  bodyweight_kg?: number;
+  birth_year?: number;
+  sex?: "male" | "female" | "other";
+  training_age_years?: number;
+  resting_hr?: number;
+  max_hr?: number;
+}
+
+type Timestamps = { created_at: string; updated_at: string };
+
+export type Database = {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string;
+          email: string;
+          display_name: string | null;
+          physical_stats: Json;
+          unit_system: UnitSystem;
+          bar_weight_kg: number;
+          available_plates_kg: number[];
+          default_rest_seconds: number;
+        } & Timestamps;
+        Insert: {
+          id: string;
+          email: string;
+          display_name?: string | null;
+          physical_stats?: Json;
+          unit_system?: UnitSystem;
+          bar_weight_kg?: number;
+          available_plates_kg?: number[];
+          default_rest_seconds?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
+        Relationships: [];
+      };
+      exercises: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          primary_muscle: MuscleGroup;
+          secondary_muscles: MuscleGroup[];
+          equipment: EquipmentType;
+          mechanic: ExerciseMechanic;
+          animation_url: string | null;
+          instructions: string | null;
+          created_by: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          primary_muscle: MuscleGroup;
+          secondary_muscles?: MuscleGroup[];
+          equipment: EquipmentType;
+          mechanic?: ExerciseMechanic;
+          animation_url?: string | null;
+          instructions?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["exercises"]["Insert"]>;
+        Relationships: [];
+      };
+      routines: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          description: string | null;
+          ai_generated: boolean;
+          ai_metadata: Json | null;
+          position: number;
+          archived: boolean;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          description?: string | null;
+          ai_generated?: boolean;
+          ai_metadata?: Json | null;
+          position?: number;
+          archived?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["routines"]["Insert"]>;
+        Relationships: [];
+      };
+      routine_exercises: {
+        Row: {
+          id: string;
+          routine_id: string;
+          exercise_id: string;
+          position: number;
+          superset_group: number | null;
+          target_sets: number;
+          target_reps: number;
+          target_reps_max: number | null;
+          target_weight_kg: number | null;
+          target_rpe: number | null;
+          target_percent_1rm: number | null;
+          warmup_sets: number;
+          rest_seconds: number;
+          notes: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          routine_id: string;
+          exercise_id: string;
+          position: number;
+          superset_group?: number | null;
+          target_sets?: number;
+          target_reps?: number;
+          target_reps_max?: number | null;
+          target_weight_kg?: number | null;
+          target_rpe?: number | null;
+          target_percent_1rm?: number | null;
+          warmup_sets?: number;
+          rest_seconds?: number;
+          notes?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["routine_exercises"]["Insert"]>;
+        Relationships: [
+          { foreignKeyName: "routine_exercises_routine_id_fkey"; columns: ["routine_id"]; isOneToOne: false; referencedRelation: "routines"; referencedColumns: ["id"] },
+          { foreignKeyName: "routine_exercises_exercise_id_fkey"; columns: ["exercise_id"]; isOneToOne: false; referencedRelation: "exercises"; referencedColumns: ["id"] },
+        ];
+      };
+      workout_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          routine_id: string | null;
+          name: string | null;
+          start_time: string;
+          end_time: string | null;
+          volume: number;
+          source: SessionSource;
+          avg_hr: number | null;
+          max_hr: number | null;
+          notes: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          routine_id?: string | null;
+          name?: string | null;
+          start_time?: string;
+          end_time?: string | null;
+          source?: SessionSource;
+          avg_hr?: number | null;
+          max_hr?: number | null;
+          notes?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["workout_sessions"]["Insert"]>;
+        Relationships: [
+          { foreignKeyName: "workout_sessions_routine_id_fkey"; columns: ["routine_id"]; isOneToOne: false; referencedRelation: "routines"; referencedColumns: ["id"] },
+        ];
+      };
+      workout_sets: {
+        Row: {
+          id: string;
+          session_id: string;
+          user_id: string;
+          exercise_id: string;
+          exercise_order: number;
+          set_number: number;
+          set_type: SetType;
+          weight: number;
+          reps: number;
+          rpe: number | null;
+          superset_group: number | null;
+          parent_set_id: string | null;
+          is_completed: boolean;
+          completed_at: string | null;
+          estimated_1rm: number | null;
+          notes: string | null;
+          client_id: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          session_id: string;
+          user_id?: string;
+          exercise_id: string;
+          exercise_order?: number;
+          set_number: number;
+          set_type?: SetType;
+          weight?: number;
+          reps?: number;
+          rpe?: number | null;
+          superset_group?: number | null;
+          parent_set_id?: string | null;
+          is_completed?: boolean;
+          notes?: string | null;
+          client_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["workout_sets"]["Insert"]>;
+        Relationships: [
+          { foreignKeyName: "workout_sets_session_id_fkey"; columns: ["session_id"]; isOneToOne: false; referencedRelation: "workout_sessions"; referencedColumns: ["id"] },
+          { foreignKeyName: "workout_sets_exercise_id_fkey"; columns: ["exercise_id"]; isOneToOne: false; referencedRelation: "exercises"; referencedColumns: ["id"] },
+          { foreignKeyName: "workout_sets_parent_set_id_fkey"; columns: ["parent_set_id"]; isOneToOne: false; referencedRelation: "workout_sets"; referencedColumns: ["id"] },
+        ];
+      };
+      heart_rate_samples: {
+        Row: {
+          id: number;
+          session_id: string;
+          user_id: string;
+          recorded_at: string;
+          bpm: number;
+          source: SessionSource;
+        };
+        Insert: {
+          session_id: string;
+          user_id?: string;
+          recorded_at: string;
+          bpm: number;
+          source?: SessionSource;
+        };
+        Update: Partial<Database["public"]["Tables"]["heart_rate_samples"]["Insert"]>;
+        Relationships: [
+          { foreignKeyName: "heart_rate_samples_session_id_fkey"; columns: ["session_id"]; isOneToOne: false; referencedRelation: "workout_sessions"; referencedColumns: ["id"] },
+        ];
+      };
+      routine_adjustments: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_id: string;
+          routine_exercise_id: string;
+          action: AdjustmentAction;
+          current_weight_kg: number | null;
+          suggested_weight_kg: number | null;
+          suggested_reps: number | null;
+          suggested_reps_max: number | null;
+          reason: string;
+          source: "ai" | "rules";
+          status: AdjustmentStatus;
+        } & Timestamps;
+        Insert: {
+          session_id: string;
+          routine_exercise_id: string;
+          action: AdjustmentAction;
+          reason: string;
+          user_id?: string;
+          current_weight_kg?: number | null;
+          suggested_weight_kg?: number | null;
+          suggested_reps?: number | null;
+          suggested_reps_max?: number | null;
+          source?: "ai" | "rules";
+          status?: AdjustmentStatus;
+        };
+        Update: Partial<Database["public"]["Tables"]["routine_adjustments"]["Insert"]>;
+        Relationships: [
+          { foreignKeyName: "routine_adjustments_routine_exercise_id_fkey"; columns: ["routine_exercise_id"]; isOneToOne: false; referencedRelation: "routine_exercises"; referencedColumns: ["id"] },
+          { foreignKeyName: "routine_adjustments_session_id_fkey"; columns: ["session_id"]; isOneToOne: false; referencedRelation: "workout_sessions"; referencedColumns: ["id"] },
+        ];
+      };
+      ai_usage: {
+        Row: {
+          id: number;
+          user_id: string;
+          kind: "generate_plan" | "adjust_session";
+          model: string | null;
+          input_tokens: number | null;
+          output_tokens: number | null;
+          ok: boolean;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+    };
+    Views: { [_ in never]: never };
+    Functions: {
+      get_last_performance: {
+        Args: { p_exercise_id: string };
+        Returns: {
+          session_id: string;
+          performed_at: string;
+          set_number: number;
+          set_type: SetType;
+          weight: number;
+          reps: number;
+          rpe: number | null;
+        }[];
+      };
+      apply_routine_adjustment: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
+      get_logged_exercises: {
+        Args: Record<string, never>;
+        Returns: {
+          exercise_id: string;
+          name: string;
+          equipment: EquipmentType;
+          session_count: number;
+          last_performed: string;
+        }[];
+      };
+      get_e1rm_history: {
+        Args: { p_exercise_id: string; p_since?: string };
+        Returns: {
+          session_id: string;
+          performed_at: string;
+          e1rm: number;
+          weight: number;
+          reps: number;
+        }[];
+      };
+      get_muscle_sets: {
+        Args: { p_since: string };
+        Returns: {
+          completed_at: string;
+          set_type: SetType;
+          primary_muscle: MuscleGroup;
+          secondary_muscles: MuscleGroup[];
+        }[];
+      };
+    };
+    Enums: {
+      set_type: SetType;
+      muscle_group: MuscleGroup;
+      equipment_type: EquipmentType;
+      exercise_mechanic: ExerciseMechanic;
+      unit_system: UnitSystem;
+      session_source: SessionSource;
+      adjustment_action: AdjustmentAction;
+      adjustment_status: AdjustmentStatus;
+    };
+    CompositeTypes: { [_ in never]: never };
+  };
+};
+
+export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
