@@ -12,6 +12,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  # On pull requests it just checks that everything builds (secrets aren't needed).
+  pull_request:
 
 jobs:
   build:
@@ -37,12 +39,20 @@ jobs:
 
       - name: Point the app at your Supabase project
         run: |
-          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ] || [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}" ]; then
-            echo "::error::Add the NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY repository secrets (Settings > Secrets and variables > Actions), then run this workflow again."
-            exit 1
+          URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+          KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}"
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "::notice::No Supabase secrets: build check only, no APK uploaded."
+              URL=https://example.supabase.co KEY=placeholder
+              echo "CHECK_ONLY=1" >> "$GITHUB_ENV"
+            else
+              echo "::error::Add the NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY repository secrets (Settings > Secrets and variables > Actions), then run this workflow again."
+              exit 1
+            fi
           fi
-          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env.production.local
-          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}" >> .env.production.local
+          echo "NEXT_PUBLIC_SUPABASE_URL=$URL" >> .env.production.local
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$KEY" >> .env.production.local
 
       - name: Build web app and copy it into Android
         run: npm run android:sync
@@ -52,6 +62,7 @@ jobs:
         run: ./gradlew assembleDebug
 
       - uses: actions/upload-artifact@v4
+        if: ${{ env.CHECK_ONLY != '1' }}
         with:
           name: ironlog-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk

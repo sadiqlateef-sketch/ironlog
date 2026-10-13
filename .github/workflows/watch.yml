@@ -9,6 +9,9 @@ on:
   push:
     branches: [main]
     paths: ["watch/**", ".github/workflows/watch.yml"]
+  # On pull requests it just checks that everything builds (secrets aren't needed).
+  pull_request:
+    paths: ["watch/**", ".github/workflows/watch.yml"]
 
 jobs:
   build:
@@ -39,8 +42,14 @@ jobs:
           KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           if [ -z "$URL" ] || [ -z "$KEY" ]; then
-            echo "::error::Add the NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY repository secrets first."
-            exit 1
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "::notice::No Supabase secrets: build check only, no APK uploaded."
+              URL=https://example.supabase.co KEY=placeholder
+              echo "CHECK_ONLY=1" >> "$GITHUB_ENV"
+            else
+              echo "::error::Add the NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY repository secrets first."
+              exit 1
+            fi
           fi
           node -e 'require("fs").writeFileSync("config.json", JSON.stringify({ supabaseUrl: process.env.URL, supabasePublishableKey: process.env.KEY }, null, 2))'
 
@@ -57,6 +66,7 @@ jobs:
         run: ./gradlew assembleRelease
 
       - uses: actions/upload-artifact@v4
+        if: ${{ env.CHECK_ONLY != '1' }}
         with:
           name: ironlog-watch-apk
           path: watch/android/app/build/outputs/apk/release/app-release.apk
