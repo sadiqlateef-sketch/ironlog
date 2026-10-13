@@ -49,3 +49,9 @@ export const MUSCLE_FILTERS: { label: string; muscles: MuscleGroup[] }[] = [
 
 /** Bars you'd load with plates. */
 export const PLATE_LOADED: EquipmentType[] = ["barbell", "trap_bar", "ez_bar", "smith_machine"];
+
+/** "Week 2 · Day 1 - Squat" -> "Squat": the week and day are shown separately. */
+export function workoutTitle(name: string): string {
+  const short = name.replace(/^Week \d+ · /, "").replace(/^Day \d+\s*[-–:·]\s*/, "");
+  return short || name;
+}

@@ -137,21 +137,33 @@ run `npm run android:assets`.
 
 ## AI programs (Phase 4)
 
-Home > **Programs** (or Workout > Programs & routines) opens the Plans screen.
+Home > **Programs** (or Workout > Programs & routines) opens the Programs screen.
 
 - **Build a program.** Pick a goal, a style (5/3/1, Sheiko, RP hypertrophy,
-  linear, or let Claude choose), days per week, session length, experience,
-  your equipment, and any notes ("bad left shoulder"). Claude designs the
-  program from the app's exercise library. For main lifts it uses a
+  linear, or let Claude choose), how many weeks (4, 6, 8 or 12), days per week,
+  session length, experience, your equipment, and any notes ("bad left
+  shoulder"). Claude designs the program from the app's exercise library and
+  maps out every workout: each day keeps the same exercises every week, while
+  the weight, sets and reps move week to week (with deload weeks where the
+  style uses them). For main lifts it uses a
   **percent of your estimated max**, which the app turns into a real weight
   rounded to plates you can load (5 lb or 2.5 kg). If you have no history for
   a lift, it uses an effort target (RPE) instead.
-- **Start a day.** Each program day has a Start button. The logger fills in the
-  sets, warm-ups and target weight, and shows the target ("77% of max, AMRAP last set").
+- **Start program.** It becomes your one active program and starts at Week 1,
+  Day 1. Home, the Workout tab and the watch then show **Up next** (for example
+  "Week 2 of 8 · Day 3"), which moves on each time you finish that workout.
+  Starting another program replaces it; **Restart** goes back to Week 1;
+  **Stop program** puts Home back to a plain Start workout.
+- **Edit a workout.** The pencil on any day lets you swap, remove or add
+  exercises and change sets, reps and weight, for just that workout or for that
+  day in every later week. Later weeks keep their own progression: a weight
+  change moves each week by the same amount.
+- **Start a day.** Each day also has its own Start button. The logger fills in
+  the sets, warm-ups and target weight.
 - **Next time.** When you finish a workout from a plan, the app compares
   what you did with the targets and suggests the next session's numbers:
   add weight, repeat, deload, or change the rep target. **Apply** updates the
-  plan; **Dismiss** leaves it alone. Suggestions you haven't answered also show
+  plan (in a program, that day in every later week too); **Dismiss** leaves it alone. Suggestions you haven't answered also show
   on the Plans screen.
 
 ### Safety rails
@@ -262,11 +274,13 @@ src/types/database.ts     TypeScript types matching the schema
 supabase/migrations/      The schema: tables, enums, triggers, RLS policies
 supabase/seed.sql         30 starter exercises (squat, bench, deadlift, ...)
 supabase/functions/       Edge Functions that call Claude (Phase 4)
-  generate-plan/          Builds a program and saves it as routines
+  generate-plan/          Builds a program and saves every week's workouts
   watch-pair/             Links a watch to an account with a one-time code
   suggest-adjustments/    Post-workout "next time" suggestions
   _shared/                Prompts, output schemas, clamps, progression rules
 src/app/plans/            Programs screen (generator, program cards)
+src/components/up-next.tsx          The active program's next workout
+src/components/workout-editor.tsx   Edit a workout (this one or later weeks too)
 src/components/adjustment-list.tsx  Apply / Dismiss suggestion cards
 ```
 
@@ -358,8 +372,13 @@ Authentication > Providers > Email while you're developing.
 - Phase 4 (`20261013020000_ai_programs.sql`) adds `routine_exercises.target_percent_1rm`,
   `routine_adjustments` (suggestions, with `apply_routine_adjustment(id)`) and
   `ai_usage` (one row per Claude call; users can read only their own rows).
-  AI programs are ordinary routines with `ai_generated = true`, grouped by
-  `ai_metadata.program_id`.
+- `20261014000000_programs.sql` adds `programs` (weeks, days per week, one
+  `is_active` per user, `started_at`). Each program workout is a routine with
+  `program_id`, `program_week` and `program_day`. `program_progress()` returns
+  the next workout: the first one, by week then day, without a finished
+  session since the program started. `start_program(id)` / `stop_program(id)`
+  switch the active one. Programs made before this were turned into 1-week
+  programs.
 - Phase 6 (`20261013030000_watch_pairing.sql`) adds `watch_pairings` and
   `watch_pair_attempts`, which only the watch-pair function can read. It also
   adds a trigger that keeps `workout_sessions.avg_hr` / `max_hr` up to date as

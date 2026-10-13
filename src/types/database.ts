@@ -99,6 +99,9 @@ export type Database = {
           ai_metadata: Json | null;
           position: number;
           archived: boolean;
+          program_id: string | null;
+          program_week: number | null;
+          program_day: number | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -109,8 +112,43 @@ export type Database = {
           ai_metadata?: Json | null;
           position?: number;
           archived?: boolean;
+          program_id?: string | null;
+          program_week?: number | null;
+          program_day?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["routines"]["Insert"]>;
+        Relationships: [];
+      };
+      programs: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          methodology: string | null;
+          summary: string | null;
+          progression_rule: string | null;
+          weeks: number;
+          days_per_week: number;
+          ai_generated: boolean;
+          ai_metadata: Json | null;
+          is_active: boolean;
+          started_at: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          methodology?: string | null;
+          summary?: string | null;
+          progression_rule?: string | null;
+          weeks?: number;
+          days_per_week?: number;
+          ai_generated?: boolean;
+          ai_metadata?: Json | null;
+          is_active?: boolean;
+          started_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["programs"]["Insert"]>;
         Relationships: [];
       };
       routine_exercises: {
@@ -315,6 +353,31 @@ export type Database = {
       apply_routine_adjustment: {
         Args: { p_id: string };
         Returns: undefined;
+      };
+      start_program: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
+      stop_program: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
+      program_progress: {
+        Args: { p_program_id?: string };
+        Returns: {
+          program_id: string;
+          program_name: string;
+          weeks: number;
+          days_per_week: number;
+          is_active: boolean;
+          total: number;
+          done: number;
+          done_routine_ids: string[];
+          next_routine_id: string | null;
+          next_routine_name: string | null;
+          next_week: number | null;
+          next_day: number | null;
+        }[];
       };
       get_logged_exercises: {
         Args: Record<string, never>;

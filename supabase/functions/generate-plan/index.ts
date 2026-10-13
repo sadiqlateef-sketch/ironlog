@@ -1,6 +1,6 @@
 // POST /functions/v1/generate-plan
-// Body: PlanRequest (see _shared/program.ts). Creates one routine per training
-// day, marked ai_generated, and returns them.
+// Body: PlanRequest (see _shared/program.ts). Creates a program with every
+// workout mapped out (one routine per week and day) and returns it.
 
 import { askStructured, checkDailyLimit, MODEL } from "../_shared/claude.ts";
 import { handle, HttpError, json, userClient } from "../_shared/http.ts";
@@ -9,7 +9,7 @@ import {
   PLAN_SYSTEM_PROMPT,
   PlanRequest,
   programSchema,
-  toRoutineRows,
+  toProgramWorkouts,
   type LiftHistory,
 } from "../_shared/program.ts";
 import type { UnitSystem } from "../_shared/units.ts";
@@ -72,50 +72,60 @@ Deno.serve(
       maxTokens: 16000,
     });
 
-    const days = toRoutineRows(program, {
-      unit,
-      exerciseIds: new Map(library.map((e) => [e.slug, e.id])),
-      e1rmBySlug: new Map(lifts.map((l) => [l.slug, l.e1rm_kg])),
-    }).slice(0, input.days_per_week);
-    if (days.length === 0) throw new HttpError(502, "Claude's plan had no usable exercises. Please try again.");
+    const workouts = toProgramWorkouts(
+      program,
+      {
+        unit,
+        exerciseIds: new Map(library.map((e) => [e.slug, e.id])),
+        e1rmBySlug: new Map(lifts.map((l) => [l.slug, l.e1rm_kg])),
+      },
+      input.weeks,
+      input.days_per_week,
+    );
+    if (workouts.length === 0) throw new HttpError(502, "Claude's plan had no usable exercises. Please try again.");
 
-    // ---- Save: one routine per day ----
-    const programId = crypto.randomUUID();
-    const { data: last } = await db.from("routines").select("position").order("position", { ascending: false }).limit(1);
-    const start = (last?.[0]?.position ?? 0) + 1;
+    // ---- Save: the program, then one routine per week and day ----
+    const { data: saved, error: pErr } = await db
+      .from("programs")
+      .insert({
+        name: program.program_name.slice(0, 80),
+        methodology: program.methodology.slice(0, 80),
+        summary: program.summary.slice(0, 600),
+        progression_rule: program.progression_rule.slice(0, 400),
+        weeks: input.weeks,
+        days_per_week: Math.max(...workouts.map((w) => w.day)),
+        ai_generated: true,
+        ai_metadata: { request: input, model: MODEL, generated_at: new Date().toISOString() },
+      })
+      .select("id, name")
+      .single();
+    if (pErr || !saved) throw new HttpError(500, "Couldn't save the program.");
+    const fail = async () => {
+      await db.from("programs").delete().eq("id", saved.id); // routines go with it
+      throw new HttpError(500, "Couldn't save the program.");
+    };
+
     const { data: routines, error: rErr } = await db
       .from("routines")
       .insert(
-        days.map((d, i) => ({
-          name: d.name,
-          description: d.focus,
+        workouts.map((w) => ({
+          name: `Week ${w.week} · ${w.name.slice(0, 70)}`,
+          description: w.focus,
           ai_generated: true,
-          position: start + i,
-          ai_metadata: {
-            program_id: programId,
-            program_name: program.program_name.slice(0, 80),
-            methodology: program.methodology.slice(0, 80),
-            summary: program.summary.slice(0, 600),
-            progression_rule: program.progression_rule.slice(0, 400),
-            day_index: i + 1,
-            request: input,
-            model: MODEL,
-            generated_at: new Date().toISOString(),
-          },
+          program_id: saved.id,
+          program_week: w.week,
+          program_day: w.day,
         })),
       )
-      .select("id, name, position");
-    if (rErr || !routines) throw new HttpError(500, "Couldn't save the program.");
+      .select("id, program_week, program_day");
+    if (rErr || !routines) return await fail();
 
-    const ordered = [...routines].sort((a, b) => a.position - b.position);
+    const idOf = new Map(routines.map((r) => [`${r.program_week}/${r.program_day}`, r.id]));
     const { error: reErr } = await db
       .from("routine_exercises")
-      .insert(ordered.flatMap((r, i) => days[i].rows.map((row) => ({ ...row, routine_id: r.id }))));
-    if (reErr) {
-      await db.from("routines").delete().in("id", ordered.map((r) => r.id));
-      throw new HttpError(500, "Couldn't save the program.");
-    }
+      .insert(workouts.flatMap((w) => w.rows.map((row) => ({ ...row, routine_id: idOf.get(`${w.week}/${w.day}`)! }))));
+    if (reErr) return await fail();
 
-    return json({ program_id: programId, program_name: program.program_name, routines: ordered });
+    return json({ program_id: saved.id, program_name: saved.name, workouts: routines.length });
   }),
 );

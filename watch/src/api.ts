@@ -81,6 +81,7 @@ export async function listRoutines(): Promise<RoutineSummary[]> {
     .from("routines")
     .select("id, name, routine_exercises(count)")
     .eq("archived", false)
+    .is("program_id", null) // program workouts come one at a time via loadUpNext
     .order("position");
   if (error) throw error;
   return (data ?? []).map((r) => ({
@@ -88,6 +89,32 @@ export async function listRoutines(): Promise<RoutineSummary[]> {
     name: r.name,
     exercises: (r.routine_exercises as unknown as { count: number }[])[0]?.count ?? 0,
   }));
+}
+
+export interface UpNext {
+  routineId: string;
+  week: number;
+  day: number;
+  weeks: number;
+  /** The day's name without the "Week N · " prefix. */
+  name: string;
+  program: string;
+}
+
+/** The active program's next workout, or null when there's no program running (or it's finished). */
+export async function loadUpNext(): Promise<UpNext | null> {
+  const { data, error } = await supabase.rpc("program_progress");
+  if (error) throw error;
+  const p = data?.[0];
+  if (!p?.next_routine_id) return null;
+  return {
+    routineId: p.next_routine_id,
+    week: p.next_week,
+    day: p.next_day,
+    weeks: p.weeks,
+    name: String(p.next_routine_name ?? "").replace(/^Week \d+ · /, "").replace(/^Day \d+\s*[-–:·]\s*/, ""),
+    program: p.program_name,
+  };
 }
 
 /** Start a routine from the watch (needs a connection, like the phone app). */

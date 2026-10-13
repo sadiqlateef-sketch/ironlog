@@ -46,7 +46,11 @@ Deno.serve(
         .eq("is_completed", true)
         .neq("set_type", "warmup")
         .order("set_number"),
-      db.from("routines").select("name, ai_metadata").eq("id", session.routine_id).single(),
+      db
+        .from("routines")
+        .select("name, ai_metadata, program_week, programs(methodology, progression_rule, weeks)")
+        .eq("id", session.routine_id)
+        .single(),
     ]);
     const unit: UnitSystem = profile?.unit_system ?? "imperial";
 
@@ -90,9 +94,14 @@ Deno.serve(
     let final = rules.map(fromRule);
     try {
       await checkDailyLimit(userId, "adjust_session");
-      const meta = (routine?.ai_metadata ?? {}) as Record<string, unknown>;
+      // Programs keep their details on the program; older routines in ai_metadata.
+      const program = routine?.programs as unknown as { methodology: string | null; progression_rule: string | null; weeks: number } | null;
+      const meta = { ...((routine?.ai_metadata ?? {}) as Record<string, unknown>), ...(program ?? {}) } as Record<string, unknown>;
+      const inProgram = program && routine?.program_week
+        ? `This was week ${routine.program_week} of a ${program.weeks}-week program. Applied changes carry to the same day in later weeks, which already progress as planned, so suggest a change only when performance clearly differs from the plan.\n`
+        : "";
       const prompt = `Routine: ${routine?.name ?? "Workout"}${meta.methodology ? ` (${meta.methodology})` : ""}
-${meta.progression_rule ? `Program progression rule: ${meta.progression_rule}\n` : ""}Lifter's unit: ${unit === "imperial" ? "pounds (round to 5 lb)" : "kilograms (round to 2.5 kg)"}
+${meta.progression_rule ? `Program progression rule: ${meta.progression_rule}\n` : ""}${inProgram}Lifter's unit: ${unit === "imperial" ? "pounds (round to 5 lb)" : "kilograms (round to 2.5 kg)"}
 
 Exercises:
 ${rules

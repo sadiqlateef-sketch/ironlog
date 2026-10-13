@@ -2,22 +2,29 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Sparkles, Trash2 } from "lucide-react";
+import { Check, Pencil, Play, RotateCcw, Sparkles, Square, Trash2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { AppShell } from "@/components/app-shell";
+import { WorkoutEditor } from "@/components/workout-editor";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { workoutTitle } from "@/lib/labels";
 import { formatWeight } from "@/lib/units";
 import {
-  deleteRoutines,
+  deleteProgram,
   generatePlan,
+  getProgramProgress,
   listPendingAdjustments,
+  listPrograms,
   listRoutinesWithExercises,
+  startProgram,
   startSession,
+  stopProgram,
   type AdjustmentWithContext,
   type PlanInput,
-  type ProgramMeta,
+  type ProgramProgress,
+  type ProgramWithWorkouts,
   type RoutineWithExercises,
 } from "@/lib/workout-api";
 import { cn } from "@/lib/utils";
@@ -31,31 +38,29 @@ export default function PlansPage() {
 }
 
 function Plans() {
-  const [routines, setRoutines] = useState<RoutineWithExercises[] | null>(null);
+  const [programs, setPrograms] = useState<ProgramWithWorkouts[] | null>(null);
+  const [progress, setProgress] = useState<Record<string, ProgramProgress>>({});
+  const [manual, setManual] = useState<RoutineWithExercises[]>([]);
   const [adjustments, setAdjustments] = useState<AdjustmentWithContext[]>([]);
+  const [editing, setEditing] = useState<RoutineWithExercises | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    listRoutinesWithExercises().then(setRoutines).catch((e: Error) => setError(e.message));
+    listPrograms()
+      .then(async (ps) => {
+        const entries = await Promise.all(ps.map(async (p) => [p.id, await getProgramProgress(p.id)] as const));
+        setProgress(Object.fromEntries(entries.filter(([, v]) => v)) as Record<string, ProgramProgress>);
+        setPrograms(ps);
+      })
+      .catch((e: Error) => setError(e.message));
+    listRoutinesWithExercises().then(setManual).catch(() => {});
     listPendingAdjustments().then(setAdjustments).catch(() => {});
   }, []);
   useEffect(refresh, [refresh]);
 
-  // Group AI routines into programs; everything else is "My routines".
-  const programs = new Map<string, { meta: ProgramMeta; days: RoutineWithExercises[] }>();
-  const manual: RoutineWithExercises[] = [];
-  for (const r of routines ?? []) {
-    const meta = r.ai_metadata as unknown as ProgramMeta | null;
-    if (r.ai_generated && meta?.program_id) {
-      const p = programs.get(meta.program_id) ?? { meta, days: [] };
-      p.days.push(r);
-      programs.set(meta.program_id, p);
-    } else manual.push(r);
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Plans</h1>
+      <h1 className="text-2xl font-bold">Programs</h1>
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       {adjustments.length > 0 && (
@@ -68,10 +73,15 @@ function Plans() {
         </Card>
       )}
 
+      {/* Your active program first, then the generator, then the rest. */}
+      {programs?.filter((p) => p.is_active).map((p) => (
+        <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
+      ))}
+
       <Generator onCreated={refresh} />
 
-      {[...programs.values()].reverse().map((p) => (
-        <ProgramCard key={p.meta.program_id} meta={p.meta} days={p.days} onChange={refresh} />
+      {programs?.filter((p) => !p.is_active).map((p) => (
+        <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
       ))}
       {manual.length > 0 && (
         <Card>
@@ -79,10 +89,12 @@ function Plans() {
             <CardTitle>My routines</CardTitle>
           </CardHeader>
           {manual.map((r) => (
-            <DayRow key={r.id} routine={r} />
+            <DayRow key={r.id} routine={r} onEdit={() => setEditing(r)} />
           ))}
         </Card>
       )}
+
+      <WorkoutEditor routine={editing} onOpenChange={(o) => !o && setEditing(null)} onSaved={refresh} />
     </div>
   );
 }
@@ -128,6 +140,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
     goal: "strength",
     methodology: "auto",
     days_per_week: 4,
+    weeks: 8,
     session_minutes: 60,
     experience: "intermediate",
     equipment: ["barbell", "dumbbell", "machine", "cable"],
@@ -157,7 +170,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="text-primary size-4" /> New program with Claude
         </CardTitle>
-        <CardDescription>Built around your logged maxes and the equipment you have.</CardDescription>
+        <CardDescription>Every workout mapped out week by week, built around your logged maxes and equipment.</CardDescription>
       </CardHeader>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
@@ -184,7 +197,19 @@ function Generator({ onCreated }: { onCreated: () => void }) {
             ))}
           </select>
         </label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Weeks
+            <select
+              className="border-input bg-background h-11 rounded-md border px-3 text-base font-normal"
+              value={form.weeks}
+              onChange={(e) => set("weeks", Number(e.target.value))}
+            >
+              {[4, 6, 8, 12].map((w) => (
+                <option key={w}>{w}</option>
+              ))}
+            </select>
+          </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
             Days a week
             <select
@@ -258,39 +283,153 @@ function Generator({ onCreated }: { onCreated: () => void }) {
 
 // ---------------- Program display ----------------
 
-function ProgramCard({ meta, days, onChange }: { meta: ProgramMeta; days: RoutineWithExercises[]; onChange: () => void }) {
-  async function remove() {
-    if (!confirm(`Delete "${meta.program_name}"? Your logged workouts stay.`)) return;
-    await deleteRoutines(days.map((d) => d.id));
-    onChange();
+function ProgramCard({
+  program,
+  progress,
+  onChange,
+  onEdit,
+}: {
+  program: ProgramWithWorkouts;
+  progress: ProgramProgress | undefined;
+  onChange: () => void;
+  onEdit: (r: RoutineWithExercises) => void;
+}) {
+  const active = program.is_active;
+  const done = new Set(active ? (progress?.done_routine_ids ?? []) : []);
+  const nextWeek = active ? (progress?.next_week ?? program.weeks) : 1;
+  // Follow the program to its current week whenever that moves.
+  const [week, setWeek] = useState(nextWeek);
+  const [shownFor, setShownFor] = useState(nextWeek);
+  if (shownFor !== nextWeek) {
+    setShownFor(nextWeek);
+    setWeek(nextWeek);
   }
+  const [error, setError] = useState<string | null>(null);
+  const days = program.routines.filter((r) => r.program_week === week);
+  const finished = active && progress && progress.total > 0 && progress.done >= progress.total;
+
+  async function run(action: () => Promise<void>) {
+    setError(null);
+    try {
+      await action();
+      onChange();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  const start = () => {
+    if (confirm(`Start "${program.name}" from week 1, day 1? It becomes your only active program.`)) run(() => startProgram(program.id));
+  };
+  const remove = () =>
+    run(async () => {
+      if (!confirm(`Delete "${program.name}"? Your logged workouts stay.`)) return;
+      await deleteProgram(program.id);
+    });
+
   return (
-    <Card data-testid="program">
+    <Card data-testid="program" className={cn(active && "border-primary")}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <CardTitle className="leading-snug">{meta.program_name}</CardTitle>
-            <CardDescription>{meta.methodology}</CardDescription>
+            {active && <p className="text-primary text-xs font-bold tracking-wide uppercase">Active program</p>}
+            <CardTitle className="leading-snug">{program.name}</CardTitle>
+            <CardDescription>
+              {program.weeks} {program.weeks === 1 ? "week" : "weeks"} · {program.days_per_week} days a week
+              {program.methodology ? ` · ${program.methodology}` : ""}
+            </CardDescription>
           </div>
           <Button variant="ghost" size="icon" aria-label="Delete program" onClick={remove}>
             <Trash2 />
           </Button>
         </div>
       </CardHeader>
-      <p className="text-sm leading-relaxed">{meta.summary}</p>
-      <p className="text-muted-foreground text-sm">
-        <span className="text-foreground font-medium">Progression:</span> {meta.progression_rule}
-      </p>
+
+      {active && progress && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm font-medium" data-testid="program-progress">
+            {finished
+              ? "Program complete. Nice work!"
+              : `Up next: Week ${progress.next_week} · Day ${progress.next_day}`}
+            <span className="text-muted-foreground font-normal"> · {progress.done} of {progress.total} done</span>
+          </p>
+          <div className="bg-secondary h-1.5 overflow-hidden rounded-full">
+            <div className="bg-primary h-full" style={{ width: `${(100 * progress.done) / Math.max(1, progress.total)}%` }} />
+          </div>
+        </div>
+      )}
+
+      {program.summary && <p className="text-sm leading-relaxed">{program.summary}</p>}
+      {program.progression_rule && (
+        <p className="text-muted-foreground text-sm">
+          <span className="text-foreground font-medium">Progression:</span> {program.progression_rule}
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {active ? (
+          <>
+            <Button variant="secondary" size="sm" onClick={() => run(async () => {
+              if (!confirm("Restart from week 1, day 1? Your logged workouts stay in your history.")) return;
+              await startProgram(program.id);
+            })}>
+              <RotateCcw /> Restart
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => run(() => stopProgram(program.id))}>
+              <Square /> Stop program
+            </Button>
+          </>
+        ) : (
+          <Button onClick={start}>
+            <Play /> Start program
+          </Button>
+        )}
+      </div>
+      {error && <p className="text-destructive text-sm">{error}</p>}
+
+      {program.weeks > 1 && (
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Week">
+          {Array.from({ length: program.weeks }, (_, i) => i + 1).map((w) => (
+            <button
+              key={w}
+              role="tab"
+              aria-selected={week === w}
+              onClick={() => setWeek(w)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1 text-sm",
+                week === w ? "bg-primary text-primary-foreground border-primary font-semibold" : "text-muted-foreground",
+              )}
+            >
+              Week {w}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col gap-2">
-        {[...days].sort((a, b) => (a.ai_metadata as unknown as ProgramMeta).day_index - (b.ai_metadata as unknown as ProgramMeta).day_index).map((d) => (
-          <DayRow key={d.id} routine={d} />
+        {days.map((d) => (
+          <DayRow
+            key={d.id}
+            routine={d}
+            done={done.has(d.id)}
+            next={active && progress?.next_routine_id === d.id}
+            onEdit={() => onEdit(d)}
+          />
         ))}
       </div>
     </Card>
   );
 }
 
-function DayRow({ routine }: { routine: RoutineWithExercises }) {
+function DayRow({
+  routine,
+  done = false,
+  next = false,
+  onEdit,
+}: {
+  routine: RoutineWithExercises;
+  done?: boolean;
+  next?: boolean;
+  onEdit: () => void;
+}) {
   const { unit } = useAuth();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -306,14 +445,29 @@ function DayRow({ routine }: { routine: RoutineWithExercises }) {
   }
 
   return (
-    <details className="bg-secondary rounded-lg">
+    <details className={cn("bg-secondary rounded-lg", next && "ring-primary ring-2")} data-testid="workout-day">
       <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5">
+        {done && <Check className="text-primary size-4 shrink-0" aria-label="Done" />}
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-semibold">{routine.name}</span>
-          {routine.description && <span className="text-muted-foreground block truncate text-xs">{routine.description}</span>}
+          <span className="block truncate font-semibold">{routine.program_day ? `Day ${routine.program_day}` : routine.name}</span>
+          <span className="text-muted-foreground block truncate text-xs">
+            {routine.program_day ? workoutTitle(routine.name) : routine.description}
+          </span>
         </span>
         <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Edit ${routine.name}`}
+          onClick={(e) => {
+            e.preventDefault();
+            onEdit();
+          }}
+        >
+          <Pencil />
+        </Button>
+        <Button
           size="sm"
+          variant={next || !routine.program_id ? "default" : "secondary"}
           onClick={(e) => {
             e.preventDefault();
             start();

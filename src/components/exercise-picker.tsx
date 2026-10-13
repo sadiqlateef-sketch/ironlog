@@ -9,7 +9,9 @@ export function ExercisePicker({
   open,
   onOpenChange,
   onPick,
+  title = "Add exercise",
 }: {
+  title?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (exercise: Exercise) => void;
@@ -24,7 +26,7 @@ export function ExercisePicker({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="h-[85dvh]">
         <DialogHeader>
-          <DialogTitle>Add exercise</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <ExerciseList
           exercises={exercises}

@@ -89,9 +89,9 @@ export function Stepper({ value, unit, onMinus, onPlus, label }: { value: string
   );
 }
 
-export function T({ children, style, muted, small, center, bold }: { children: ReactNode; style?: object; muted?: boolean; small?: boolean; center?: boolean; bold?: boolean }) {
+export function T({ children, style, muted, small, center, bold, numberOfLines }: { children: ReactNode; style?: object; muted?: boolean; small?: boolean; center?: boolean; bold?: boolean; numberOfLines?: number }) {
   return (
-    <Text style={[{ color: muted ? C.muted : C.text, fontSize: small ? 12 : 14 }, center && { textAlign: "center" }, bold && { fontWeight: "700" }, style]}>
+    <Text numberOfLines={numberOfLines} style={[{ color: muted ? C.muted : C.text, fontSize: small ? 12 : 14 }, center && { textAlign: "center" }, bold && { fontWeight: "700" }, style]}>
       {children}
     </Text>
   );
