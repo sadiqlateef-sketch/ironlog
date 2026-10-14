@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, FileUp, Flag, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, FileUp, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -69,6 +69,12 @@ export function WorkoutScreen() {
                 <Stat label="Exercises" value={summary.exercises} />
                 <Stat label="Sets" value={summary.sets} />
               </dl>
+            )}
+            {summary?.atGym && (
+              <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                <MapPin className="size-4 shrink-0" aria-hidden />
+                {summary.durationMin > 30 ? `At ${summary.atGym}, so it's going on your Google Calendar if it's connected.` : `At ${summary.atGym}. Workouts over 30 minutes go on your calendar.`}
+              </p>
             )}
             {summary?.routineId && <NextTime sessionId={summary.sessionId} />}
             <Button onClick={() => (setSummary(null), router.push("/"))}>Done</Button>
@@ -186,7 +192,14 @@ function ActiveWorkout({
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold">{session.name ?? "Workout"}</h1>
-          <Elapsed since={session.start_time} />
+          <div className="flex items-center gap-2">
+            <Elapsed since={session.start_time} />
+            {session.at_gym && (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <MapPin className="size-3.5" aria-hidden /> At the gym
+              </span>
+            )}
+          </div>
         </div>
         <Button onClick={() => (undone > 0 ? setConfirmFinish(true) : finish())}>
           <Flag /> Finish

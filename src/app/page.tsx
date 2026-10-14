@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calculator, Dumbbell, FileUp, Heart, LogOut, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
+import { Calculator, ChevronRight, Dumbbell, FileUp, Heart, LogOut, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PlateCalculator } from "@/components/plate-calculator";
+import { SessionSheet } from "@/components/session-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
 import { UpNext, useActiveProgram } from "@/components/up-next";
 import { Button } from "@/components/ui/button";
@@ -26,12 +27,15 @@ function Dashboard() {
   const [active, setActive] = useState<WorkoutSession | null>(null);
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
   const [plates, setPlates] = useState(false);
-  const program = useActiveProgram();
+  const [open, setOpen] = useState<string | null>(null);
+  // Bumped after a workout is edited or deleted, so the list and Up next refresh.
+  const [reload, setReload] = useState(0);
+  const program = useActiveProgram(reload);
 
   useEffect(() => {
     getActiveSession().then(setActive).catch(() => {});
     listRecentSessions().then(setRecent).catch(() => setRecent([]));
-  }, []);
+  }, [reload]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -114,31 +118,41 @@ function Dashboard() {
 
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Recent workouts</h2>
+        {recent && recent.length > 0 && <p className="text-muted-foreground -mt-1 text-xs">Tap one to see, fix or delete it.</p>}
         {recent === null ? (
           <p className="text-muted-foreground text-sm">Loading…</p>
         ) : recent.length === 0 ? (
           <Card className="text-muted-foreground text-sm">No workouts yet. Your first one starts above.</Card>
         ) : (
           recent.map((s) => (
-            <Card key={s.id} className="flex-row items-center justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{s.name ?? "Workout"}</p>
-                <p className="text-muted-foreground text-xs">
-                  {new Date(s.start_time).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-                  {s.end_time && ` · ${Math.round((+new Date(s.end_time) - +new Date(s.start_time)) / 60000)} min`}
-                  {s.avg_hr != null && (
-                    <span className="ml-1 inline-flex items-center gap-0.5" title={`Max ${s.max_hr} bpm`}>
-                      · <Heart className="size-3" aria-hidden /> {s.avg_hr} bpm avg
-                    </span>
-                  )}
-                </p>
-              </div>
-              <p className="shrink-0 font-mono text-sm font-semibold">{formatWeight(s.volume, unit)}</p>
+            <Card key={s.id} className="p-0">
+              <button
+                type="button"
+                onClick={() => setOpen(s.id)}
+                aria-label={`${s.name ?? "Workout"}: view, edit or delete`}
+                className="flex w-full items-center gap-3 p-4 text-left"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{s.name ?? "Workout"}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {new Date(s.start_time).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                    {s.end_time && ` · ${Math.round((+new Date(s.end_time) - +new Date(s.start_time)) / 60000)} min`}
+                    {s.avg_hr != null && (
+                      <span className="ml-1 inline-flex items-center gap-0.5" title={`Max ${s.max_hr} bpm`}>
+                        · <Heart className="size-3" aria-hidden /> {s.avg_hr} bpm avg
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <p className="shrink-0 font-mono text-sm font-semibold">{formatWeight(s.volume, unit)}</p>
+                <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
+              </button>
             </Card>
           ))
         )}
       </section>
 
+      <SessionSheet sessionId={open} onOpenChange={(o) => !o && setOpen(null)} onChanged={() => setReload((r) => r + 1)} />
       <PlateCalculator open={plates} onOpenChange={setPlates} />
     </div>
   );

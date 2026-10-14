@@ -246,6 +246,51 @@ recognizer in the Android app (it asks for microphone permission the first
 time) and the browser's speech recognition on the web, where the browser has
 one; otherwise the mic button is hidden and your keyboard's mic still works.
 
+## Gym check-in and Google Calendar
+
+Progress > gear > **Gym & calendar**.
+
+- **Your gym.** Stand in your gym and tap **I'm at my gym: save this spot**.
+  It counts as the gym within 330, 660 (default) or 1310 ft of that spot;
+  **Am I there?** shows how far away you are.
+- **Check-in.** When a workout opens on the phone (started there or on the
+  watch), the app checks your location once and marks the workout
+  `at_gym`. If it can't get a fix then, it tries again when you tap Finish.
+  There's no background tracking.
+- **Calendar.** A gym workout longer than 30 minutes is added to the Google
+  Calendar you pick ("Workout: Push Day", with minutes, sets, volume and
+  exercises, at your gym's name). The `gym-calendar` Edge Function does it
+  right after Finish, and again each time the app opens for anything missed
+  in the last 14 days. The event id comes from the workout id, so a workout
+  can never be added twice.
+
+The Google sign-in's refresh token is kept in `calendar_connections`, which
+only the Edge Function can read (RLS on, no policies).
+
+### Turning on Google Calendar (one time, no command line)
+
+1. Go to https://console.cloud.google.com/projectcreate, name the project
+   **Ironlog**, and click **Create**. Make sure it's selected at the top.
+2. Open https://console.cloud.google.com/apis/library/calendar-json.googleapis.com
+   and click **Enable**.
+3. Open https://console.cloud.google.com/auth/overview and click **Get started**.
+   App name **Ironlog**, your email for support, Audience **External**, your
+   email again for contact, tick the agreement, **Create**.
+4. Click **Audience** on the left, then **Publish app** > **Confirm**. (In
+   "Testing" mode Google signs you out of the calendar every 7 days.)
+5. Click **Clients** on the left > **Create client**. Type **Web application**,
+   name **Ironlog**. Under **Authorized redirect URIs** click **Add URI** and
+   paste `https://<your project ref>.supabase.co/functions/v1/gym-calendar`.
+   Click **Create** and keep the window open.
+6. In GitHub, go to the repo's Settings > Secrets and variables > Actions and
+   add two secrets: `GOOGLE_CLIENT_ID` (the Client ID) and
+   `GOOGLE_CLIENT_SECRET` (the Client secret).
+7. Run **Actions > Deploy database and functions**, then rebuild the APK.
+8. In the app: Gym & calendar > **Connect Google Calendar**. Google will say it
+   hasn't verified the app (it's your own app): tap **Advanced** > **Go to
+   Ironlog**, tick the calendar boxes, and continue. You land back in Ironlog;
+   pick the calendar (one named "Workout" is chosen for you if you have it).
+
 ## Progress screen (Phase 3)
 
 - **Muscle recovery heatmap.** Front and back body views, coloured from dark

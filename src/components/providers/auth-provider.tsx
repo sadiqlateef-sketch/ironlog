@@ -14,7 +14,7 @@ interface AuthState {
   unit: UnitSystem;
   setUnit: (unit: UnitSystem) => Promise<void>;
   /** Save profile settings (bar, plates, rest time...) and update them here. */
-  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats">>) => Promise<void>;
+  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
