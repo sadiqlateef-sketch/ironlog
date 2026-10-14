@@ -1,17 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Dumbbell, LogOut } from "lucide-react";
+import { Dumbbell, LogOut, MapPin } from "lucide-react";
 import { EquipmentSheet } from "@/components/equipment-sheet";
+import { GymSheet } from "@/components/gym-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-/** The gear on the Progress profile header: your name, units, weights and sign out. */
+/** The gear on the Progress profile header: your name, units, weights, gym and sign out. */
 export function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [equipment, setEquipment] = useState(false);
+  const [gym, setGym] = useState(false);
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -26,16 +28,21 @@ export function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
                 onOpenChange(false);
                 setEquipment(true);
               }}
+              onGym={() => {
+                onOpenChange(false);
+                setGym(true);
+              }}
             />
           )}
         </DialogContent>
       </Dialog>
       <EquipmentSheet open={equipment} onOpenChange={setEquipment} />
+      <GymSheet open={gym} onOpenChange={setGym} />
     </>
   );
 }
 
-function SettingsForm({ onEquipment }: { onEquipment: () => void }) {
+function SettingsForm({ onEquipment, onGym }: { onEquipment: () => void; onGym: () => void }) {
   const { profile, unit, setUnit, updateProfile, signOut } = useAuth();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [saved, setSaved] = useState<string | null>(null);
@@ -80,6 +87,9 @@ function SettingsForm({ onEquipment }: { onEquipment: () => void }) {
       </div>
       <Button variant="secondary" onClick={onEquipment}>
         <Dumbbell /> Edit available weights
+      </Button>
+      <Button variant="secondary" onClick={onGym}>
+        <MapPin /> Gym &amp; calendar
       </Button>
       <Button variant="secondary" className="text-destructive" onClick={signOut}>
         <LogOut /> Sign out

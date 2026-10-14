@@ -47,6 +47,10 @@ export type Database = {
           bar_weight_kg: number;
           available_plates_kg: number[];
           default_rest_seconds: number;
+          gym_name: string | null;
+          gym_lat: number | null;
+          gym_lng: number | null;
+          gym_radius_m: number;
         } & Timestamps;
         Insert: {
           id: string;
@@ -57,6 +61,10 @@ export type Database = {
           bar_weight_kg?: number;
           available_plates_kg?: number[];
           default_rest_seconds?: number;
+          gym_name?: string | null;
+          gym_lat?: number | null;
+          gym_lng?: number | null;
+          gym_radius_m?: number;
         };
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
         Relationships: [];
@@ -245,6 +253,8 @@ export type Database = {
           avg_hr: number | null;
           max_hr: number | null;
           notes: string | null;
+          at_gym: boolean | null;
+          calendar_event_id: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -257,6 +267,8 @@ export type Database = {
           avg_hr?: number | null;
           max_hr?: number | null;
           notes?: string | null;
+          at_gym?: boolean | null;
+          calendar_event_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sessions"]["Insert"]>;
         Relationships: [
