@@ -210,7 +210,7 @@ at https://www.anthropic.com/pricing.
 
 ## Import a finished workout
 
-Workout > **Import** (or Home > **Import a workout from a photo or notes**)
+Workout > **Import** (or Home > **Import photo**)
 adds a workout you already did somewhere else.
 
 1. **Add it.** Take a photo of your notebook, pick screenshots from another app
@@ -229,6 +229,22 @@ adds a workout you already did somewhere else.
 
 The server converts units to kg, drops impossible numbers and dates in the
 future, and limits imports to 20 per person per day (logged in `ai_usage`).
+
+## Tell Claude (log by chatting)
+
+Workout > **Tell Claude** (or Home > **Tell Claude**) opens a chat. Type or
+tap the mic and say what you did: "squat three sets of five at two twenty five,
+bench one eighty five for eight, eight and seven". Claude answers with what it
+understood. Send another message to add or fix something ("forgot curls 3x12
+at 30", "actually bench was 185") and it answers with the updated workout.
+**Check and save** opens the same review screen as an import.
+
+It uses the same `import-workout` Edge Function: the app sends the whole chat
+each time, numbered, so later messages can change earlier ones. Each message
+counts toward the 20 imports a day. The mic uses the phone's own speech
+recognizer in the Android app (it asks for microphone permission the first
+time) and the browser's speech recognition on the web, where the browser has
+one; otherwise the mic button is hidden and your keyboard's mic still works.
 
 ## Progress screen (Phase 3)
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calculator, Dumbbell, FileUp, Heart, LogOut, Play, Sparkles, Watch } from "lucide-react";
+import { Calculator, Dumbbell, FileUp, Heart, LogOut, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -77,11 +77,18 @@ function Dashboard() {
         </Button>
       </div>
 
-      <Button asChild variant="secondary">
-        <Link href="/import/">
-          <FileUp /> Import a workout from a photo or notes
-        </Link>
-      </Button>
+      <div className="grid grid-cols-2 gap-3">
+        <Button asChild variant="secondary">
+          <Link href="/log/">
+            <MessageSquareText /> Tell Claude
+          </Link>
+        </Button>
+        <Button asChild variant="secondary">
+          <Link href="/import/">
+            <FileUp /> Import photo
+          </Link>
+        </Button>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Button variant="secondary" onClick={() => setPlates(true)}>
