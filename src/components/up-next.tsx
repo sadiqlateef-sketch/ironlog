@@ -9,14 +9,14 @@ import { Card } from "@/components/ui/card";
 import { workoutTitle } from "@/lib/labels";
 import { getProgramProgress, getRoutine, startSession, type ProgramProgress } from "@/lib/workout-api";
 
-/** Your active program's next workout, loaded once. `undefined` while loading. */
-export function useActiveProgram() {
+/** Your active program's next workout, reloaded when reloadKey changes. `undefined` while loading. */
+export function useActiveProgram(reloadKey = 0) {
   const [progress, setProgress] = useState<ProgramProgress | null | undefined>(undefined);
   useEffect(() => {
     getProgramProgress()
       .then(setProgress)
       .catch(() => setProgress(null));
-  }, []);
+  }, [reloadKey]);
   return progress;
 }
 

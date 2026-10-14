@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { ExerciseDetail, type Tab } from "@/components/exercise-detail";
 import { MuscleFigure, sideOf } from "@/components/muscle-map";
+import { UnmarkDay } from "@/components/unmark-day";
 import { WorkoutEditor } from "@/components/workout-editor";
 import { ActionSheet, type SheetAction } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
@@ -184,6 +185,7 @@ export function PlannedTab({
         day={open}
         title={open?.program_day ? `Day ${open.program_day} · ${workoutTitle(open.name)}` : (open?.name ?? "")}
         last={open ? lastFor(open) : undefined}
+        done={!!open && done.has(open.id)}
         busy={busy}
         onOpenChange={(o) => !o && setOpen(null)}
         onStart={(d) => onStart(d)}
@@ -352,6 +354,7 @@ function DayDetails({
   day,
   title,
   last,
+  done = false,
   busy,
   onOpenChange,
   onStart,
@@ -361,6 +364,7 @@ function DayDetails({
   day: Day | null;
   title: string;
   last?: string;
+  done?: boolean;
   busy: boolean;
   onOpenChange: (open: boolean) => void;
   onStart: (d: Day) => void;
@@ -412,6 +416,7 @@ function DayDetails({
                   {last && <> · last done {agoLabel(last).toLowerCase()}</>}
                 </DialogDescription>
               </DialogHeader>
+              {done && <UnmarkDay routineId={day.id} onDone={onReordered} />}
               {error && <p className="text-destructive text-sm">{error}</p>}
               <SortableList
                 items={items}
