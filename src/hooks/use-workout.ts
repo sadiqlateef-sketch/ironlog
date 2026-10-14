@@ -199,6 +199,19 @@ export function useWorkout() {
     [load, fail],
   );
 
+  /** Start a workout some other way (a ready-made or Instant workout), then open it. */
+  const startWith = useCallback(
+    async (create: () => Promise<unknown>) => {
+      try {
+        await create();
+        await load();
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [load, fail],
+  );
+
   const finish = useCallback(async () => {
     if (!session) return null;
     const done = blocksRef.current.flatMap((b) => b.sets.filter((s) => s.done));
@@ -527,6 +540,7 @@ export function useWorkout() {
   );
 
   return {
+    startWith,
     session,
     blocks,
     error,
