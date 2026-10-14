@@ -601,3 +601,40 @@ export async function startTemplateWorkout(day: TemplateLike["days"][number]): P
     day.items.filter((i) => ids.has(i.slug)).map((i) => ({ exercise_id: ids.get(i.slug)!, sets: i.sets, warmups: i.warmups })),
   );
 }
+
+// ---------- Progress overview ----------
+
+export type StatsSet = Pick<WorkoutSet, "session_id" | "exercise_id" | "set_type" | "weight" | "reps" | "completed_at">;
+
+/** Every finished set since a date, paged so long histories aren't cut off at 1,000 rows. */
+export async function listFinishedSetsSince(since: Date): Promise<StatsSet[]> {
+  const out: StatsSet[] = [];
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const rows: StatsSet[] = unwrap(
+      await getSupabase()
+        .from("workout_sets")
+        .select("session_id, exercise_id, set_type, weight, reps, completed_at")
+        .eq("is_completed", true)
+        .gte("completed_at", since.toISOString())
+        .order("completed_at")
+        .range(from, from + page - 1),
+    );
+    out.push(...rows);
+    if (rows.length < page) return out;
+  }
+}
+
+/** How many workouts you've ever finished. */
+export async function countFinishedSessions(): Promise<number> {
+  const { count, error } = await getSupabase()
+    .from("workout_sessions")
+    .select("id", { count: "exact", head: true })
+    .not("end_time", "is", null);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+export async function getSession(id: string): Promise<WorkoutSession> {
+  return unwrap(await getSupabase().from("workout_sessions").select("*").eq("id", id).single());
+}

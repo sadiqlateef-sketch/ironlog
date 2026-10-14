@@ -6,6 +6,17 @@ import { BarChart } from "@/components/charts/bar-chart";
 import { LineChart } from "@/components/charts/line-chart";
 import { BodyHeatmap } from "@/components/body-heatmap";
 import { PeriodizationCard } from "@/components/periodization-card";
+import {
+  CalendarCard,
+  CompareCard,
+  InsightsCard,
+  MuscleBreakdownCard,
+  ProfileHeader,
+  ProgressIndexCard,
+  TopLiftsCard,
+  useStats,
+  WeekCards,
+} from "@/components/progress/overview";
 import { OneRmCalculator } from "@/components/one-rm-calculator";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,45 +53,85 @@ export default function ProgressPage() {
   );
 }
 
+type ProgressTab = "overview" | "body";
+
 function Progress() {
+  const [tab, setTab] = useState<ProgressTab>("overview");
   const [range, setRange] = useState<(typeof RANGES)[number]>(RANGES[1]);
   // Set once per range change, so the charts' effects see a stable date.
   const [since, setSince] = useState(() => daysAgo(RANGES[1].days));
+  const [reload, setReload] = useState(0);
+  const { data, loading, error } = useStats(reload);
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Progress</h1>
-      <PeriodizationCard />
-      <RecoveryCard />
-      {/* One filter row, scoping every chart below it */}
-      <div className="bg-secondary grid grid-cols-3 rounded-xl p-1" role="group" aria-label="Time range">
-        {RANGES.map((r) => (
+      <ProfileHeader syncing={loading} onSync={() => setReload((r) => r + 1)} />
+      <div className="bg-secondary grid grid-cols-2 gap-1 rounded-xl p-1" role="tablist" aria-label="Progress">
+        {(["overview", "body"] as const).map((t) => (
           <button
-            key={r.key}
+            key={t}
             type="button"
-            aria-pressed={range.key === r.key}
-            onClick={() => {
-              setRange(r);
-              setSince(daysAgo(r.days));
-            }}
-            className={cn(
-              "rounded py-1.5 text-sm font-semibold",
-              range.key === r.key ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
-            )}
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={cn("h-10 rounded-lg text-sm font-semibold capitalize", tab === t ? "bg-foreground text-background" : "text-muted-foreground")}
           >
-            {r.label}
+            {t}
           </button>
         ))}
       </div>
-      <VolumeCard since={since} />
-      <StrengthCard since={since} />
-      <Card>
-        <CardHeader>
-          <CardTitle>1RM calculator</CardTitle>
-          <CardDescription>Estimate your max from any set, plus training percentages.</CardDescription>
-        </CardHeader>
-        <OneRmCalculator />
-      </Card>
+      {error && <p className="text-destructive text-sm">{error}</p>}
+
+      {tab === "body" && <RecoveryCard />}
+
+      {tab === "overview" && (
+        <>
+          {data ? (
+            <>
+              <WeekCards data={data} />
+              <CalendarCard data={data} />
+              <ProgressIndexCard data={data} />
+              <MuscleBreakdownCard data={data} />
+              <TopLiftsCard data={data} />
+              <InsightsCard data={data} />
+              <CompareCard data={data} />
+            </>
+          ) : (
+            !error && <p className="text-muted-foreground text-sm">Loading…</p>
+          )}
+          <PeriodizationCard />
+          <h2 className="text-muted-foreground mt-2 text-xs font-semibold tracking-wide uppercase">Charts</h2>
+          {/* One filter row, scoping every chart below it */}
+          <div className="bg-secondary grid grid-cols-3 rounded-xl p-1" role="group" aria-label="Time range">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                aria-pressed={range.key === r.key}
+                onClick={() => {
+                  setRange(r);
+                  setSince(daysAgo(r.days));
+                }}
+                className={cn(
+                  "rounded py-1.5 text-sm font-semibold",
+                  range.key === r.key ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
+                )}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <VolumeCard since={since} />
+          <StrengthCard since={since} />
+          <Card>
+            <CardHeader>
+              <CardTitle>1RM calculator</CardTitle>
+              <CardDescription>Estimate your max from any set, plus training percentages.</CardDescription>
+            </CardHeader>
+            <OneRmCalculator />
+          </Card>
+        </>
+      )}
     </div>
   );
 }
