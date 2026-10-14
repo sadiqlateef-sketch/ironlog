@@ -18,13 +18,24 @@ export interface LinePoint {
 const M = { top: 16, right: 44, bottom: 22, left: 36 };
 
 /** Single-series trend: 2px line, faint area wash, ringed end-dot with its value. */
-export function LineChart({ data, height = 200, ariaLabel }: { data: LinePoint[]; height?: number; ariaLabel: string }) {
+export function LineChart({
+  data,
+  height = 200,
+  ariaLabel,
+  goal,
+}: {
+  data: LinePoint[];
+  height?: number;
+  ariaLabel: string;
+  /** Optional dashed target line, e.g. your goal weight. */
+  goal?: { value: number; label: string } | null;
+}) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
 
   const plotW = Math.max(0, width - M.left - M.right);
   const plotH = height - M.top - M.bottom;
-  const values = data.map((d) => d.value);
+  const values = [...data.map((d) => d.value), ...(goal ? [goal.value] : [])];
   const lo = Math.min(...values), hi = Math.max(...values);
   const pad = Math.max(1, (hi - lo) * 0.15);
   const ticks = niceTicks(Math.max(0, lo - pad), hi + pad, 3);
@@ -72,6 +83,14 @@ export function LineChart({ data, height = 200, ariaLabel }: { data: LinePoint[]
             <text x={x(last)} y={height - 6} textAnchor="end" className="fill-muted-foreground text-[10px]">
               {shortDate(data[last].date)}
             </text>
+          )}
+          {goal && (
+            <g>
+              <line x1={M.left} x2={width - M.right} y1={y(goal.value)} y2={y(goal.value)} stroke="var(--success)" strokeDasharray="4 4" />
+              <text x={width - M.right + 4} y={y(goal.value)} dy="0.32em" className="fill-success text-[10px] font-semibold">
+                {goal.label}
+              </text>
+            </g>
           )}
           {area && <path d={area} fill="var(--chart-1)" opacity={0.1} />}
           <path d={line} fill="none" stroke="var(--chart-1)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />

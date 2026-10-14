@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { BarChart } from "@/components/charts/bar-chart";
 import { LineChart } from "@/components/charts/line-chart";
 import { BodyHeatmap } from "@/components/body-heatmap";
+import { PeriodizationCard } from "@/components/periodization-card";
 import { OneRmCalculator } from "@/components/one-rm-calculator";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,7 @@ function Progress() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold">Progress</h1>
+      <PeriodizationCard />
       <RecoveryCard />
       {/* One filter row, scoping every chart below it */}
       <div className="bg-secondary grid grid-cols-3 rounded-xl p-1" role="group" aria-label="Time range">

@@ -14,7 +14,9 @@ import {
   insertSets,
   listExercises,
   listSessionSets,
+  moveSetsToExercise,
   startSession,
+  updateSessionNotes,
   updateSet,
   type Exercise,
   type LastPerformance,
@@ -47,6 +49,29 @@ export interface Block {
   targetNote: string | null;
   previous: LastPerformance;
   sets: UiSet[];
+  /** The routine row this exercise came from (for AI progression), if any. */
+  routineExerciseId: string | null;
+  /** Target rep range from the routine, for the progression chart. */
+  repMin: number | null;
+  repMax: number | null;
+}
+
+const REST_KEY = "ironlog.rest.";
+
+/** Your own rest time for an exercise, remembered on this device. */
+function savedRest(exerciseId: string): number | null {
+  try {
+    const v = localStorage.getItem(REST_KEY + exerciseId);
+    return v == null ? null : Number(v);
+  } catch {
+    return null;
+  }
+}
+
+function saveRest(exerciseId: string, seconds: number) {
+  try {
+    localStorage.setItem(REST_KEY + exerciseId, String(seconds));
+  } catch {}
 }
 
 function targetNoteFor(t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null }): string | null {
@@ -95,7 +120,7 @@ export function useWorkout() {
   const fail = useCallback((e: unknown) => setError((e as Error).message ?? String(e)), []);
 
   const defaultRest = useCallback(
-    (ex: Exercise) => (ex.mechanic === "compound" ? (profile?.default_rest_seconds ?? 120) : 90),
+    (ex: Exercise) => savedRest(ex.id) ?? (ex.mechanic === "compound" ? (profile?.default_rest_seconds ?? 120) : 90),
     [profile],
   );
 
@@ -121,7 +146,7 @@ export function useWorkout() {
           order,
           exercise,
           supersetGroup: rows[0].superset_group,
-          restSeconds: target?.rest_seconds ?? defaultRest(exercise),
+          restSeconds: savedRest(exercise.id) ?? target?.rest_seconds ?? defaultRest(exercise),
           repTarget: target
             ? target.target_reps_max
               ? `${target.target_reps}-${target.target_reps_max}`
@@ -130,6 +155,9 @@ export function useWorkout() {
           targetNote: target ? targetNoteFor(target) : null,
           previous: await getLastPerformance(exercise.id),
           sets: rows.map((r) => toUiSet(r, unit)),
+          routineExerciseId: target?.id ?? null,
+          repMin: target?.target_reps ?? null,
+          repMax: target?.target_reps_max ?? target?.target_reps ?? null,
         };
       }),
     );
@@ -234,6 +262,9 @@ export function useWorkout() {
             targetNote: null,
             previous,
             sets: rows.sort((a, b) => a.set_number - b.set_number).map((r) => toUiSet(r, unit)),
+            routineExerciseId: null,
+            repMin: null,
+            repMax: null,
           },
         ]);
       } catch (e) {
@@ -290,6 +321,75 @@ export function useWorkout() {
       }
     },
     [fail, setBlocks],
+  );
+
+  /** Swap in another exercise, keeping the sets (and anything already logged). */
+  const swapExercise = useCallback(
+    async (order: number, exercise: Exercise) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      if (!block || block.exercise.id === exercise.id) return;
+      try {
+        const [previous] = await Promise.all([
+          getLastPerformance(exercise.id),
+          moveSetsToExercise(block.sets.map((s) => s.id), exercise.id),
+        ]);
+        setBlocks((prev) =>
+          prev.map((b) =>
+            b.order === order
+              ? { ...b, exercise, previous, restSeconds: defaultRest(exercise), routineExerciseId: null, repMin: null, repMax: null }
+              : b,
+          ),
+        );
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [defaultRest, fail, setBlocks],
+  );
+
+  /** Change this exercise's rest time; remembered for next time too. */
+  const setRest = useCallback(
+    (order: number, seconds: number) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      if (!block) return;
+      saveRest(block.exercise.id, seconds);
+      setBlocks((prev) => prev.map((b) => (b.order === order ? { ...b, restSeconds: seconds } : b)));
+    },
+    [setBlocks],
+  );
+
+  const saveNotes = useCallback(
+    async (notes: string) => {
+      if (!session) return;
+      setSession({ ...session, notes: notes.trim() || null });
+      try {
+        await updateSessionNotes(session.id, notes);
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [session, fail],
+  );
+
+  /** After accepting a new weight: put it on the sets you haven't done yet. */
+  const applyWeightToRemaining = useCallback(
+    async (order: number, weightKg: number) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      if (!block) return;
+      const todo = block.sets.filter((s) => !s.done && s.type !== "warmup");
+      const shown = toDisplay(weightKg, unit);
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.order === order ? { ...b, sets: b.sets.map((s) => (todo.some((t) => t.id === s.id) ? { ...s, weight: shown } : s)) } : b,
+        ),
+      );
+      try {
+        await Promise.all(todo.map((s) => updateSet(s.id, { weight: weightKg })));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [unit, fail, setBlocks],
   );
 
   // ---- Sets ----
@@ -436,6 +536,10 @@ export function useWorkout() {
     discard,
     addExercise,
     removeExercise,
+    swapExercise,
+    setRest,
+    saveNotes,
+    applyWeightToRemaining,
     toggleSuperset,
     addSet,
     removeSet,

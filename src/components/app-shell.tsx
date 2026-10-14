@@ -36,6 +36,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-md flex-1 px-4 pt-6 pb-40">{children}</main>
       <div className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
         <RestTimerBar />
+        {/* Pages can put a sticky action bar here (the workout's "Log Set"). */}
+        <div id="bottom-bar-slot" />
         <nav className="mx-auto max-w-md px-3 pb-3">
           <ul className="glass-strong grid grid-cols-4 rounded-3xl">
             {tabs.map(({ href, label, icon: Icon }) => {

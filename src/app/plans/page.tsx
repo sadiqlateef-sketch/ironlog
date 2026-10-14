@@ -165,7 +165,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Card>
+    <Card id="generator" className="scroll-mt-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="text-primary-text size-4" /> New program with Claude

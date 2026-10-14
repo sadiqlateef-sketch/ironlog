@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Flag, Play, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, Flag, NotebookPen, Play, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { PlateCalculator } from "@/components/plate-calculator";
+import { EquipmentSheet } from "@/components/equipment-sheet";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
+import { IntervalTimer } from "@/components/workout/interval-timer";
+import { NotesSheet } from "@/components/workout/notes-sheet";
+import { ProgressionSheet } from "@/components/workout/progression-sheet";
+import { RestSheet } from "@/components/workout/rest-sheet";
+import { SwapSheet } from "@/components/workout/swap-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UpNext, useActiveProgram } from "@/components/up-next";
-import { useWorkout } from "@/hooks/use-workout";
+import { useWorkout, type Block } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
   listRoutines,
@@ -21,23 +28,15 @@ import {
   type Exercise,
   type Routine,
 } from "@/lib/workout-api";
-import { formatClock } from "@/lib/workout-logic";
+import { focusAfterLog, formatClock, nextUnfinished, segmentStates } from "@/lib/workout-logic";
+import { cn } from "@/lib/utils";
 import { exactAlarmStatus, keepScreenOn, openExactAlarmSettings, tap } from "@/lib/native";
 
 export function WorkoutScreen() {
   const w = useWorkout();
   const router = useRouter();
-  const [picking, setPicking] = useState(false);
   const [info, setInfo] = useState<Exercise | null>(null);
-  const [plates, setPlates] = useState<{ open: boolean; weight: number | null }>({ open: false, weight: null });
-  const [confirmFinish, setConfirmFinish] = useState(false);
-  const [summary, setSummary] = useState<{
-    sessionId: string;
-    routineId: string | null;
-    durationMin: number;
-    sets: number;
-    exercises: number;
-  } | null>(null);
+  const [summary, setSummary] = useState<NonNullable<Awaited<ReturnType<Workout["finish"]>>> | null>(null);
 
   // Phone app: keep the screen awake while a workout is open.
   const active = !!w.session;
@@ -75,25 +74,160 @@ export function WorkoutScreen() {
     );
   }
 
-  const undone = w.blocks.reduce((n, b) => n + b.sets.filter((s) => !s.done).length, 0);
+  return <ActiveWorkout w={w} onFinished={setSummary} onInfo={setInfo} info={info} />;
+}
+
+type Workout = ReturnType<typeof useWorkout>;
+type View = "focus" | "list";
+const VIEW_KEY = "ironlog.logger.view";
+
+function savedView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "focus";
+  } catch {
+    return "focus";
+  }
+}
+
+/** The logger while a workout is running. */
+function ActiveWorkout({
+  w,
+  onFinished,
+  info,
+  onInfo,
+}: {
+  w: Workout;
+  onFinished: (s: NonNullable<Awaited<ReturnType<Workout["finish"]>>>) => void;
+  info: Exercise | null;
+  onInfo: (e: Exercise | null) => void;
+}) {
+  const session = w.session!;
+  const [picking, setPicking] = useState(false);
+  const [plates, setPlates] = useState<{ open: boolean; weight: number | null }>({ open: false, weight: null });
+  const [confirmFinish, setConfirmFinish] = useState(false);
+  const [view, setViewState] = useState<View>(savedView);
+  const [focusPick, setFocus] = useState<number | null>(null);
+  const [restFor, setRestFor] = useState<number | null>(null);
+  const [swapFor, setSwapFor] = useState<number | null>(null);
+  const [intervalOpen, setIntervalOpen] = useState(false);
+  const [equipment, setEquipment] = useState(false);
+  const [notes, setNotes] = useState(false);
+  const [chartFor, setChartFor] = useState<Exercise | null>(null);
+  const [progressionFor, setProgressionFor] = useState<number | null>(null);
+  const [nudge, setNudge] = useState<string | null>(null);
+  const [adjustments, setAdjustments] = useState<AdjustmentWithContext[]>([]);
+  const slot = useSlot("bottom-bar-slot");
+
+  // Suggestions the AI made after the last time you did this routine.
+  useEffect(() => {
+    if (!session.routine_id) return;
+    listPendingAdjustments().then(setAdjustments).catch(() => {});
+  }, [session.routine_id]);
+
+  const blocks = w.blocks;
+  const firstOpen = blocks.find((b) => b.sets.some((s) => !s.done))?.order ?? blocks.at(-1)?.order ?? null;
+  const focusOrder = focusPick != null && blocks.some((b) => b.order === focusPick) ? focusPick : firstOpen;
+  const focus = blocks.find((b) => b.order === focusOrder) ?? null;
+  const nextSet = focus?.sets.find((s) => !s.done) ?? null;
+  const after = focus ? nextUnfinished(focus.order, blocks) : null;
+  const undone = blocks.reduce((n, b) => n + b.sets.filter((s) => !s.done).length, 0);
+  const adjustmentFor = (b: Block | null) =>
+    b?.routineExerciseId ? (adjustments.find((a) => a.routine_exercise_id === b.routineExerciseId) ?? null) : null;
+  const focusAdjustment = adjustmentFor(focus);
+
+  function setView(v: View) {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {}
+  }
+
+  function jumpTo(order: number) {
+    setFocus(order);
+    if (view === "list") document.getElementById(`exercise-${order}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   async function finish() {
     setConfirmFinish(false);
     const s = await w.finish();
-    if (s) setSummary(s);
+    if (s) onFinished(s);
   }
+
+  async function logSet() {
+    if (!focus) return setPicking(true);
+    if (!nextSet) {
+      if (after != null) return jumpTo(after);
+      return undone > 0 ? setConfirmFinish(true) : finish();
+    }
+    tap();
+    const ok = await w.toggleDone(focus.order, nextSet.id);
+    if (!ok) {
+      setNudge("Enter your reps first");
+      setTimeout(() => setNudge(null), 2500);
+      return;
+    }
+    // In a superset, hop to the partner exercise.
+    const updated = blocks.map((b) =>
+      b.order === focus.order ? { ...b, sets: b.sets.map((s) => (s.id === nextSet.id ? { ...s, done: true } : s)) } : b,
+    );
+    setFocus(focusAfterLog(focus.order, updated));
+  }
+
+  const logLabel = !focus ? "Add exercise" : nextSet ? "Log Set" : after != null ? "Next exercise" : "Finish workout";
+  const shown = view === "focus" && focus ? [focus] : blocks;
+  const states = segmentStates(blocks, focusOrder);
 
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold">{w.session.name ?? "Workout"}</h1>
-          <Elapsed since={w.session.start_time} />
+          <h1 className="truncate text-2xl font-bold">{session.name ?? "Workout"}</h1>
+          <Elapsed since={session.start_time} />
         </div>
         <Button onClick={() => (undone > 0 ? setConfirmFinish(true) : finish())}>
           <Flag /> Finish
         </Button>
       </header>
+
+      {blocks.length > 0 && (
+        <div className="flex items-center gap-3">
+          <ol className="flex flex-1 gap-1.5" aria-label="Exercises">
+            {blocks.map((b, i) => (
+              <li key={b.order} className="flex-1">
+                <button
+                  type="button"
+                  onClick={() => jumpTo(b.order)}
+                  aria-label={`${b.exercise.name}${states[i] === "done" ? ", done" : states[i] === "current" ? ", current" : ""}`}
+                  aria-current={states[i] === "current" ? "step" : undefined}
+                  className="flex h-6 w-full items-center"
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-full rounded-full transition-colors",
+                      states[i] === "done" && "bg-success",
+                      states[i] === "current" && "bg-primary-text shadow-[0_0_10px_rgb(132_168_255/0.7)]",
+                      states[i] === "todo" && "bg-foreground/20",
+                    )}
+                  />
+                </button>
+              </li>
+            ))}
+          </ol>
+          <div className="bg-secondary flex rounded-lg p-0.5 text-xs font-semibold" role="group" aria-label="Layout">
+            {(["focus", "list"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={cn("rounded-md px-2.5 py-1 capitalize", view === v ? "bg-foreground text-background" : "text-muted-foreground")}
+              >
+                {v === "focus" ? "One" : "All"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {w.error && (
         <button onClick={w.clearError} className="bg-destructive/15 text-destructive rounded-lg p-3 text-left text-sm">
@@ -103,32 +237,40 @@ export function WorkoutScreen() {
 
       <ExactAlarmHint />
 
-      {w.blocks.map((block, i) => (
-        <ExerciseBlock
-          key={block.order}
-          block={block}
-          isLast={i === w.blocks.length - 1}
-          onShowInfo={() => setInfo(block.exercise)}
-          onPlates={(weight) => setPlates({ open: true, weight })}
-          onToggleSuperset={() => w.toggleSuperset(block.order)}
-          onRemove={() => w.removeExercise(block.order)}
-          onAddSet={() => w.addSet(block.order)}
-          onRemoveSet={(id) => w.removeSet(block.order, id)}
-          onChangeSet={(id, patch) => w.patchSet(block.order, id, patch)}
-          onCommitSet={(id) => w.commitSet(block.order, id)}
-          onCycleType={(id) => w.cycleType(block.order, id)}
-          onToggleDone={(id) => {
-            tap();
-            return w.toggleDone(block.order, id);
-          }}
-        />
+      {shown.map((block) => (
+        <div key={block.order} id={`exercise-${block.order}`} className="scroll-mt-4">
+          <ExerciseBlock
+            block={block}
+            focused={view === "focus"}
+            isLast={blocks.indexOf(block) === blocks.length - 1}
+            onShowInfo={() => onInfo(block.exercise)}
+            onChart={() => setChartFor(block.exercise)}
+            onSwap={() => setSwapFor(block.order)}
+            onRest={() => setRestFor(block.order)}
+            onInterval={() => setIntervalOpen(true)}
+            onEquipment={() => setEquipment(true)}
+            onPlates={(weight) => setPlates({ open: true, weight })}
+            onToggleSuperset={() => w.toggleSuperset(block.order)}
+            onRemove={() => w.removeExercise(block.order)}
+            onAddSet={() => w.addSet(block.order)}
+            onRemoveSet={(id) => w.removeSet(block.order, id)}
+            onChangeSet={(id, patch) => w.patchSet(block.order, id, patch)}
+            onCommitSet={(id) => w.commitSet(block.order, id)}
+            onCycleType={(id) => w.cycleType(block.order, id)}
+            onToggleDone={(id) => {
+              tap();
+              setFocus(block.order);
+              return w.toggleDone(block.order, id);
+            }}
+          />
+        </div>
       ))}
 
       <Button size="lg" variant="outline" onClick={() => setPicking(true)}>
         <Plus /> Add exercise
       </Button>
 
-      {w.blocks.length === 0 && (
+      {blocks.length === 0 && (
         <p className="text-muted-foreground text-center text-sm">
           Add your first exercise. Last time&apos;s numbers show up automatically.
         </p>
@@ -141,14 +283,97 @@ export function WorkoutScreen() {
       >
         Discard workout
       </button>
+      {/* Room for the Log Set bar */}
+      <div className="h-20" aria-hidden />
+
+      {slot &&
+        createPortal(
+          <div className="relative mx-auto max-w-md px-3 pb-2">
+            {focusAdjustment && (
+              <button
+                type="button"
+                onClick={() => setProgressionFor(focus!.order)}
+                className="glass-strong border-ai/50 absolute -top-14 left-3 flex h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold shadow-[0_0_24px_rgb(179_154_255/0.35)]"
+              >
+                <Sparkles className="text-ai size-4" /> New progression
+              </button>
+            )}
+            {nudge && (
+              <p role="status" className="glass-strong absolute -top-12 right-3 rounded-full px-4 py-2 text-sm font-semibold">
+                {nudge}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setNotes(true)}
+                aria-label={session.notes ? "Workout notes (1 note)" : "Workout notes"}
+                className="glass-strong relative grid size-14 shrink-0 place-items-center rounded-2xl"
+              >
+                <NotebookPen className="size-6" />
+                {session.notes && (
+                  <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 grid size-5 place-items-center rounded-full text-[11px] font-bold">
+                    1
+                  </span>
+                )}
+              </button>
+              <Button size="lg" className="h-14 flex-1 text-lg" onClick={logSet} data-testid="log-set">
+                {logLabel === "Next exercise" && <ChevronRight />}
+                {logLabel}
+              </Button>
+            </div>
+          </div>,
+          slot,
+        )}
 
       <ExercisePicker open={picking} onOpenChange={setPicking} onPick={w.addExercise} />
-      <ExerciseDetail exercise={info} onOpenChange={(o) => !o && setInfo(null)} />
+      <ExerciseDetail exercise={info} onOpenChange={(o) => !o && onInfo(null)} />
+      <ExerciseDetail exercise={chartFor} onOpenChange={(o) => !o && setChartFor(null)} showChart />
       <PlateCalculator
         open={plates.open}
         onOpenChange={(open) => setPlates((p) => ({ ...p, open }))}
         initialWeight={plates.weight}
+        onEditWeights={() => setEquipment(true)}
       />
+      <EquipmentSheet open={equipment} onOpenChange={setEquipment} />
+      <IntervalTimer open={intervalOpen} onOpenChange={setIntervalOpen} />
+      <NotesSheet open={notes} onOpenChange={setNotes} notes={session.notes} onSave={w.saveNotes} />
+      {(() => {
+        const b = blocks.find((x) => x.order === restFor);
+        return (
+          <RestSheet
+            open={!!b}
+            onOpenChange={(o) => !o && setRestFor(null)}
+            exerciseName={b?.exercise.name ?? ""}
+            seconds={b?.restSeconds ?? 0}
+            onChange={(sec) => b && w.setRest(b.order, sec)}
+          />
+        );
+      })()}
+      <SwapSheet
+        exercise={blocks.find((b) => b.order === swapFor)?.exercise ?? null}
+        onOpenChange={(o) => !o && setSwapFor(null)}
+        onSwap={(e) => swapFor != null && w.swapExercise(swapFor, e)}
+      />
+      {(() => {
+        const b = blocks.find((x) => x.order === progressionFor) ?? null;
+        const drop = (a: AdjustmentWithContext) => setAdjustments((list) => list.filter((x) => x.id !== a.id));
+        return (
+          <ProgressionSheet
+            exerciseName={b?.exercise.name ?? ""}
+            adjustment={adjustmentFor(b)}
+            previous={b?.previous ?? []}
+            repMin={b?.repMin ?? null}
+            repMax={b?.repMax ?? null}
+            onOpenChange={(o) => !o && setProgressionFor(null)}
+            onApplied={(a) => {
+              drop(a);
+              if (b && a.suggested_weight_kg != null) w.applyWeightToRemaining(b.order, a.suggested_weight_kg);
+            }}
+            onDismissed={drop}
+          />
+        );
+      })()}
       <Dialog open={confirmFinish} onOpenChange={setConfirmFinish}>
         <DialogContent>
           <DialogHeader>
@@ -166,6 +391,18 @@ export function WorkoutScreen() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/** A DOM node rendered by the app shell, found after mount. */
+const noSubscribe = () => () => {};
+
+/** The app shell's empty slot above the tab bar, once it's in the page. */
+function useSlot(id: string): HTMLElement | null {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => document.getElementById(id),
+    () => null,
   );
 }
 

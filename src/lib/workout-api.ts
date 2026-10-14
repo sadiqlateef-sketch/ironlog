@@ -47,6 +47,54 @@ export async function getLastPerformance(exerciseId: string): Promise<LastPerfor
   return unwrap(await getSupabase().rpc("get_last_performance", { p_exercise_id: exerciseId })) ?? [];
 }
 
+export type ExercisePrefs = Tables<"exercise_prefs">;
+
+export async function getExercisePrefs(exerciseId: string): Promise<ExercisePrefs | null> {
+  return unwrap(await getSupabase().from("exercise_prefs").select("*").eq("exercise_id", exerciseId).maybeSingle());
+}
+
+export async function saveExercisePrefs(
+  exerciseId: string,
+  patch: Partial<Pick<ExercisePrefs, "goal_weight_kg" | "favorite" | "notes">>,
+): Promise<ExercisePrefs> {
+  return unwrap(
+    await getSupabase()
+      .from("exercise_prefs")
+      .upsert({ exercise_id: exerciseId, ...patch }, { onConflict: "user_id,exercise_id" })
+      .select()
+      .single(),
+  );
+}
+
+export async function listFavoriteExerciseIds(): Promise<string[]> {
+  const rows = unwrap(await getSupabase().from("exercise_prefs").select("exercise_id").eq("favorite", true));
+  return rows.map((r) => r.exercise_id);
+}
+
+/** Every finished set of one exercise, with the workouts they came from. */
+export async function getExerciseHistory(exerciseId: string) {
+  const sets = unwrap(
+    await getSupabase()
+      .from("workout_sets")
+      .select("session_id, set_number, set_type, weight, reps, completed_at")
+      .eq("exercise_id", exerciseId)
+      .eq("is_completed", true)
+      .order("completed_at", { ascending: false })
+      .limit(1000),
+  );
+  const ids = [...new Set(sets.map((s) => s.session_id))];
+  const sessions = ids.length
+    ? unwrap(
+        await getSupabase()
+          .from("workout_sessions")
+          .select("id, start_time, name")
+          .in("id", ids)
+          .not("end_time", "is", null),
+      )
+    : [];
+  return { sets, sessions };
+}
+
 // ---------- Sessions ----------
 
 export async function getActiveSession(): Promise<WorkoutSession | null> {
@@ -115,6 +163,10 @@ export async function finishSession(sessionId: string): Promise<void> {
   unwrap(await supabase.from("workout_sessions").update({ end_time: new Date().toISOString() }).eq("id", sessionId).select("id"));
 }
 
+export async function updateSessionNotes(sessionId: string, notes: string): Promise<void> {
+  unwrap(await getSupabase().from("workout_sessions").update({ notes: notes.trim() || null }).eq("id", sessionId).select("id"));
+}
+
 export async function discardSession(sessionId: string): Promise<void> {
   unwrap(await getSupabase().from("workout_sessions").delete().eq("id", sessionId).select("id"));
 }
@@ -145,6 +197,11 @@ export async function insertSets(sets: SetInsert[]): Promise<WorkoutSet[]> {
 
 export async function updateSet(id: string, patch: SetUpdate): Promise<void> {
   unwrap(await getSupabase().from("workout_sets").update(patch).eq("id", id).select("id"));
+}
+
+/** Swap: move these sets onto another exercise. */
+export async function moveSetsToExercise(ids: string[], exerciseId: string): Promise<void> {
+  if (ids.length) unwrap(await getSupabase().from("workout_sets").update({ exercise_id: exerciseId }).in("id", ids).select("id"));
 }
 
 export async function deleteSets(ids: string[]): Promise<void> {

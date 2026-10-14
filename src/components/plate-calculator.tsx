@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Dumbbell } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { calculatePlates, plateColor, STANDARD_PLATES } from "@/lib/plates";
+import { calculatePlates, ownedPlates, plateColor } from "@/lib/plates";
 import { parseNumber } from "@/lib/workout-logic";
 
 /** Bottom sheet that shows exactly which plates to load on each side. */
@@ -12,11 +14,14 @@ export function PlateCalculator({
   open,
   onOpenChange,
   initialWeight,
+  onEditWeights,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Target in the user's unit, e.g. the weight typed in the current set. */
   initialWeight?: number | null;
+  /** Opens the "your bar and plates" sheet. */
+  onEditWeights?: () => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -27,21 +32,32 @@ export function PlateCalculator({
         </DialogHeader>
         {/* Mounted fresh on every open, so it starts from the current set's weight. */}
         <PlateForm initialWeight={initialWeight} />
+        {onEditWeights && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onOpenChange(false);
+              onEditWeights();
+            }}
+          >
+            <Dumbbell /> Edit available weights
+          </Button>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
 
 function PlateForm({ initialWeight }: { initialWeight?: number | null }) {
-  const { unit } = useAuth();
-  const std = STANDARD_PLATES[unit];
+  const { profile, unit } = useAuth();
+  const std = ownedPlates(profile, unit);
   const u = unit === "imperial" ? "lb" : "kg";
   const [target, setTarget] = useState(initialWeight ? String(initialWeight) : "");
   const [bar, setBar] = useState(String(std.bar));
 
   const t = parseNumber(target);
   const b = parseNumber(bar) ?? std.bar;
-  const result = t != null ? calculatePlates(t, b, [...std.plates]) : null;
+  const result = t != null ? calculatePlates(t, b, std.plates) : null;
 
   return (
     <>
@@ -66,7 +82,7 @@ function PlateForm({ initialWeight }: { initialWeight?: number | null }) {
                 <div
                   key={i}
                   className={`${plateColor(p, unit)} mx-px rounded-sm border border-black/30`}
-                  style={{ width: 14, height: `${Math.max(30, Math.min(100, (p / std.plates[0]) * 100))}%` }}
+                  style={{ width: 14, height: `${Math.max(30, Math.min(100, (p / Math.max(...std.plates)) * 100))}%` }}
                 />
               ))}
               <div className="bg-muted-foreground h-3 flex-1 rounded-r" />
