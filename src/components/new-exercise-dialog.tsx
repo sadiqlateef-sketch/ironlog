@@ -15,13 +15,16 @@ export function NewExerciseDialog({
   open,
   onOpenChange,
   onCreated,
+  initialName,
 }: {
+  /** Prefill the name, e.g. with what an imported workout called it (read on mount; give the dialog a key to reset). */
+  initialName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (exercise: Exercise) => void;
 }) {
   const { session } = useAuth();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName ?? "");
   const [muscle, setMuscle] = useState<MuscleGroup>("chest");
   const [equipment, setEquipment] = useState<EquipmentType>("barbell");
   const [compound, setCompound] = useState(true);
