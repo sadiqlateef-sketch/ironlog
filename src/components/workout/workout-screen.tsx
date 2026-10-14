@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronRight, Flag, NotebookPen, Play, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, Flag, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { EquipmentSheet } from "@/components/equipment-sheet";
+import { useSlot } from "@/hooks/use-slot";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
 import { IntervalTimer } from "@/components/workout/interval-timer";
 import { NotesSheet } from "@/components/workout/notes-sheet";
@@ -18,11 +18,12 @@ import { RestSheet } from "@/components/workout/rest-sheet";
 import { SwapSheet } from "@/components/workout/swap-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { UpNext, useActiveProgram } from "@/components/up-next";
+import { FindTab } from "@/components/workout/find-tab";
+import { InstantTab } from "@/components/workout/instant-tab";
+import { PlannedTab } from "@/components/workout/planned-tab";
 import { useWorkout, type Block } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
-  listRoutines,
   requestAdjustments,
   type AdjustmentWithContext,
   type Exercise,
@@ -52,7 +53,7 @@ export function WorkoutScreen() {
   if (w.session === null) {
     return (
       <>
-        <StartWorkout onStart={w.start} error={w.error} />
+        <StartWorkout onStart={w.start} onStartWith={w.startWith} error={w.error} />
         <Dialog open={!!summary} onOpenChange={(o) => !o && (setSummary(null), router.push("/"))}>
           <DialogContent>
             <DialogHeader>
@@ -395,56 +396,82 @@ function ActiveWorkout({
 }
 
 /** A DOM node rendered by the app shell, found after mount. */
-const noSubscribe = () => () => {};
+type StartTab = "find" | "planned" | "instant";
+const TAB_KEY = "ironlog.workout.tab";
+const START_TABS: { key: StartTab; label: string }[] = [
+  { key: "find", label: "Find" },
+  { key: "planned", label: "Planned" },
+  { key: "instant", label: "Instant" },
+];
 
-/** The app shell's empty slot above the tab bar, once it's in the page. */
-function useSlot(id: string): HTMLElement | null {
-  return useSyncExternalStore(
-    noSubscribe,
-    () => document.getElementById(id),
-    () => null,
-  );
+function savedTab(): StartTab {
+  try {
+    const t = localStorage.getItem(TAB_KEY);
+    return t === "find" || t === "instant" ? t : "planned";
+  } catch {
+    return "planned";
+  }
 }
 
-function StartWorkout({ onStart, error }: { onStart: (r?: Routine) => Promise<void>; error: string | null }) {
-  const [routines, setRoutines] = useState<Routine[]>([]);
+/** No workout running: browse plans, follow yours, or build one for right now. */
+function StartWorkout({
+  onStart,
+  onStartWith,
+  error,
+}: {
+  onStart: (r?: Routine) => Promise<void>;
+  onStartWith: (create: () => Promise<unknown>) => Promise<void>;
+  error: string | null;
+}) {
+  const [tab, setTab] = useState<StartTab>(savedTab);
   const [busy, setBusy] = useState(false);
-  const program = useActiveProgram();
+  // Remounts the Planned tab after a program is added from Find.
+  const [plannedKey, setPlannedKey] = useState(0);
 
-  useEffect(() => {
-    listRoutines().then(setRoutines).catch(() => {});
-  }, []);
+  function choose(t: StartTab) {
+    setTab(t);
+    try {
+      localStorage.setItem(TAB_KEY, t);
+    } catch {}
+  }
 
-  async function go(r?: Routine) {
+  async function wrap(run: () => Promise<void>) {
     setBusy(true);
-    await onStart(r);
+    await run();
     setBusy(false);
   }
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold">Workout</h1>
-      {error && <p className="text-destructive text-sm">{error}</p>}
-      {program && <UpNext progress={program} />}
-      <Button size={program ? "default" : "lg"} variant={program ? "secondary" : "default"} onClick={() => go()} disabled={busy}>
-        <Play /> Start empty workout
-      </Button>
-      <Button asChild variant="secondary">
-        <Link href="/plans/">
-          <Sparkles /> {program || routines.length ? "Programs & routines" : "Build a program with Claude"}
-        </Link>
-      </Button>
-      {/* With a program running, its next workout is the one to do. */}
-      {!program && routines.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Your routines</h2>
-          {routines.map((r) => (
-            <Button key={r.id} variant="secondary" className="justify-start" onClick={() => go(r)} disabled={busy}>
-              {r.name}
-              {r.ai_generated && <span className="text-muted-foreground ml-auto text-xs">AI</span>}
-            </Button>
-          ))}
-        </section>
+      <div className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Workout">
+        {START_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => choose(t.key)}
+            className={cn("h-10 rounded-lg text-sm font-semibold", tab === t.key ? "bg-foreground text-background" : "text-muted-foreground")}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {error && <p className="text-destructive text-sm">{error.includes("one_active") ? "Finish or discard your current workout first." : error}</p>}
+      {tab === "planned" && (
+        <PlannedTab key={plannedKey} busy={busy} onStart={(r) => wrap(() => onStart(r))} onFindPlan={() => choose("find")} />
+      )}
+      {tab === "instant" && <InstantTab busy={busy} onStart={(create) => wrap(() => onStartWith(create))} />}
+      {tab === "find" && (
+        <FindTab
+          busy={busy}
+          onStart={(create) => wrap(() => onStartWith(create))}
+          onPlanAdded={() => {
+            setPlannedKey((k) => k + 1);
+            choose("planned");
+          }}
+        />
       )}
     </div>
   );

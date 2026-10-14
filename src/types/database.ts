@@ -360,6 +360,14 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      reorder_routine_exercises: {
+        Args: { p_routine_id: string; p_ids: string[] };
+        Returns: undefined;
+      };
+      reorder_program_days: {
+        Args: { p_program_id: string; p_week: number; p_routine_ids: string[] };
+        Returns: undefined;
+      };
       get_last_performance: {
         Args: { p_exercise_id: string };
         Returns: {

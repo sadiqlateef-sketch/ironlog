@@ -32,7 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { MuscleGroup } from "@/types/database";
 
-type Tab = "history" | "chart" | "guide";
+export type Tab = "history" | "chart" | "guide";
 
 /**
  * Everything about one exercise in a bottom sheet: your history, a progress
@@ -42,17 +42,20 @@ export function ExerciseDetail({
   exercise,
   onOpenChange,
   showChart,
+  tab,
 }: {
   exercise: Exercise | null;
   onOpenChange: (open: boolean) => void;
   /** Open on the Chart tab instead of History. */
   showChart?: boolean;
+  /** Which tab to open on (overrides showChart). */
+  tab?: Tab;
 }) {
   return (
     <Dialog open={!!exercise} onOpenChange={onOpenChange}>
       <DialogContent>
         {/* Keyed so every exercise starts fresh on its own first tab. */}
-        {exercise && <Detail key={exercise.id} exercise={exercise} initialTab={showChart ? "chart" : "history"} />}
+        {exercise && <Detail key={exercise.id} exercise={exercise} initialTab={tab ?? (showChart ? "chart" : "history")} />}
       </DialogContent>
     </Dialog>
   );

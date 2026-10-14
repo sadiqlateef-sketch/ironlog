@@ -24,6 +24,10 @@ export async function listExercises(): Promise<Exercise[]> {
   return unwrap(await getSupabase().from("exercises").select("*").order("name"));
 }
 
+export async function getExercise(id: string): Promise<Exercise> {
+  return unwrap(await getSupabase().from("exercises").select("*").eq("id", id).single());
+}
+
 export async function createExercise(input: {
   name: string;
   primary_muscle: Exercise["primary_muscle"];
@@ -125,34 +129,53 @@ export async function listRoutines(): Promise<Routine[]> {
  * Start a workout. From a routine, the sets are created up front with the
  * routine's targets so logging is just "check, check, check".
  */
+export interface PlannedExercise {
+  exercise_id: string;
+  sets: number;
+  warmups?: number;
+  superset_group?: number | null;
+  weight_kg?: number | null;
+}
+
 export async function startSession(routine?: Routine): Promise<WorkoutSession> {
+  const items = routine
+    ? unwrap(await getSupabase().from("routine_exercises").select("*").eq("routine_id", routine.id).order("position")).map(
+        (x): PlannedExercise => ({
+          exercise_id: x.exercise_id,
+          sets: x.target_sets,
+          warmups: x.warmup_sets,
+          superset_group: x.superset_group,
+          weight_kg: x.target_weight_kg,
+        }),
+      )
+    : [];
+  return startPlannedSession({ name: routine?.name ?? "Workout", routineId: routine?.id ?? null }, items);
+}
+
+/** Start a workout with these exercises' sets laid out, ready to fill in. */
+export async function startPlannedSession(
+  info: { name: string; routineId?: string | null },
+  items: PlannedExercise[],
+): Promise<WorkoutSession> {
   const supabase = getSupabase();
   const session: WorkoutSession = unwrap(
     await supabase
       .from("workout_sessions")
-      .insert({ routine_id: routine?.id ?? null, name: routine?.name ?? "Workout", source: "web" })
+      .insert({ routine_id: info.routineId ?? null, name: info.name, source: "web" })
       .select()
       .single(),
   );
 
-  if (routine) {
-    const items = unwrap(
-      await supabase.from("routine_exercises").select("*").eq("routine_id", routine.id).order("position"),
-    );
-    // Every row spells out weight and reps: in a bulk insert, a key missing
-    // from one row is sent as null rather than the column default.
-    const sets: SetInsert[] = [];
-    items.forEach((item, i) => {
-      let n = 1;
-      for (let w = 0; w < item.warmup_sets; w++) {
-        sets.push({ session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, set_number: n++, set_type: "warmup", superset_group: item.superset_group, weight: 0, reps: 0 });
-      }
-      for (let s = 0; s < item.target_sets; s++) {
-        sets.push({ session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, set_number: n++, set_type: "normal", superset_group: item.superset_group, weight: item.target_weight_kg ?? 0, reps: 0 });
-      }
-    });
-    if (sets.length) unwrap(await supabase.from("workout_sets").insert(sets).select("id"));
-  }
+  // Every row spells out weight and reps: in a bulk insert, a key missing
+  // from one row is sent as null rather than the column default.
+  const sets: SetInsert[] = [];
+  items.forEach((item, i) => {
+    let n = 1;
+    const base = { session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, superset_group: item.superset_group ?? null, reps: 0 };
+    for (let w = 0; w < (item.warmups ?? 0); w++) sets.push({ ...base, set_number: n++, set_type: "warmup", weight: 0 });
+    for (let s = 0; s < item.sets; s++) sets.push({ ...base, set_number: n++, set_type: "normal", weight: item.weight_kg ?? 0 });
+  });
+  if (sets.length) unwrap(await supabase.from("workout_sets").insert(sets).select("id"));
   return session;
 }
 
@@ -255,7 +278,7 @@ export interface PlanInput {
 }
 
 export type RoutineWithExercises = Routine & {
-  routine_exercises: (RoutineExercise & { exercises: Pick<Exercise, "name" | "equipment"> | null })[];
+  routine_exercises: (RoutineExercise & { exercises: Pick<Exercise, "name" | "equipment" | "primary_muscle" | "image_urls"> | null })[];
 };
 
 /** Turn an Edge Function failure into the message it sent back. */
@@ -286,7 +309,7 @@ export async function listRoutinesWithExercises(): Promise<RoutineWithExercises[
   return unwrap(
     await getSupabase()
       .from("routines")
-      .select("*, routine_exercises(*, exercises(name, equipment))")
+      .select("*, routine_exercises(*, exercises(name, equipment, primary_muscle, image_urls))")
       .eq("archived", false)
       .is("program_id", null)
       .order("position")
@@ -304,7 +327,7 @@ export async function listPrograms(): Promise<ProgramWithWorkouts[]> {
   return unwrap(
     await getSupabase()
       .from("programs")
-      .select("*, routines(*, routine_exercises(*, exercises(name, equipment)))")
+      .select("*, routines(*, routine_exercises(*, exercises(name, equipment, primary_muscle, image_urls)))")
       .order("is_active", { ascending: false })
       .order("created_at", { ascending: false })
       .order("program_week", { referencedTable: "routines" })
@@ -481,4 +504,100 @@ export async function applyAdjustment(id: string): Promise<void> {
 
 export async function dismissAdjustment(id: string): Promise<void> {
   unwrap(await getSupabase().from("routine_adjustments").update({ status: "dismissed" }).eq("id", id).select("id"));
+}
+
+// ---------- Workout tab: ordering, history, templates ----------
+
+export async function reorderRoutineExercises(routineId: string, ids: string[]): Promise<void> {
+  unwrap(await getSupabase().rpc("reorder_routine_exercises", { p_routine_id: routineId, p_ids: ids }));
+}
+
+export async function reorderProgramDays(programId: string, week: number, routineIds: string[]): Promise<void> {
+  unwrap(await getSupabase().rpc("reorder_program_days", { p_program_id: programId, p_week: week, p_routine_ids: routineIds }));
+}
+
+/** Finished workouts from the last year, newest first: which routine and when. */
+export async function listWorkoutLog(): Promise<Pick<WorkoutSession, "id" | "routine_id" | "name" | "start_time">[]> {
+  return unwrap(
+    await getSupabase()
+      .from("workout_sessions")
+      .select("id, routine_id, name, start_time")
+      .not("end_time", "is", null)
+      .gte("start_time", new Date(Date.now() - 365 * 86_400_000).toISOString())
+      .order("start_time", { ascending: false }),
+  );
+}
+
+type TemplateLike = {
+  name: string;
+  description: string;
+  weeks: number;
+  days: { name: string; items: { slug: string; sets: number; reps: number; repsMax?: number; rest?: number; warmups?: number }[] }[];
+};
+
+async function insertRoutineItems(routineId: string, items: TemplateLike["days"][number]["items"], ids: Map<string, string>) {
+  const rows = items
+    .filter((it) => ids.has(it.slug))
+    .map((it, i) => ({
+      routine_id: routineId,
+      exercise_id: ids.get(it.slug)!,
+      position: i + 1,
+      target_sets: it.sets,
+      target_reps: it.reps,
+      target_reps_max: it.repsMax ?? null,
+      warmup_sets: it.warmups ?? 0,
+      rest_seconds: it.rest ?? 120,
+      superset_group: null,
+      target_weight_kg: null,
+      target_rpe: null,
+      notes: null,
+    }));
+  if (rows.length) unwrap(await getSupabase().from("routine_exercises").insert(rows).select("id"));
+}
+
+/** Look up built-in exercise ids by slug. */
+async function idsForSlugs(slugs: string[]): Promise<Map<string, string>> {
+  const rows = unwrap(await getSupabase().from("exercises").select("id, slug").in("slug", slugs).is("created_by", null));
+  return new Map(rows.map((r) => [r.slug, r.id]));
+}
+
+/** Copy a ready-made plan into your programs, optionally starting it now. */
+export async function copyTemplateProgram(t: TemplateLike, start: boolean): Promise<string> {
+  const supabase = getSupabase();
+  const ids = await idsForSlugs([...new Set(t.days.flatMap((d) => d.items.map((i) => i.slug)))]);
+  const program: Program = unwrap(
+    await supabase
+      .from("programs")
+      .insert({ name: t.name, summary: t.description, weeks: t.weeks, days_per_week: t.days.length, ai_generated: false })
+      .select()
+      .single(),
+  );
+  for (let week = 1; week <= t.weeks; week++) {
+    const routines = unwrap(
+      await supabase
+        .from("routines")
+        .insert(t.days.map((d, i) => ({ name: d.name, program_id: program.id, program_week: week, program_day: i + 1, position: i })))
+        .select("id, program_day"),
+    );
+    for (const r of routines) await insertRoutineItems(r.id, t.days[r.program_day! - 1].items, ids);
+  }
+  if (start) await startProgram(program.id);
+  return program.id;
+}
+
+/** Save one ready-made workout as a routine you can start any time. */
+export async function copyTemplateRoutine(day: TemplateLike["days"][number], description: string): Promise<Routine> {
+  const ids = await idsForSlugs(day.items.map((i) => i.slug));
+  const routine: Routine = unwrap(await getSupabase().from("routines").insert({ name: day.name, description }).select().single());
+  await insertRoutineItems(routine.id, day.items, ids);
+  return routine;
+}
+
+/** Start a ready-made workout right now without saving it. */
+export async function startTemplateWorkout(day: TemplateLike["days"][number]): Promise<WorkoutSession> {
+  const ids = await idsForSlugs(day.items.map((i) => i.slug));
+  return startPlannedSession(
+    { name: day.name },
+    day.items.filter((i) => ids.has(i.slug)).map((i) => ({ exercise_id: ids.get(i.slug)!, sets: i.sets, warmups: i.warmups })),
+  );
 }
