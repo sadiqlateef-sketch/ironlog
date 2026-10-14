@@ -73,6 +73,8 @@ export type Database = {
           animation_url: string | null;
           instructions: string | null;
           created_by: string | null;
+          aliases: string[];
+          image_urls: string[];
         } & Timestamps;
         Insert: {
           id?: string;
@@ -85,8 +87,28 @@ export type Database = {
           animation_url?: string | null;
           instructions?: string | null;
           created_by?: string | null;
+          aliases?: string[];
+          image_urls?: string[];
         };
         Update: Partial<Database["public"]["Tables"]["exercises"]["Insert"]>;
+        Relationships: [];
+      };
+      exercise_prefs: {
+        Row: {
+          user_id: string;
+          exercise_id: string;
+          goal_weight_kg: number | null;
+          favorite: boolean;
+          notes: string | null;
+        } & Timestamps;
+        Insert: {
+          user_id?: string;
+          exercise_id: string;
+          goal_weight_kg?: number | null;
+          favorite?: boolean;
+          notes?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["exercise_prefs"]["Insert"]>;
         Relationships: [];
       };
       routines: {

@@ -13,6 +13,8 @@ interface AuthState {
   profile: Profile | null;
   unit: UnitSystem;
   setUnit: (unit: UnitSystem) => Promise<void>;
+  /** Save profile settings (bar, plates, rest time...) and update them here. */
+  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -52,13 +54,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [userId],
   );
 
+  const updateProfile = useCallback<AuthState["updateProfile"]>(
+    async (patch) => {
+      if (!userId) return;
+      const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select().single();
+      if (error) throw new Error(error.message);
+      setProfile(data);
+    },
+    [userId],
+  );
+
   const signOut = useCallback(async () => {
     await getSupabase().auth.signOut();
   }, []);
 
   return (
     <AuthContext
-      value={{ session, profile, unit: profile?.unit_system ?? "imperial", setUnit, signOut }}
+      value={{ session, profile, unit: profile?.unit_system ?? "imperial", setUnit, updateProfile, signOut }}
     >
       {children}
     </AuthContext>

@@ -7,7 +7,7 @@ import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExerciseList } from "@/components/exercise-list";
 import { NewExerciseDialog } from "@/components/new-exercise-dialog";
 import { Button } from "@/components/ui/button";
-import { listExercises, type Exercise } from "@/lib/workout-api";
+import { listExercises, listFavoriteExerciseIds, type Exercise } from "@/lib/workout-api";
 
 export default function ExercisesPage() {
   return (
@@ -22,9 +22,12 @@ function Library() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Exercise | null>(null);
   const [creating, setCreating] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const loadFavorites = () => listFavoriteExerciseIds().then((ids) => setFavorites(new Set(ids))).catch(() => {});
 
   useEffect(() => {
     listExercises().then(setExercises).catch((e: Error) => setError(e.message));
+    loadFavorites();
   }, []);
 
   return (
@@ -37,11 +40,18 @@ function Library() {
       </header>
       {error && <p className="text-destructive text-sm">{error}</p>}
       {exercises ? (
-        <ExerciseList exercises={exercises} onSelect={setSelected} />
+        <ExerciseList exercises={exercises} onSelect={setSelected} favorites={favorites} muscleGrid />
       ) : (
         !error && <p className="text-muted-foreground text-sm">Loading…</p>
       )}
-      <ExerciseDetail exercise={selected} onOpenChange={(o) => !o && setSelected(null)} />
+      <ExerciseDetail
+        exercise={selected}
+        onOpenChange={(o) => {
+          if (o) return;
+          setSelected(null);
+          loadFavorites();
+        }}
+      />
       <NewExerciseDialog
         open={creating}
         onOpenChange={setCreating}

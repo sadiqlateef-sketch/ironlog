@@ -43,6 +43,37 @@ export const STANDARD_PLATES = {
   metric: { bar: 20, plates: [25, 20, 15, 10, 5, 2.5, 1.25] },
 } as const;
 
+/** Every plate size you can tick in "Edit available weights", in each unit. */
+export const ALL_PLATES = {
+  imperial: [55, 45, 35, 25, 15, 10, 5, 2.5, 1.25],
+  metric: [25, 20, 15, 10, 5, 2.5, 1.25, 0.5],
+} as const;
+
+const KG_TO_LB = 2.2046226218;
+
+/** Round a converted plate to its nominal size (20.41 kg -> 45 lb). */
+function nominal(value: number): number {
+  return Math.round(value * 4) / 4;
+}
+
+/**
+ * The bar and plates you own (stored in kg on your profile), in your unit.
+ * Falls back to the standard set when nothing is saved.
+ */
+export function ownedPlates(
+  profile: { bar_weight_kg: number; available_plates_kg: number[] } | null,
+  unit: "metric" | "imperial",
+): { bar: number; plates: number[] } {
+  if (!profile || profile.available_plates_kg.length === 0) {
+    return { bar: STANDARD_PLATES[unit].bar, plates: [...STANDARD_PLATES[unit].plates] };
+  }
+  const conv = (kg: number) => nominal(unit === "imperial" ? Number(kg) * KG_TO_LB : Number(kg));
+  return {
+    bar: conv(profile.bar_weight_kg),
+    plates: [...new Set(profile.available_plates_kg.map(conv))].sort((a, b) => b - a),
+  };
+}
+
 /** Colour per plate, following the IWF/competition convention. */
 export function plateColor(plate: number, unit: "metric" | "imperial"): string {
   const kg = unit === "imperial" ? plate / 2.2046226218 : plate;
