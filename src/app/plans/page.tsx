@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Pencil, Play, RotateCcw, Sparkles, Square, Trash2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { AppShell } from "@/components/app-shell";
+import { UnmarkDay } from "@/components/unmark-day";
 import { WorkoutEditor } from "@/components/workout-editor";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -412,6 +413,7 @@ function ProgramCard({
             done={done.has(d.id)}
             next={active && progress?.next_routine_id === d.id}
             onEdit={() => onEdit(d)}
+            onChange={onChange}
           />
         ))}
       </div>
@@ -424,11 +426,13 @@ function DayRow({
   done = false,
   next = false,
   onEdit,
+  onChange,
 }: {
   routine: RoutineWithExercises;
   done?: boolean;
   next?: boolean;
   onEdit: () => void;
+  onChange?: () => void;
 }) {
   const { unit } = useAuth();
   const router = useRouter();
@@ -477,6 +481,11 @@ function DayRow({
         </Button>
       </summary>
       {error && <p className="text-destructive px-3 text-sm">{error}</p>}
+      {done && (
+        <div className="px-3 pb-2">
+          <UnmarkDay routineId={routine.id} onDone={() => onChange?.()} />
+        </div>
+      )}
       <ul className="flex flex-col gap-1.5 px-3 pb-3 text-sm">
         {routine.routine_exercises.map((x) => (
           <li key={x.id} className="flex flex-col">

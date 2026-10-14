@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Flame, Lightbulb, RefreshCw, Settings } from "lucide-react";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { useAuth } from "@/components/providers/auth-provider";
-import { SessionSheet } from "@/components/session-sheet";
+import { DaySheet } from "@/components/session-sheet";
 import { SettingsSheet } from "@/components/settings-sheet";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,13 +153,12 @@ function compact(n: number) {
 
 // ---------------- Calendar + totals (#47, #48) ----------------
 
-export function CalendarCard({ data }: { data: StatsData }) {
+export function CalendarCard({ data, onChanged }: { data: StatsData; onChanged?: () => void }) {
   const [month, setMonth] = useState(() => {
     const d = new Date(data.now);
     return { y: d.getFullYear(), m: d.getMonth() };
   });
-  const [open, setOpen] = useState<string | null>(null);
-  const [pick, setPick] = useState<StatSession[] | null>(null);
+  const [open, setOpen] = useState<Date | null>(null);
   const byDay = useMemo(() => {
     const m = new Map<string, StatSession[]>();
     for (const s of data.sessions) m.set(dayKey(s.start_time), [...(m.get(dayKey(s.start_time)) ?? []), s]);
@@ -201,12 +200,13 @@ export function CalendarCard({ data }: { data: StatsData }) {
             <button
               key={i}
               type="button"
-              disabled={!ss}
-              onClick={() => (ss!.length === 1 ? setOpen(ss![0].id) : setPick(ss!))}
+              disabled={k > today}
+              onClick={() => setOpen(d)}
               aria-label={`${d.toLocaleDateString(undefined, { month: "long", day: "numeric" })}${ss ? `: ${ss.length} workout${ss.length > 1 ? "s" : ""}` : ""}`}
               className={cn(
                 "mx-auto grid size-9 place-items-center rounded-full font-mono text-sm",
-                ss ? "bg-primary text-primary-foreground font-bold" : "text-foreground/85",
+                ss ? "bg-primary text-primary-foreground font-bold" : "text-foreground/85 hover:bg-accent",
+                k > today && "text-muted-foreground",
                 isToday && "ring-primary-text ring-2",
               )}
             >
@@ -215,6 +215,7 @@ export function CalendarCard({ data }: { data: StatsData }) {
           );
         })}
       </div>
+      <p className="text-muted-foreground text-center text-xs">Tap a day to see, fix or delete its workout.</p>
       <dl className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-secondary rounded-xl px-2 py-2">
           <dt className="text-muted-foreground text-xs">This month</dt>
@@ -232,34 +233,8 @@ export function CalendarCard({ data }: { data: StatsData }) {
           </dd>
         </div>
       </dl>
-      <SessionSheet sessionId={open} onOpenChange={(o) => !o && setOpen(null)} />
-      {pick && (
-        <SessionPicker
-          sessions={pick}
-          onPick={(id) => {
-            setPick(null);
-            setOpen(id);
-          }}
-          onClose={() => setPick(null)}
-        />
-      )}
+      <DaySheet day={open} onOpenChange={(o) => !o && setOpen(null)} onChanged={onChanged} />
     </Card>
-  );
-}
-
-function SessionPicker({ sessions, onPick, onClose }: { sessions: StatSession[]; onPick: (id: string) => void; onClose: () => void }) {
-  return (
-    <div className="flex flex-col gap-2" role="group" aria-label="Pick a workout">
-      {sessions.map((s) => (
-        <Button key={s.id} variant="secondary" className="justify-start" onClick={() => onPick(s.id)}>
-          {s.name ?? "Workout"} ·{" "}
-          {new Date(s.start_time).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
-        </Button>
-      ))}
-      <Button variant="ghost" onClick={onClose}>
-        Cancel
-      </Button>
-    </div>
   );
 }
 

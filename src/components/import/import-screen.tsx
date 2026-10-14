@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Camera, Check, ImagePlus, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { ExercisePicker } from "@/components/exercise-picker";
+import { SET_GRID, SetLine } from "@/components/set-line";
 import { NewExerciseDialog } from "@/components/new-exercise-dialog";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { prepareImages } from "@/lib/import-image";
 import { toKg, kgToLb, type UnitSystem } from "@/lib/units";
 import { cn } from "@/lib/utils";
-import { nextSetType, setLabel } from "@/lib/workout-logic";
+import { setLabel } from "@/lib/workout-logic";
 import { listExercises, readWorkout, saveFinishedWorkout, type Exercise, type ImportedWorkout, type WorkoutSet } from "@/lib/workout-api";
 
 type SetType = WorkoutSet["set_type"];
@@ -43,16 +44,6 @@ interface Draft {
   notes: string;
   exercises: DraftExercise[];
 }
-
-const typeStyles = {
-  normal: "bg-secondary text-foreground",
-  warmup: "bg-set-warmup/20 text-set-warmup",
-  drop: "bg-set-drop/20 text-set-drop",
-  failure: "bg-set-failure/20 text-set-failure",
-} as const;
-
-const numInput =
-  "h-11 w-full min-w-0 rounded-xl bg-secondary text-center font-mono text-lg font-bold outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring";
 
 let nextKey = 1;
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -383,7 +374,7 @@ function Review({
               </Button>
             </div>
 
-            <div className="grid grid-cols-[2.5rem_1fr_1fr_2.75rem] items-center gap-2 px-1">
+            <div className={SET_GRID}>
               <span className="text-muted-foreground text-center text-xs font-semibold">Set</span>
               <span className="text-muted-foreground text-center text-xs font-semibold">{unitLabel}</span>
               <span className="text-muted-foreground text-center text-xs font-semibold">Reps</span>
@@ -467,50 +458,6 @@ function Review({
         }}
       />
     </div>
-  );
-}
-
-function SetLine({
-  s,
-  label,
-  onChange,
-  onRemove,
-}: {
-  s: DraftSet;
-  label: string;
-  onChange: (patch: Partial<DraftSet>) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => onChange({ type: nextSetType(s.type) })}
-        aria-label={`Set type ${s.type}. Tap to change.`}
-        className={cn("h-9 rounded-lg font-mono text-sm font-bold", typeStyles[s.type])}
-      >
-        {label}
-      </button>
-      <input
-        inputMode="decimal"
-        aria-label="Weight"
-        placeholder="0"
-        value={s.weight}
-        onChange={(e) => onChange({ weight: e.target.value.replace(/[^\d.]/g, "") })}
-        className={numInput}
-      />
-      <input
-        inputMode="numeric"
-        aria-label="Reps"
-        placeholder="0"
-        value={s.reps}
-        onChange={(e) => onChange({ reps: e.target.value.replace(/\D/g, "") })}
-        className={numInput}
-      />
-      <button type="button" onClick={onRemove} aria-label="Remove set" className="text-muted-foreground grid h-11 place-items-center">
-        <X className="size-5" />
-      </button>
-    </>
   );
 }
 

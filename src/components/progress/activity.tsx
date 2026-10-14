@@ -23,7 +23,7 @@ type Feed = {
 };
 
 /** Every finished workout, newest first, with its training summary and records. */
-export function ActivityTab({ reloadKey }: { reloadKey: number }) {
+export function ActivityTab({ reloadKey, onChanged }: { reloadKey: number; onChanged?: () => void }) {
   const [feed, setFeed] = useState<{ key: number; data: Feed } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
@@ -69,7 +69,7 @@ export function ActivityTab({ reloadKey }: { reloadKey: number }) {
           Show more workouts
         </Button>
       )}
-      <SessionSheet sessionId={open} onOpenChange={(o) => !o && setOpen(null)} />
+      <SessionSheet sessionId={open} onOpenChange={(o) => !o && setOpen(null)} onChanged={onChanged} />
     </>
   );
 }
@@ -140,7 +140,7 @@ function WorkoutCard({ session, feed, onOpen }: { session: WorkoutSession; feed:
 
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <Button variant="secondary" onClick={onOpen}>
-          View details <ChevronRight />
+          View, edit or delete <ChevronRight />
         </Button>
         <Button variant="secondary" size="icon" aria-label={`Share ${title} as an image`} disabled={sharing === "Making the image…"} onClick={share}>
           <Share2 />

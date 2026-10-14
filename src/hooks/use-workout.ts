@@ -25,6 +25,7 @@ import {
   type WorkoutSession,
   type WorkoutSet,
 } from "@/lib/workout-api";
+import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz } from "@/lib/native";
 import { bestE1rm, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
 import type { SetType } from "@/types/database";
@@ -204,6 +205,25 @@ export function useWorkout() {
     if (profile) load();
   }, [profile, load]);
 
+  // ---- Gym check-in ----
+  // Once per workout, as soon as it's open on the phone (that also covers a
+  // workout started on the watch): are we at the gym? No fix yet = try again at Finish.
+  const gymLat = profile?.gym_lat;
+  const gymLng = profile?.gym_lng;
+  const gymRadius = profile?.gym_radius_m;
+  const gymName = profile?.gym_name;
+  const checkingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!session || session.at_gym !== null || gymLat == null || gymLng == null || checkingRef.current === session.id) return;
+    const id = session.id;
+    checkingRef.current = id;
+    checkAtGym(gymOf({ gym_lat: gymLat, gym_lng: gymLng, gym_radius_m: gymRadius ?? 200, gym_name: gymName ?? null })).then(async (at) => {
+      if (at === null) return;
+      await markSessionAtGym(id, at).catch(() => {});
+      setSession((s) => (s && s.id === id ? { ...s, at_gym: at } : s));
+    });
+  }, [session, gymLat, gymLng, gymRadius, gymName]);
+
   // ---- Session lifecycle ----
   const start = useCallback(
     async (routine?: Routine) => {
@@ -236,7 +256,22 @@ export function useWorkout() {
     try {
       await finishSession(session.id);
       restTimer.stop();
+      const endedAt = Date.now();
+      const gym = gymOf(profile);
+      // Workouts at the gym longer than 30 minutes go on your Google Calendar.
+      if (session.at_gym === null && gym) {
+        // Location wasn't known at the start; check now without holding up the summary.
+        const { id, start_time } = session;
+        checkAtGym(gym).then(async (at) => {
+          if (at === null) return;
+          await markSessionAtGym(id, at).catch(() => {});
+          if (countsForCalendar(at, start_time, endedAt)) syncGymCalendar();
+        });
+      } else if (countsForCalendar(session.at_gym, session.start_time, endedAt)) {
+        syncGymCalendar();
+      }
       const summary = {
+        atGym: session.at_gym === true ? (gym?.name ?? "the gym") : null,
         sessionId: session.id,
         routineId: session.routine_id,
         durationMin: Math.round((Date.now() - new Date(session.start_time).getTime()) / 60000),
@@ -252,7 +287,7 @@ export function useWorkout() {
       fail(e);
       return null;
     }
-  }, [session, restTimer, fail, setBlocks]);
+  }, [session, profile, restTimer, fail, setBlocks]);
 
   const discard = useCallback(async () => {
     if (!session) return;

@@ -7,6 +7,8 @@
 #   SUPABASE_PROJECT_REF   the id in your project URL: https://<ref>.supabase.co
 #   SUPABASE_DB_PASSWORD   the database password you chose when creating the project
 #   ANTHROPIC_API_KEY      optional: turns on Claude for AI programs
+#   GOOGLE_CLIENT_ID       optional, with GOOGLE_CLIENT_SECRET: turns on gym
+#   GOOGLE_CLIENT_SECRET   workouts on Google Calendar (see README)
 name: Deploy database and functions
 
 on:
@@ -29,6 +31,8 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -63,8 +67,12 @@ jobs:
           fi
 
       - name: Deploy functions
-        run: npx supabase functions deploy generate-plan suggest-adjustments watch-pair import-workout claude-connector --project-ref "$PROJECT_REF" --use-api
+        run: npx supabase functions deploy generate-plan suggest-adjustments watch-pair import-workout gym-calendar claude-connector --project-ref "$PROJECT_REF" --use-api
 
       - name: Set Claude API key
         if: ${{ env.ANTHROPIC_API_KEY != '' }}
         run: npx supabase secrets set ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" --project-ref "$PROJECT_REF"
+
+      - name: Set Google Calendar keys
+        if: ${{ env.GOOGLE_CLIENT_ID != '' && env.GOOGLE_CLIENT_SECRET != '' }}
+        run: npx supabase secrets set GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" --project-ref "$PROJECT_REF"
