@@ -36,8 +36,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-md flex-1 px-4 pt-6 pb-40">{children}</main>
       <div className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
         <RestTimerBar />
-        <nav className="bg-background/95 border-t backdrop-blur">
-          <ul className="mx-auto grid max-w-md grid-cols-4">
+        <nav className="mx-auto max-w-md px-3 pb-3">
+          <ul className="glass-strong grid grid-cols-4 rounded-3xl">
             {tabs.map(({ href, label, icon: Icon }) => {
               const active = href === "/" ? pathname === "/" : pathname.startsWith(href.slice(0, -1));
               return (
@@ -45,11 +45,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Link
                     href={href}
                     className={cn(
-                      "flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium",
-                      active ? "text-primary" : "text-muted-foreground",
+                      "flex flex-col items-center gap-1 py-3 text-xs font-semibold",
+                      active ? "text-primary-text" : "text-muted-foreground",
                     )}
                   >
-                    <Icon className="size-5" />
+                    <Icon className="size-6" strokeWidth={active ? 2.4 : 2} />
                     {label}
                   </Link>
                 </li>

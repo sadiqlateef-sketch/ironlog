@@ -168,7 +168,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="text-primary size-4" /> New program with Claude
+          <Sparkles className="text-primary-text size-4" /> New program with Claude
         </CardTitle>
         <CardDescription>Every workout mapped out week by week, built around your logged maxes and equipment.</CardDescription>
       </CardHeader>
@@ -186,7 +186,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
         <label className="flex flex-col gap-1 text-sm font-medium">
           Style
           <select
-            className="border-input bg-background h-11 rounded-md border px-3 text-base font-normal"
+            className="border-input bg-secondary h-11 rounded-xl border px-3 text-base font-normal"
             value={form.methodology}
             onChange={(e) => set("methodology", e.target.value as PlanInput["methodology"])}
           >
@@ -201,7 +201,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
           <label className="flex flex-col gap-1 text-sm font-medium">
             Weeks
             <select
-              className="border-input bg-background h-11 rounded-md border px-3 text-base font-normal"
+              className="border-input bg-secondary h-11 rounded-xl border px-3 text-base font-normal"
               value={form.weeks}
               onChange={(e) => set("weeks", Number(e.target.value))}
             >
@@ -213,7 +213,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
           <label className="flex flex-col gap-1 text-sm font-medium">
             Days a week
             <select
-              className="border-input bg-background h-11 rounded-md border px-3 text-base font-normal"
+              className="border-input bg-secondary h-11 rounded-xl border px-3 text-base font-normal"
               value={form.days_per_week}
               onChange={(e) => set("days_per_week", Number(e.target.value))}
             >
@@ -225,7 +225,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
           <label className="flex flex-col gap-1 text-sm font-medium">
             Minutes each
             <select
-              className="border-input bg-background h-11 rounded-md border px-3 text-base font-normal"
+              className="border-input bg-secondary h-11 rounded-xl border px-3 text-base font-normal"
               value={form.session_minutes}
               onChange={(e) => set("session_minutes", Number(e.target.value))}
             >
@@ -267,7 +267,7 @@ function Generator({ onCreated }: { onCreated: () => void }) {
             maxLength={500}
             rows={2}
             placeholder="e.g. bad left shoulder, want a bigger deadlift, meet in 12 weeks"
-            className="border-input bg-background placeholder:text-muted-foreground rounded-md border px-3 py-2 text-base font-normal"
+            className="border-input bg-secondary placeholder:text-muted-foreground rounded-xl border px-3 py-2 text-base font-normal"
             value={form.notes}
             onChange={(e) => set("notes", e.target.value)}
           />
@@ -331,7 +331,7 @@ function ProgramCard({
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            {active && <p className="text-primary text-xs font-bold tracking-wide uppercase">Active program</p>}
+            {active && <p className="text-primary-text text-xs font-bold tracking-wide uppercase">Active program</p>}
             <CardTitle className="leading-snug">{program.name}</CardTitle>
             <CardDescription>
               {program.weeks} {program.weeks === 1 ? "week" : "weeks"} · {program.days_per_week} days a week
@@ -447,7 +447,7 @@ function DayRow({
   return (
     <details className={cn("bg-secondary rounded-lg", next && "ring-primary ring-2")} data-testid="workout-day">
       <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5">
-        {done && <Check className="text-primary size-4 shrink-0" aria-label="Done" />}
+        {done && <Check className="text-primary-text size-4 shrink-0" aria-label="Done" />}
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{routine.program_day ? `Day ${routine.program_day}` : routine.name}</span>
           <span className="text-muted-foreground block truncate text-xs">

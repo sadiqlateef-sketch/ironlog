@@ -30,7 +30,7 @@ export default function App() {
       <StatusBar hidden />
       {route === "boot" && (
         <Screen center scroll={false}>
-          <ActivityIndicator color={C.lime} />
+          <ActivityIndicator color={C.accentText} />
         </Screen>
       )}
       {route === "pair" && <PairScreen onLinked={signedIn} />}

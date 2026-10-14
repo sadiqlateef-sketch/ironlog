@@ -25,13 +25,15 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/70" />
+      <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
           // Bottom sheet on phones, centred dialog on wider screens.
-          "bg-background fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col gap-4 overflow-y-auto rounded-t-2xl border p-5 shadow-lg",
-          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
+          "bg-popover fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col gap-4 overflow-y-auto rounded-t-3xl border p-5 pt-7 shadow-2xl backdrop-blur-2xl backdrop-saturate-150",
+          // Grab handle, like a native bottom sheet (hidden on the centred dialog).
+          "before:bg-foreground/25 before:absolute before:top-2.5 before:left-1/2 before:h-1 before:w-10 before:-translate-x-1/2 before:rounded-full sm:before:hidden sm:pt-5",
+          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           className,
         )}

@@ -1,14 +1,17 @@
-// Shared look for the round watch screen: near-black, high contrast, big touch targets.
+// Shared look for the round watch screen: matches the phone's dark glass theme,
+// high contrast, big touch targets. Real blur is too heavy for a watch chip and
+// drains the battery, so "glass" here is a solid navy tint over near-black.
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ViewStyle } from "react-native";
 
 export const C = {
-  bg: "#0b0b0b",
-  card: "#1c1c1e",
-  text: "#fafafa",
-  muted: "#a1a1aa",
-  lime: "#aae841",
-  onLime: "#0b0b0b",
+  bg: "#07080f",
+  card: "#1a1e36",
+  text: "#f5f7ff",
+  muted: "#a3aacb",
+  accent: "#3d63ee", // fills (buttons, progress); white text on it
+  onAccent: "#ffffff",
+  accentText: "#84a8ff", // blue text and spinners on the dark background
   amber: "#f5b544",
   red: "#ff6b5e",
 };
@@ -56,13 +59,13 @@ export function Btn({
       style={({ pressed }) => [
         styles.btn,
         big && styles.btnBig,
-        kind === "primary" && { backgroundColor: C.lime },
+        kind === "primary" && { backgroundColor: C.accent },
         kind === "secondary" && { backgroundColor: C.card },
         kind === "ghost" && { backgroundColor: "transparent" },
         (pressed || disabled) && { opacity: 0.6 },
       ]}
     >
-      <Text style={[styles.btnText, big && styles.btnTextBig, { color: kind === "primary" ? C.onLime : C.text }]} numberOfLines={1}>
+      <Text style={[styles.btnText, big && styles.btnTextBig, { color: kind === "primary" ? C.onAccent : C.text }]} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>

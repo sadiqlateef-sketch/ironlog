@@ -14,7 +14,7 @@ const typeStyles = {
 } as const;
 
 const inputClass =
-  "h-11 w-full min-w-0 rounded-md bg-secondary text-center font-mono text-lg font-semibold outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring disabled:opacity-100";
+  "h-12 w-full min-w-0 rounded-xl bg-secondary text-center font-mono text-xl font-extrabold outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring disabled:opacity-100";
 
 export function SetRow({
   set,
@@ -22,6 +22,7 @@ export function SetRow({
   weightPlaceholder,
   previousText,
   repPlaceholder,
+  current,
   editing,
   onChange,
   onCommit,
@@ -34,6 +35,8 @@ export function SetRow({
   weightPlaceholder: string;
   previousText: string;
   repPlaceholder: string;
+  /** The next set to do: highlighted so it is easy to find mid-workout. */
+  current: boolean;
   editing: boolean;
   onChange: (patch: Partial<UiSet>) => void;
   onCommit: () => void;
@@ -54,8 +57,9 @@ export function SetRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[2.5rem_1fr_4.5rem_4rem_2.75rem] items-center gap-2 rounded-lg px-1 py-1 transition-colors",
-        set.done && "bg-primary/10",
+        "grid grid-cols-[2.5rem_1fr_4.5rem_4rem_3rem] items-center gap-2 rounded-lg px-1 py-1 transition-colors",
+        set.done && "bg-success/10",
+        current && "bg-primary/15 ring-primary/60 ring-1",
         shake && "animate-pulse ring-destructive ring-2",
       )}
       data-testid="set-row"
@@ -64,7 +68,7 @@ export function SetRow({
         type="button"
         onClick={onCycleType}
         aria-label={`Set ${workingNumber}, type ${set.type}. Tap to change type.`}
-        className={cn("h-9 rounded-md font-mono text-sm font-bold", typeStyles[set.type])}
+        className={cn("h-9 rounded-lg font-mono text-sm font-bold", typeStyles[set.type])}
       >
         {setLabel(set.type, workingNumber)}
       </button>
@@ -105,7 +109,7 @@ export function SetRow({
           type="button"
           onClick={onRemove}
           aria-label="Delete set"
-          className="bg-destructive/20 text-destructive grid size-11 place-items-center rounded-md"
+          className="bg-destructive/20 text-destructive grid size-12 place-items-center rounded-xl"
         >
           <X className="size-5" />
         </button>
@@ -116,8 +120,8 @@ export function SetRow({
           aria-label={set.done ? "Mark set not done" : "Complete set"}
           aria-pressed={set.done}
           className={cn(
-            "grid size-11 place-items-center rounded-md transition-colors",
-            set.done ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
+            "grid size-12 place-items-center rounded-xl transition-colors",
+            set.done ? "bg-success text-[#08200d]" : "bg-secondary text-muted-foreground",
           )}
         >
           <Check className="size-6" strokeWidth={3} />

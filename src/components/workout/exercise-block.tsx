@@ -47,14 +47,14 @@ export function ExerciseBlock({
   return (
     <section
       className={cn(
-        "bg-card flex flex-col gap-2 rounded-xl border p-3",
+        "glass flex flex-col gap-2 rounded-2xl p-3",
         block.supersetGroup != null && "border-l-set-drop border-l-4",
       )}
       data-testid="exercise-block"
     >
       <header className="flex items-start gap-2">
         <button type="button" onClick={onShowInfo} className="min-w-0 flex-1 text-left">
-          <h2 className="text-primary truncate text-lg font-bold">{block.exercise.name}</h2>
+          <h2 className="truncate text-xl font-bold tracking-tight">{block.exercise.name}</h2>
           <p className="text-muted-foreground text-xs">
             {block.supersetGroup != null && <span className="text-set-drop mr-2 font-semibold">SUPERSET</span>}
             {block.repTarget && <>Target {block.repTarget} reps · </>}
@@ -97,7 +97,7 @@ export function ExerciseBlock({
         </Button>
       </header>
 
-      <div className="text-muted-foreground grid grid-cols-[2.5rem_1fr_4.5rem_4rem_2.75rem] gap-2 px-1 text-center text-[11px] font-semibold tracking-wide uppercase">
+      <div className="text-muted-foreground grid grid-cols-[2.5rem_1fr_4.5rem_4rem_3rem] gap-2 px-1 text-center text-[11px] font-semibold tracking-wide uppercase">
         <span>Set</span>
         <span>Last time</span>
         <span>{u}</span>
@@ -115,6 +115,7 @@ export function ExerciseBlock({
             previousText={prev ? `${toDisplay(prev.weight, unit) || "0"}×${prev.reps}` : "–"}
             weightPlaceholder={prev ? toDisplay(prev.weight, unit) || "0" : "0"}
             repPlaceholder={prev ? String(prev.reps) : (block.repTarget?.split("-")[0] ?? "0")}
+            current={set === nextUndone}
             editing={editing}
             onChange={(patch) => onChangeSet(set.id, patch)}
             onCommit={() => onCommitSet(set.id)}

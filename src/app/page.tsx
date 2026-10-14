@@ -81,7 +81,7 @@ function Dashboard() {
         <Button variant="secondary" onClick={() => setPlates(true)}>
           <Calculator /> Plates
         </Button>
-        <div className="bg-secondary grid grid-cols-2 rounded-md p-1" role="group" aria-label="Weight unit">
+        <div className="bg-secondary grid grid-cols-2 rounded-xl p-1" role="group" aria-label="Weight unit">
           {(["imperial", "metric"] as const).map((u) => (
             <button
               key={u}
@@ -90,7 +90,7 @@ function Dashboard() {
               aria-pressed={unit === u}
               className={cn(
                 "rounded text-sm font-semibold",
-                unit === u ? "bg-background text-foreground" : "text-muted-foreground",
+                unit === u ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
               )}
             >
               {u === "imperial" ? "lb" : "kg"}

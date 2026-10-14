@@ -9,7 +9,7 @@ import { applyAdjustment, dismissAdjustment, type AdjustmentWithContext } from "
 import { cn } from "@/lib/utils";
 
 const ACTIONS = {
-  increase: { label: "Add weight", icon: ArrowUp, tone: "text-primary" },
+  increase: { label: "Add weight", icon: ArrowUp, tone: "text-primary-text" },
   hold: { label: "Repeat", icon: Repeat, tone: "text-muted-foreground" },
   deload: { label: "Deload", icon: ArrowDown, tone: "text-set-warmup" },
   adjust_reps: { label: "New rep target", icon: ArrowRight, tone: "text-set-drop" },
