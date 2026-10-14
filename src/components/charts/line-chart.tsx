@@ -79,7 +79,7 @@ export function LineChart({ data, height = 200, ariaLabel }: { data: LinePoint[]
             <line x1={x(hover)} x2={x(hover)} y1={M.top} y2={y(yMin)} stroke="var(--chart-axis)" />
           )}
           {[hover ?? last].map((i) => (
-            <circle key={i} cx={x(i)} cy={y(data[i].value)} r={5} fill="var(--chart-1)" stroke="var(--card)" strokeWidth={2} />
+            <circle key={i} cx={x(i)} cy={y(data[i].value)} r={5} fill="var(--chart-1)" stroke="var(--card-solid)" strokeWidth={2} />
           ))}
           {hover == null && (
             <text x={x(last) + 9} y={y(data[last].value)} dy="0.32em" className="fill-foreground text-[11px] font-semibold">

@@ -44,7 +44,7 @@ export function UpNext({ progress }: { progress: ProgramProgress }) {
   return (
     <Card className="border-primary gap-3 p-4" data-testid="up-next">
       <div className="min-w-0">
-        <p className="text-primary text-xs font-bold tracking-wide uppercase">
+        <p className="text-primary-text text-xs font-bold tracking-wide uppercase">
           {finished ? "Program complete" : `Up next · Week ${progress.next_week} of ${progress.weeks}`}
         </p>
         <p className="truncate text-lg font-bold">

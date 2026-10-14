@@ -77,7 +77,7 @@ export function BodyHeatmap({ data }: { data: MuscleRecovery[] }) {
               key={i}
               d={s.d}
               fill={heatColor(pct)}
-              stroke={active === s.m ? "var(--foreground)" : "var(--card)"}
+              stroke={active === s.m ? "var(--foreground)" : "var(--card-solid)"}
               strokeWidth={active === s.m ? 2 : 1.5}
               tabIndex={i === shapes.findIndex((x) => x.m === s.m) ? 0 : -1}
               aria-label={`${MUSCLE_LABELS[s.m]}: ${pct}% recovered`}

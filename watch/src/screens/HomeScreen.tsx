@@ -50,14 +50,14 @@ export function HomeScreen({ onOpenWorkout, onSignedOut }: { onOpenWorkout: () =
   if (active === undefined) {
     return (
       <Screen center scroll={false}>
-        <ActivityIndicator color={C.lime} />
+        <ActivityIndicator color={C.accentText} />
       </Screen>
     );
   }
 
   return (
     <Screen>
-      <T center bold style={{ color: C.lime, fontSize: 16 }}>
+      <T center bold style={{ color: C.accentText, fontSize: 16 }}>
         Ironlog
       </T>
       {error && (

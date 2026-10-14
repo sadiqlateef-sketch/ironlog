@@ -51,7 +51,7 @@ function Progress() {
       <h1 className="text-2xl font-bold">Progress</h1>
       <RecoveryCard />
       {/* One filter row, scoping every chart below it */}
-      <div className="bg-secondary grid grid-cols-3 rounded-md p-1" role="group" aria-label="Time range">
+      <div className="bg-secondary grid grid-cols-3 rounded-xl p-1" role="group" aria-label="Time range">
         {RANGES.map((r) => (
           <button
             key={r.key}
@@ -63,7 +63,7 @@ function Progress() {
             }}
             className={cn(
               "rounded py-1.5 text-sm font-semibold",
-              range.key === r.key ? "bg-background text-foreground" : "text-muted-foreground",
+              range.key === r.key ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
             )}
           >
             {r.label}
@@ -273,7 +273,7 @@ function StrengthCard({ since }: { since: Date }) {
         <>
           <select
             aria-label="Exercise"
-            className="border-input bg-background h-11 w-full rounded-md border px-3 text-base"
+            className="border-input bg-secondary h-11 w-full rounded-xl border px-3 text-base"
             value={exerciseId ?? ""}
             onChange={(e) => setPicked(e.target.value)}
           >

@@ -9,7 +9,7 @@ import { createExercise, type Exercise } from "@/lib/workout-api";
 import { EQUIPMENT_LABELS, MUSCLE_LABELS } from "@/lib/labels";
 import type { EquipmentType, MuscleGroup } from "@/types/database";
 
-const selectClass = "border-input bg-background h-11 w-full rounded-md border px-3 text-base";
+const selectClass = "border-input bg-secondary h-11 w-full rounded-xl border px-3 text-base";
 
 export function NewExerciseDialog({
   open,

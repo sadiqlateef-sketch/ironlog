@@ -42,7 +42,7 @@ export function PairScreen({ onLinked }: { onLinked: () => void }) {
   const code = pairing ? `${pairing.code.slice(0, 3)} ${pairing.code.slice(3)}` : "";
   return (
     <Screen center>
-      <T center bold style={{ color: C.lime, fontSize: 16 }}>
+      <T center bold style={{ color: C.accentText, fontSize: 16 }}>
         Ironlog
       </T>
       {error ? (
@@ -72,10 +72,10 @@ export function PairScreen({ onLinked }: { onLinked: () => void }) {
           >
             {code}
           </Text>
-          <ActivityIndicator color={C.lime} />
+          <ActivityIndicator color={C.accentText} />
         </>
       ) : (
-        <ActivityIndicator color={C.lime} />
+        <ActivityIndicator color={C.accentText} />
       )}
     </Screen>
   );

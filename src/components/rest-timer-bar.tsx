@@ -17,20 +17,20 @@ export function RestTimerBar() {
     <div
       role="timer"
       aria-live="polite"
-      className={`relative overflow-hidden border-t ${done ? "bg-primary text-primary-foreground" : "bg-card"}`}
+      className={`relative mx-3 mb-2 overflow-hidden rounded-2xl sm:mx-auto sm:max-w-md ${done ? "bg-primary text-primary-foreground shadow-[0_6px_24px_rgb(61_99_238/0.45)]" : "glass-strong"}`}
     >
       {!done && (
         <div
-          className="bg-primary/15 absolute inset-y-0 left-0 transition-[width] duration-300 ease-linear"
+          className="bg-primary/25 absolute inset-y-0 left-0 transition-[width] duration-300 ease-linear"
           style={{ width: `${progress * 100}%` }}
         />
       )}
-      <div className="relative mx-auto flex max-w-md items-center gap-2 px-4 py-2">
+      <div className="relative flex items-center gap-2 px-4 py-2.5">
         <div className="min-w-0 flex-1">
           <p className={`text-xs ${done ? "" : "text-muted-foreground"} truncate`}>
             {done ? "Rest over. Next set!" : `Resting · ${timer.label}`}
           </p>
-          <p className="font-mono text-2xl font-bold leading-tight">{formatClock(remaining)}</p>
+          <p className="font-mono text-3xl font-extrabold leading-tight tracking-tight">{formatClock(remaining)}</p>
         </div>
         {!done && (
           <>

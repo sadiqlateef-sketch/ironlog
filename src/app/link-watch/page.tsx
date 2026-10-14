@@ -43,7 +43,7 @@ function LinkWatch() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Watch className="text-primary size-4" /> Ironlog for Wear OS
+            <Watch className="text-primary-text size-4" /> Ironlog for Wear OS
           </CardTitle>
           <CardDescription>
             Open Ironlog on your watch. It shows a 6-digit code. Type it here and the watch signs in to your account.
@@ -52,7 +52,7 @@ function LinkWatch() {
         {done ? (
           <div className="flex flex-col gap-3">
             <p className="flex items-center gap-2 font-medium">
-              <Check className="text-primary size-5" /> Linked. Your watch will sign in within a few seconds.
+              <Check className="text-primary-text size-5" /> Linked. Your watch will sign in within a few seconds.
             </p>
             <Button asChild variant="secondary">
               <Link href="/">Back to home</Link>

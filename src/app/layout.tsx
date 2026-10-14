@@ -23,7 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Stop pinch-zoom from firing while tapping inputs mid-set.
   maximumScale: 1,
-  themeColor: "#0b0b0b",
+  themeColor: "#07080f",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

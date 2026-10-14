@@ -6,41 +6,56 @@
 @custom-variant light (&:is(.light *));
 
 :root {
-  --radius: 0.75rem;
+  --radius: 0.875rem;
+  color-scheme: dark;
 
-  --background: oklch(0.13 0 0);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.18 0 0);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.86 0.2 128);          /* electric lime: "do this now" */
-  --primary-foreground: oklch(0.15 0 0);
-  --secondary: oklch(0.25 0 0);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.25 0 0);
-  --muted-foreground: oklch(0.72 0 0);
-  --accent: oklch(0.28 0 0);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.65 0.22 25);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.86 0.2 128);
+  /* Dark glass: frosted, see-through panels over a deep navy/violet backdrop
+     with soft colour glows. Every text colour here is checked (WCAG AA)
+     against the brightest spot the glow can put behind it, because gym
+     lighting is harsh and numbers must still pop mid-set. */
+  --background: #07080f;
+  --foreground: #f5f7ff;
+  --card: rgb(24 27 48 / 0.58);          /* glass: see-through, blurred */
+  --card-solid: #151829;                  /* same tone, opaque, for strokes/outlines */
+  --card-foreground: #f5f7ff;
+  --popover: rgb(20 23 42 / 0.82);
+  --popover-foreground: #f5f7ff;
+  --primary: #3d63ee;                     /* blue fill: "do this now" (white text on it) */
+  --primary-foreground: #ffffff;
+  --primary-text: #84a8ff;                /* blue for text and icons on glass */
+  --secondary: rgb(255 255 255 / 0.08);
+  --secondary-foreground: #f5f7ff;
+  --muted: rgb(255 255 255 / 0.08);
+  --muted-foreground: #a3aacb;
+  --accent: rgb(255 255 255 / 0.12);
+  --accent-foreground: #f5f7ff;
+  --destructive: #e5484d;
+  --border: rgb(255 255 255 / 11%);
+  --input: rgb(255 255 255 / 16%);
+  --ring: #6b97ff;
+  --success: #7fe08a;                     /* completed sets */
+  --ai: #b39aff;                          /* AI suggestions */
 
-  /* Set-type colours used by the logger in Phase 2 */
-  --set-warmup: oklch(0.8 0.15 85);
-  --set-drop: oklch(0.72 0.17 250);
-  --set-failure: oklch(0.68 0.22 25);
+  /* Set-type colours used by the logger */
+  --set-warmup: #ffd479;
+  --set-drop: #5fd4e0;
+  --set-failure: #ff8a7a;
 
-  /* Charts (validated against the dark card surface: in the 0.48-0.67 L band, >= 3:1) */
-  --chart-1: oklch(0.66 0.17 130);
-  --chart-grid: oklch(1 0 0 / 8%);
-  --chart-axis: oklch(1 0 0 / 18%);
+  /* Charts (blue line/bars on glass; >= 3:1 against the card surface) */
+  --chart-1: #6b97ff;
+  --chart-grid: rgb(255 255 255 / 8%);
+  --chart-axis: rgb(255 255 255 / 18%);
   /* Recovery heatmap: one hue (red, 25deg); low fatigue recedes, high fatigue glows */
   --heat-hue: 25;
+
+  /* Backdrop glows behind the glass */
+  --glow-1: rgb(42 70 216 / 0.42);
+  --glow-2: rgb(106 47 214 / 0.34);
+  --glow-3: rgb(15 122 138 / 0.26);
 }
 
 .light {
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.13 0 0);
   --card: oklch(0.97 0 0);
@@ -58,6 +73,13 @@
   --border: oklch(0 0 0 / 14%);
   --input: oklch(0 0 0 / 18%);
   --ring: oklch(0.45 0.15 135);
+  --card-solid: oklch(0.97 0 0);
+  --primary-text: oklch(0.45 0.15 135);
+  --success: oklch(0.5 0.15 145);
+  --ai: oklch(0.5 0.2 290);
+  --glow-1: transparent;
+  --glow-2: transparent;
+  --glow-3: transparent;
   --chart-1: oklch(0.55 0.15 135);
   --chart-grid: oklch(0 0 0 / 8%);
   --chart-axis: oklch(0 0 0 / 20%);
@@ -78,6 +100,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-success: var(--success);
+  --color-ai: var(--ai);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -100,7 +125,37 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Soft colour glows the glass panels blur over. Fixed so they don't
+       scroll away; radial gradients are cheap on phones (no blur filter). */
+    background-image:
+      radial-gradient(60% 40% at 0% 0%, var(--glow-1), transparent 70%),
+      radial-gradient(55% 40% at 100% 45%, var(--glow-2), transparent 70%),
+      radial-gradient(50% 35% at 10% 100%, var(--glow-3), transparent 70%);
+    background-attachment: fixed;
     /* Weights and reps line up in columns */
     font-variant-numeric: tabular-nums;
   }
+}
+
+/* Frosted glass panel: cards, sheets, the tab bar and the rest timer. */
+@utility glass {
+  background-color: var(--card);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 10px 30px rgb(0 0 0 / 0.35);
+}
+
+/* Denser glass for chrome that floats over scrolling content (tab bar, rest
+   timer), so text scrolling underneath doesn't compete with its labels. */
+@utility glass-strong {
+  background-color: var(--popover);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+  backdrop-filter: blur(26px) saturate(150%);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 10px 30px rgb(0 0 0 / 0.45);
 }

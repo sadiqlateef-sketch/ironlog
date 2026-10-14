@@ -115,7 +115,7 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
   if (w === undefined) {
     return (
       <Screen center scroll={false}>
-        <ActivityIndicator color={C.lime} />
+        <ActivityIndicator color={C.accentText} />
       </Screen>
     );
   }
@@ -215,7 +215,7 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
     const avg = hrAll.current.length ? Math.round(hrAll.current.reduce((a, b) => a + b, 0) / hrAll.current.length) : null;
     return (
       <Screen center>
-        <T center bold style={{ color: C.lime, fontSize: 16 }}>
+        <T center bold style={{ color: C.accentText, fontSize: 16 }}>
           Workout saved
         </T>
         <T center>
@@ -247,7 +247,7 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
           {formatClock(left)}
         </T>
         <View style={{ height: 4, borderRadius: 2, backgroundColor: C.card, overflow: "hidden" }}>
-          <View style={{ height: 4, width: `${Math.min(100, pct * 100)}%`, backgroundColor: C.lime }} />
+          <View style={{ height: 4, width: `${Math.min(100, pct * 100)}%`, backgroundColor: C.accent }} />
         </View>
         <T center muted small>
           {view.next}
