@@ -423,3 +423,8 @@ verify_jwt = false
 # so this function checks the caller itself instead of requiring a JWT.
 [functions.gym-calendar]
 verify_jwt = false
+
+# Claude calls this with the secret from your connector link instead of a
+# Supabase sign-in, so the function checks that secret itself.
+[functions.claude-connector]
+verify_jwt = false
