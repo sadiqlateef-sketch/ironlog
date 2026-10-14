@@ -4,8 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BarChart } from "@/components/charts/bar-chart";
 import { LineChart } from "@/components/charts/line-chart";
-import { BodyHeatmap } from "@/components/body-heatmap";
 import { PeriodizationCard } from "@/components/periodization-card";
+import { BodyTab } from "@/components/progress/body";
 import {
   CalendarCard,
   CompareCard,
@@ -21,13 +21,10 @@ import { OneRmCalculator } from "@/components/one-rm-calculator";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { shortDate } from "@/lib/chart-scale";
-import { MUSCLE_LABELS } from "@/lib/labels";
-import { computeRecovery, LOOKBACK_HOURS, recoveryLabel, type MuscleRecovery } from "@/lib/recovery";
 import { kgToLb, type UnitSystem } from "@/lib/units";
 import {
   getE1rmHistory,
   getLoggedExercises,
-  getMuscleSets,
   listSessionsSince,
   type E1rmPoint,
   type LoggedExercise,
@@ -82,7 +79,7 @@ function Progress() {
       </div>
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      {tab === "body" && <RecoveryCard />}
+      {tab === "body" && <BodyTab />}
 
       {tab === "overview" && (
         <>
@@ -142,75 +139,6 @@ function TableView({ children }: { children: ReactNode }) {
       <summary className="text-muted-foreground cursor-pointer text-xs">Show as table</summary>
       <div className="mt-2 max-h-64 overflow-y-auto">{children}</div>
     </details>
-  );
-}
-
-// ---------------- Recovery ----------------
-
-function RecoveryCard() {
-  const [data, setData] = useState<MuscleRecovery[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getMuscleSets(new Date(Date.now() - LOOKBACK_HOURS * 3_600_000))
-      .then((sets) => setData(computeRecovery(sets)))
-      .catch((e: Error) => setError(e.message));
-  }, []);
-
-  const fatigued = (data ?? []).filter((m) => m.recovery < 90).sort((a, b) => a.recovery - b.recovery);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Muscle recovery</CardTitle>
-        <CardDescription>Estimated from your hard sets over the last 5 days.</CardDescription>
-      </CardHeader>
-      {error && <p className="text-destructive text-sm">{error}</p>}
-      {data && (
-        <>
-          <BodyHeatmap data={data} />
-          {fatigued.length === 0 ? (
-            <p className="text-sm">Everything is recovered. Good day to train anything.</p>
-          ) : (
-            <ul className="flex flex-col gap-1.5 text-sm">
-              {fatigued.slice(0, 5).map((m) => (
-                <li key={m.muscle} className="flex items-baseline justify-between gap-2">
-                  <span>{MUSCLE_LABELS[m.muscle]}</span>
-                  <span className="text-muted-foreground">
-                    <span className="text-foreground font-semibold tabular-nums">{m.recovery}%</span> ·{" "}
-                    {recoveryLabel(m.recovery)}
-                    {m.hoursToReady > 0 && ` · ~${m.hoursToReady} h`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <TableView>
-            <table className="w-full tabular-nums">
-              <thead className="text-muted-foreground text-xs">
-                <tr>
-                  <th className="text-left font-medium">Muscle</th>
-                  <th className="text-right font-medium">Recovered</th>
-                  <th className="text-right font-medium">Hard sets</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...data].sort((a, b) => a.recovery - b.recovery).map((m) => (
-                  <tr key={m.muscle} className="border-t">
-                    <td className="py-1">{MUSCLE_LABELS[m.muscle]}</td>
-                    <td className="py-1 text-right">{m.recovery}%</td>
-                    <td className="py-1 text-right">{m.sets}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableView>
-          <p className="text-muted-foreground text-xs">
-            A rule-of-thumb estimate, not a medical measurement. Soreness, sleep and food matter too.
-          </p>
-        </>
-      )}
-    </Card>
   );
 }
 

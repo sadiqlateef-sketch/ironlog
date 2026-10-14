@@ -22,7 +22,7 @@ export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
 export type AdjustmentStatus = "pending" | "applied" | "dismissed";
 
 /** Shape of users.physical_stats (all optional). */
-export interface PhysicalStats {
+export type PhysicalStats = {
   height_cm?: number;
   bodyweight_kg?: number;
   birth_year?: number;
@@ -30,7 +30,7 @@ export interface PhysicalStats {
   training_age_years?: number;
   resting_hr?: number;
   max_hr?: number;
-}
+};
 
 type Timestamps = { created_at: string; updated_at: string };
 
@@ -109,6 +109,26 @@ export type Database = {
           notes?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["exercise_prefs"]["Insert"]>;
+        Relationships: [];
+      };
+      body_measurements: {
+        Row: {
+          id: string;
+          user_id: string;
+          measured_on: string;
+          weight_kg: number | null;
+          body_fat_pct: number | null;
+          waist_cm: number | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          measured_on?: string;
+          weight_kg?: number | null;
+          body_fat_pct?: number | null;
+          waist_cm?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["body_measurements"]["Insert"]>;
         Relationships: [];
       };
       routines: {

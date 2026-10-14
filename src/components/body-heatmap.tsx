@@ -3,15 +3,13 @@
 import { useState } from "react";
 import { MUSCLE_LABELS } from "@/lib/labels";
 import { recoveryLabel, type MuscleRecovery } from "@/lib/recovery";
-import { BACK, FRONT, type Shape } from "@/components/muscle-map";
+import { BACK, BodyOutline, FRONT, type Shape } from "@/components/muscle-map";
 import type { MuscleGroup } from "@/types/database";
 
-/** One-hue ramp (red): 100% recovered recedes toward the surface, fatigue glows. */
+/** Recovered muscles stay the body's grey; the more tired, the warmer the red. */
 export function heatColor(recovery: number): string {
   const f = Math.min(1, Math.max(0, (100 - recovery) / 100));
-  const L = 0.41 + f * 0.31;
-  const C = 0.04 + f * 0.16;
-  return `oklch(${L.toFixed(3)} ${C.toFixed(3)} var(--heat-hue))`;
+  return `color-mix(in oklab, var(--heat) ${Math.round(f * 100)}%, var(--body-muscle))`;
 }
 
 export function BodyHeatmap({ data }: { data: MuscleRecovery[] }) {
@@ -22,7 +20,7 @@ export function BodyHeatmap({ data }: { data: MuscleRecovery[] }) {
   const figure = (shapes: Shape[], title: string) => (
     <figure className="flex flex-col items-center gap-1">
       <svg viewBox="0 0 200 400" className="h-auto w-full max-w-[150px]" role="group" aria-label={`${title} view`}>
-        <circle cx={100} cy={32} r={20} className="fill-secondary" />
+        <BodyOutline />
         {shapes.map((s, i) => {
           const r = byMuscle.get(s.m);
           const pct = r?.recovery ?? 100;
@@ -31,7 +29,7 @@ export function BodyHeatmap({ data }: { data: MuscleRecovery[] }) {
               key={i}
               d={s.d}
               fill={heatColor(pct)}
-              stroke={active === s.m ? "var(--foreground)" : "var(--card-solid)"}
+              stroke={active === s.m ? "var(--foreground)" : "var(--body-base)"}
               strokeWidth={active === s.m ? 2 : 1.5}
               tabIndex={i === shapes.findIndex((x) => x.m === s.m) ? 0 : -1}
               aria-label={`${MUSCLE_LABELS[s.m]}: ${pct}% recovered`}
