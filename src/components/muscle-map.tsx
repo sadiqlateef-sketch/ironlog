@@ -47,6 +47,36 @@ export const BACK: Shape[] = [
   ...pair("calves", 80, 350, 12, 32),
 ];
 
+/**
+ * The smooth body outline the muscles sit on, the same front and back.
+ * Overlapping pieces share one opaque fill, so the joins don't show.
+ */
+export const BODY: string[] = [
+  "M88,44 h24 v28 h-24 z", // neck
+  "M74,70 Q100,62 126,70 Q150,74 150,96 L146,118 Q138,150 134,190 Q140,206 136,226 L100,238 L64,226 Q60,206 66,190 Q62,150 54,118 L50,96 Q50,74 74,70 Z",
+  ...[
+    [54, 94, 12, 18], // shoulder
+    [52, 132, 14, 30], // upper arm
+    [45, 186, 12, 32], // forearm
+    [42, 226, 8, 11], // hand
+    [80, 266, 21, 52], // thigh
+    [80, 350, 15, 40], // lower leg
+    [82, 392, 11, 6], // foot
+  ].flatMap(([cx, cy, rx, ry]) => [ell(cx, cy, rx, ry), ell(200 - cx, cy, rx, ry)]),
+];
+
+/** The grey body behind the muscles: head plus outline. */
+export function BodyOutline() {
+  return (
+    <g fill="var(--body-base)" aria-hidden>
+      <circle cx={100} cy={26} r={19} />
+      {BODY.map((d, i) => (
+        <path key={i} d={d} />
+      ))}
+    </g>
+  );
+}
+
 /** Which side of the body shows a muscle best. */
 export function sideOf(m: MuscleGroup): "front" | "back" {
   return FRONT.some((s) => s.m === m) && !["traps", "side_delts", "forearms", "calves"].includes(m) ? "front" : "back";
@@ -54,7 +84,7 @@ export function sideOf(m: MuscleGroup): "front" | "back" {
 
 /**
  * A static front or back figure. `fill` picks each muscle's colour; muscles it
- * returns nothing for are drawn in the quiet surface colour.
+ * returns nothing for are drawn in the body's quiet grey.
  */
 export function MuscleFigure({
   side,
@@ -67,9 +97,9 @@ export function MuscleFigure({
 }) {
   return (
     <svg viewBox="0 0 200 400" className={className} aria-hidden>
-      <circle cx={100} cy={32} r={20} className="fill-secondary" />
+      <BodyOutline />
       {(side === "front" ? FRONT : BACK).map((s, i) => (
-        <path key={i} d={s.d} fill={fill(s.m) ?? "var(--secondary)"} stroke="var(--card-solid)" strokeWidth={1.5} />
+        <path key={i} d={s.d} fill={fill(s.m) ?? "var(--body-muscle)"} stroke="var(--body-base)" strokeWidth={1.5} />
       ))}
     </svg>
   );

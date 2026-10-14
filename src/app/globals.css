@@ -45,8 +45,11 @@
   --chart-1: #6b97ff;
   --chart-grid: rgb(255 255 255 / 8%);
   --chart-axis: rgb(255 255 255 / 18%);
-  /* Recovery heatmap: one hue (red, 25deg); low fatigue recedes, high fatigue glows */
-  --heat-hue: 25;
+  /* Muscle figures: a smooth grey body, muscles a step lighter. Recovery
+     tints tired muscles from that grey toward a warm red. */
+  --body-base: #2a2f48;
+  --body-muscle: #454c6e;
+  --heat: #ff6a4d;
 
   /* Backdrop glows behind the glass */
   --glow-1: rgb(42 70 216 / 0.42);
@@ -83,6 +86,9 @@
   --chart-1: oklch(0.55 0.15 135);
   --chart-grid: oklch(0 0 0 / 8%);
   --chart-axis: oklch(0 0 0 / 20%);
+  --body-base: oklch(0.88 0 0);
+  --body-muscle: oklch(0.78 0 0);
+  --heat: oklch(0.6 0.2 30);
 }
 
 @theme inline {
