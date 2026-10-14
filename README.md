@@ -230,6 +230,44 @@ adds a workout you already did somewhere else.
 The server converts units to kg, drops impossible numbers and dates in the
 future, and limits imports to 20 per person per day (logged in `ai_usage`).
 
+## Log workouts from a Claude chat
+
+Tell Claude about a workout in any chat (claude.ai, the Claude phone app,
+Claude Code) and it saves it to Ironlog: "Just did bench 3x5 at 225, then
+rows 3x10 at 135".
+
+**Set up (once):**
+
+1. In Ironlog: Progress > gear > **Connect to Claude** > **Make my link** >
+   **Copy link**. The link is shown once and works like a password.
+2. On claude.ai: [Settings > Connectors](https://claude.ai/settings/connectors)
+   > **Add custom connector**. Name it `Ironlog`, paste the link as the URL,
+   and click **Add**. It shows up in the Claude phone app too.
+3. In a chat, turn Ironlog on in the tools menu and tell Claude your workout.
+
+**How it works:** the `claude-connector` Edge Function is a small MCP server
+(the protocol Claude connectors use) with four tools: `find_exercises`,
+`log_workout`, `recent_workouts`, and `delete_workout` (only for workouts it
+logged, to fix mistakes). Claude does the reading in your chat, so it costs
+nothing on your Anthropic API key. Workouts go through the same cleaning as
+imports (unit conversion, impossible numbers, no future dates) and are saved
+as finished workouts tagged `source = 'claude'`. An exercise that isn't in
+your library is refused with the closest matches, so Claude can pick one or
+ask you before adding it as your own exercise.
+
+**Why a secret link and not a Supabase sign-in:** the app is a static site
+inside the APK, so there's no web page to host an OAuth sign-in for Claude.
+Instead the link carries a long random secret (244 random bits). Only its
+SHA-256 hash is stored (`claude_links`, migration
+`20261014073000_claude_connector.sql`); making a new link or **Disconnect
+Claude** cuts the old one off at once. Clients that can send headers can
+also use `POST /functions/v1/claude-connector` with
+`Authorization: Bearer <secret>`.
+
+Deploy it with the **Deploy database and functions** workflow (it's in the
+function list there), or by hand:
+`npx supabase functions deploy claude-connector`.
+
 ## Progress screen (Phase 3)
 
 - **Muscle recovery heatmap.** Front and back body views, coloured from dark

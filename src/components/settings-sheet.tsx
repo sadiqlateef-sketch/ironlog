@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Dumbbell, LogOut } from "lucide-react";
+import { Dumbbell, LogOut, MessageCircle } from "lucide-react";
+import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 /** The gear on the Progress profile header: your name, units, weights and sign out. */
 export function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [equipment, setEquipment] = useState(false);
+  const [claude, setClaude] = useState(false);
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -26,16 +28,21 @@ export function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
                 onOpenChange(false);
                 setEquipment(true);
               }}
+              onClaude={() => {
+                onOpenChange(false);
+                setClaude(true);
+              }}
             />
           )}
         </DialogContent>
       </Dialog>
       <EquipmentSheet open={equipment} onOpenChange={setEquipment} />
+      <ClaudeConnectSheet open={claude} onOpenChange={setClaude} />
     </>
   );
 }
 
-function SettingsForm({ onEquipment }: { onEquipment: () => void }) {
+function SettingsForm({ onEquipment, onClaude }: { onEquipment: () => void; onClaude: () => void }) {
   const { profile, unit, setUnit, updateProfile, signOut } = useAuth();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [saved, setSaved] = useState<string | null>(null);
@@ -80,6 +87,9 @@ function SettingsForm({ onEquipment }: { onEquipment: () => void }) {
       </div>
       <Button variant="secondary" onClick={onEquipment}>
         <Dumbbell /> Edit available weights
+      </Button>
+      <Button variant="secondary" onClick={onClaude}>
+        <MessageCircle /> Connect to Claude
       </Button>
       <Button variant="secondary" className="text-destructive" onClick={signOut}>
         <LogOut /> Sign out

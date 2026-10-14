@@ -17,7 +17,7 @@ export type EquipmentType =
   | "bodyweight" | "band" | "smith_machine" | "ez_bar" | "trap_bar" | "other";
 export type ExerciseMechanic = "compound" | "isolation";
 export type UnitSystem = "metric" | "imperial";
-export type SessionSource = "web" | "phone" | "watch" | "import";
+export type SessionSource = "web" | "phone" | "watch" | "import" | "claude";
 export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
 export type AdjustmentStatus = "pending" | "applied" | "dismissed";
 
@@ -378,9 +378,24 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      claude_links: {
+        // token_hash isn't readable from the app.
+        Row: {
+          user_id: string;
+          created_at: string;
+          last_used_at: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
+      create_claude_link: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
       reorder_routine_exercises: {
         Args: { p_routine_id: string; p_ids: string[] };
         Returns: undefined;

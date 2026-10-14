@@ -63,7 +63,7 @@ jobs:
           fi
 
       - name: Deploy functions
-        run: npx supabase functions deploy generate-plan suggest-adjustments watch-pair import-workout --project-ref "$PROJECT_REF" --use-api
+        run: npx supabase functions deploy generate-plan suggest-adjustments watch-pair import-workout claude-connector --project-ref "$PROJECT_REF" --use-api
 
       - name: Set Claude API key
         if: ${{ env.ANTHROPIC_API_KEY != '' }}
