@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, FileUp, Flag, MapPin, NotebookPen, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, FileUp, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -463,11 +463,18 @@ function StartWorkout({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Workout</h1>
-        <Button asChild variant="secondary" size="sm">
-          <Link href="/import/">
-            <FileUp /> Import
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/log/">
+              <MessageSquareText /> Tell Claude
+            </Link>
+          </Button>
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/import/">
+              <FileUp /> Import
+            </Link>
+          </Button>
+        </div>
       </div>
       <div className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Workout">
         {START_TABS.map((t) => (

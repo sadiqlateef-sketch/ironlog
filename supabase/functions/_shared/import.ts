@@ -71,6 +71,8 @@ Rules:
 - If handwriting is unclear, give your best reading. Never invent sets or exercises that aren't there.
 - slug: pick the exercise from the library that is the same movement (same equipment when the source says it). Names differ between apps: "Bench Press (Barbell)" is barbell bench press, "DB Row" is a dumbbell row, "RDL" is a Romanian deadlift. Use null when nothing in the library is the same movement; don't force a near miss.
 - date: read it from the source. Relative words like "today" or "yesterday", and weekdays without a date, are relative to the "today" date you are given. If no date appears, null.
+- Text may be spoken and turned into text by the phone: numbers can be spelled out ("two twenty five" is 225, "one thirty five" is 135) and gym words misheard ("dead lift", "bench pressed"). Read it the way a lifter meant it.
+- Text may be a chat, one message per line starting "Message 1:", "Message 2:" and so on. Treat it as one workout. Later messages add to it or correct it: "actually bench was 185" changes the earlier bench weight, "forgot curls 3x12 at 30" adds curls, "drop the rows" removes rows. Return the workout as it stands after the last message.
 - If the input has no strength workout in it, set is_workout to false and return no exercises.`;
 
 export interface LibraryExercise {

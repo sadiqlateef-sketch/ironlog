@@ -36,7 +36,7 @@ interface DraftExercise {
   sets: DraftSet[];
 }
 
-interface Draft {
+export interface Draft {
   name: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
@@ -50,14 +50,14 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const localDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const localTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-function showWeight(kg: number, unit: UnitSystem): string {
+export function showWeight(kg: number, unit: UnitSystem): string {
   if (!(kg > 0)) return "";
   const v = unit === "imperial" ? kgToLb(kg) : kg;
   return String(Math.round(v * 10) / 10);
 }
 
 /** Turn what Claude read into an editable form, filling gaps with sensible guesses. */
-function toDraft(w: ImportedWorkout, unit: UnitSystem): Draft {
+export function toDraft(w: ImportedWorkout, unit: UnitSystem): Draft {
   const setCount = w.exercises.reduce((n, x) => n + x.sets.length, 0);
   const minutes = w.duration_minutes ?? Math.min(120, Math.max(20, setCount * 3));
   const now = new Date();
@@ -215,7 +215,7 @@ function Pick({ onRead }: { onRead: (w: ImportedWorkout) => void }) {
 
 // ---------- Step 2: check and fix, then save ----------
 
-function Review({
+export function Review({
   draft,
   setDraft,
   unit,
@@ -463,7 +463,15 @@ function Review({
 
 // ---------- Step 3: done ----------
 
-function Saved({ onAnother, sessionId }: { onAnother: () => void; sessionId: string | null }) {
+export function Saved({
+  onAnother,
+  sessionId,
+  anotherLabel = "Import another",
+}: {
+  onAnother: () => void;
+  sessionId: string | null;
+  anotherLabel?: string;
+}) {
   const router = useRouter();
   return (
     <div className="flex flex-col items-center gap-4 pt-10 text-center" data-session={sessionId ?? undefined}>
@@ -474,7 +482,7 @@ function Saved({ onAnother, sessionId }: { onAnother: () => void; sessionId: str
       <p className="text-muted-foreground text-sm">It&apos;s in your history now, so your progress charts, records and recovery include it.</p>
       <div className="grid w-full grid-cols-2 gap-3">
         <Button variant="secondary" onClick={onAnother}>
-          Import another
+          {anotherLabel}
         </Button>
         <Button onClick={() => router.push("/progress/")}>See progress</Button>
       </div>
