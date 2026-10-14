@@ -5,6 +5,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatWeight } from "@/lib/units";
 import { getSession, listExercises, listSessionSets, type Exercise, type WorkoutSession, type WorkoutSet } from "@/lib/workout-api";
+import { formatDuration, trainingSummary } from "@/lib/stats";
 import { workingSetNumbers } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ function Details({ id }: { id: string }) {
           {minutes != null && ` · ${minutes} min`} · {formatWeight(session.volume, unit)} volume
         </DialogDescription>
       </DialogHeader>
+      {sets.length > 0 && session.end_time && <SummaryRow session={session} sets={sets} />}
       {groups.length === 0 && <p className="text-muted-foreground text-sm">No sets were logged in this workout.</p>}
       {groups.map((g) => {
         const numbers = workingSetNumbers(g.map((s) => s.set_type));
@@ -69,5 +71,24 @@ function Details({ id }: { id: string }) {
         );
       })}
     </>
+  );
+}
+
+/** Where the time went: lifting, resting and idle (estimated from when sets were ticked off). */
+function SummaryRow({ session, sets }: { session: WorkoutSession; sets: WorkoutSet[] }) {
+  const sum = trainingSummary(session, sets);
+  return (
+    <dl className="bg-secondary grid grid-cols-3 gap-2 rounded-2xl p-3 text-center" aria-label="Training summary">
+      {[
+        ["Lifting", sum.liftingSec],
+        ["Rest", sum.restSec],
+        ["Idle", sum.idleSec],
+      ].map(([label, sec]) => (
+        <div key={label}>
+          <dt className="text-muted-foreground text-xs">{label}</dt>
+          <dd className="font-mono text-lg font-extrabold">{formatDuration(Number(sec))}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

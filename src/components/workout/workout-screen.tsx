@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { FindTab } from "@/components/workout/find-tab";
 import { InstantTab } from "@/components/workout/instant-tab";
 import { PlannedTab } from "@/components/workout/planned-tab";
+import { RecordBadge, RecordCelebration } from "@/components/workout/record";
 import { useWorkout, type Block } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
@@ -60,6 +61,7 @@ export function WorkoutScreen() {
               <DialogTitle>Workout saved 💪</DialogTitle>
               <DialogDescription>Nice work.</DialogDescription>
             </DialogHeader>
+            {summary && summary.records > 0 && <RecordBadge count={summary.records} className="self-start" />}
             {summary && (
               <dl className="grid grid-cols-3 gap-3 text-center">
                 <Stat label="Minutes" value={summary.durationMin} />
@@ -229,6 +231,8 @@ function ActiveWorkout({
           </div>
         </div>
       )}
+
+      {w.record && <RecordCelebration key={w.record.key} hit={w.record} onDone={w.clearRecord} />}
 
       {w.error && (
         <button onClick={w.clearError} className="bg-destructive/15 text-destructive rounded-lg p-3 text-left text-sm">

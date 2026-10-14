@@ -5,8 +5,10 @@
 
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
+import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { Share } from "@capacitor/share";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { KeepAwake } from "@capacitor-community/keep-awake";
 
@@ -105,4 +107,38 @@ export async function exactAlarmStatus(): Promise<"granted" | "denied" | "n/a"> 
 export async function openExactAlarmSettings(): Promise<void> {
   if (!isNative()) return;
   await LocalNotifications.changeExactNotificationSetting().catch(() => {});
+}
+
+/**
+ * Share an image: the Android share sheet in the app, the browser's share
+ * sheet where it has one, otherwise a download. Returns which one happened.
+ */
+export async function shareImage(blob: Blob, fileName: string, title: string): Promise<"shared" | "downloaded" | "cancelled"> {
+  try {
+    if (isNative()) {
+      const data = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1]);
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(blob);
+      });
+      const { uri } = await Filesystem.writeFile({ path: fileName, data, directory: Directory.Cache });
+      await Share.share({ title, files: [uri], dialogTitle: title });
+      return "shared";
+    }
+    const file = new File([blob], fileName, { type: blob.type });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title });
+      return "shared";
+    }
+  } catch (e) {
+    // Closing the share sheet isn't an error worth showing.
+    if (/cancel|abort/i.test(String((e as Error)?.message ?? e)) || (e as Error)?.name === "AbortError") return "cancelled";
+    throw e;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), { href: url, download: fileName });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return "downloaded";
 }

@@ -9,6 +9,7 @@ import {
   discardSession,
   finishSession,
   getActiveSession,
+  getBestE1rms,
   getLastPerformance,
   getRoutineTargets,
   insertSets,
@@ -24,8 +25,17 @@ import {
   type WorkoutSession,
   type WorkoutSet,
 } from "@/lib/workout-api";
-import { nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
+import { buzz } from "@/lib/native";
+import { bestE1rm, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
 import type { SetType } from "@/types/database";
+
+/** A set that just beat your best estimated 1RM for that exercise. */
+export interface RecordHit {
+  key: number;
+  exercise: string;
+  weight: string;
+  reps: number;
+}
 
 /** One row in the logger. Weight and reps are strings in the user's unit while editing. */
 export interface UiSet {
@@ -108,6 +118,10 @@ export function useWorkout() {
   const [blocks, setBlocksState] = useState<Block[]>([]);
   const [error, setError] = useState<string | null>(null);
   const blocksRef = useRef<Block[]>([]);
+  // Best estimated 1RM (kg) per exercise, including sets already done today.
+  const bestRef = useRef(new Map<string, number>());
+  const recordsRef = useRef(new Set<string>());
+  const [record, setRecord] = useState<RecordHit | null>(null);
 
   const setBlocks = useCallback((fn: (prev: Block[]) => Block[]) => {
     setBlocksState((prev) => {
@@ -161,6 +175,10 @@ export function useWorkout() {
         };
       }),
     );
+    const best = await getBestE1rms([...new Set(sets.map((s) => s.exercise_id))], active.id);
+    for (const s of sets)
+      if (s.is_completed && s.set_type !== "warmup") best.set(s.exercise_id, Math.max(best.get(s.exercise_id) ?? 0, bestE1rm([s])));
+    bestRef.current = best;
     return {
       session: active,
       blocks: loaded.filter((b): b is Block => b !== null).sort((a, b) => a.order - b.order),
@@ -224,7 +242,9 @@ export function useWorkout() {
         durationMin: Math.round((Date.now() - new Date(session.start_time).getTime()) / 60000),
         sets: done.length,
         exercises: blocksRef.current.filter((b) => b.sets.some((s) => s.done)).length,
+        records: recordsRef.current.size,
       };
+      recordsRef.current = new Set();
       setSession(null);
       setBlocks(() => []);
       return summary;
@@ -238,6 +258,7 @@ export function useWorkout() {
     if (!session) return;
     try {
       await discardSession(session.id);
+      recordsRef.current = new Set();
       restTimer.stop();
       setSession(null);
       setBlocks(() => []);
@@ -490,6 +511,26 @@ export function useWorkout() {
     [patchSet, fail],
   );
 
+  /** Celebrates a set that beats every earlier workout's best for that lift. */
+  const checkRecord = useCallback(
+    async (exercise: Exercise, kg: number, reps: number, shown: string, sessionId: string) => {
+      const e = bestE1rm([{ weight: kg, reps }]);
+      if (!e) return;
+      let best = bestRef.current.get(exercise.id);
+      if (best === undefined) {
+        best = (await getBestE1rms([exercise.id], sessionId).catch(() => new Map<string, number>())).get(exercise.id) ?? 0;
+      }
+      bestRef.current.set(exercise.id, Math.max(best, e));
+      // Your first time doing a lift sets the bar rather than breaking it.
+      if (best > 0 && e > best + 1e-6) {
+        recordsRef.current.add(exercise.id);
+        setRecord({ key: Date.now(), exercise: exercise.name, weight: shown, reps });
+        buzz();
+      }
+    },
+    [],
+  );
+
   /**
    * The one-tap action. Empty fields fall back to last time's numbers (shown as
    * grey placeholders), then the rest timer starts on its own.
@@ -525,9 +566,11 @@ export function useWorkout() {
       } else if (set.type === "warmup") {
         restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
       }
+      const kg = toKg(parseNumber(weight) ?? 0, unit);
+      if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
       try {
         await updateSet(id, {
-          weight: toKg(parseNumber(weight) ?? 0, unit),
+          weight: kg,
           reps: Math.round(repsNum),
           is_completed: true,
         });
@@ -536,7 +579,7 @@ export function useWorkout() {
       }
       return true;
     },
-    [patchSet, unit, restTimer, fail],
+    [patchSet, unit, restTimer, fail, session, checkRecord],
   );
 
   return {
@@ -545,6 +588,8 @@ export function useWorkout() {
     blocks,
     error,
     clearError: () => setError(null),
+    record,
+    clearRecord: () => setRecord(null),
     start,
     finish,
     discard,
