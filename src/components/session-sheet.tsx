@@ -215,7 +215,7 @@ function Details({ id, inDay = false, onChanged, onDeleted }: { id: string; inDa
             <div className="border-destructive/60 flex flex-col gap-3 rounded-2xl border p-3" role="alertdialog" aria-label="Delete workout?">
               <p className="text-sm">
                 <span className="font-bold">Delete “{title}”?</span> Its {sets.length} set{sets.length === 1 ? "" : "s"} come out of your history, charts,
-                records and recovery. This can&apos;t be undone.
+                records and recovery, and a program day it counted for is no longer ticked. This can&apos;t be undone.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="secondary" onClick={() => setMode("view")} disabled={busy}>

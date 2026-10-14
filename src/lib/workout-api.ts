@@ -699,6 +699,21 @@ export async function saveSessionEdits(sessionId: string, name: string | null, p
   }
 }
 
+/**
+ * Un-tick a program day: its finished workouts stop counting for that day
+ * (they're unlinked from it) but stay in your history, charts and records.
+ */
+export async function unmarkRoutineDone(routineId: string): Promise<void> {
+  unwrap(
+    await getSupabase()
+      .from("workout_sessions")
+      .update({ routine_id: null })
+      .eq("routine_id", routineId)
+      .not("end_time", "is", null)
+      .select("id"),
+  );
+}
+
 /** Delete a finished workout and every set in it. */
 export const deleteSession = discardSession;
 
