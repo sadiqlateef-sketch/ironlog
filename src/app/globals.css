@@ -40,6 +40,7 @@
   --set-warmup: #ffd479;
   --set-drop: #5fd4e0;
   --set-failure: #ff8a7a;
+  --record: #ffcf5c;                      /* new personal records (gold) */
 
   /* Charts (blue line/bars on glass; >= 3:1 against the card surface) */
   --chart-1: #6b97ff;
@@ -86,6 +87,7 @@
   --chart-1: oklch(0.55 0.15 135);
   --chart-grid: oklch(0 0 0 / 8%);
   --chart-axis: oklch(0 0 0 / 20%);
+  --record: oklch(0.55 0.13 80);
   --body-base: oklch(0.88 0 0);
   --body-muscle: oklch(0.78 0 0);
   --heat: oklch(0.6 0.2 30);
@@ -122,6 +124,7 @@
   --color-set-warmup: var(--set-warmup);
   --color-set-drop: var(--set-drop);
   --color-set-failure: var(--set-failure);
+  --color-record: var(--record);
   --color-chart-1: var(--chart-1);
 }
 
@@ -165,3 +168,11 @@
     inset 0 1px 0 rgb(255 255 255 / 0.07),
     0 10px 30px rgb(0 0 0 / 0.45);
 }
+
+/* Confetti for the new-record pop-up in the logger */
+@keyframes record-confetti {
+  from { transform: translate(0, -12px) rotate(0deg); opacity: 1; }
+  to { transform: translate(var(--drift, 0px), 140px) rotate(540deg); opacity: 0; }
+}
+.record-confetti { animation: record-confetti 1.4s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .record-confetti { display: none; } }

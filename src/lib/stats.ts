@@ -268,3 +268,91 @@ export function insights(
 
   return out;
 }
+
+// ---------------- Activity feed (#59, #60) ----------------
+
+/**
+ * New records per workout: exercises where the workout's best estimated 1RM
+ * beat every earlier workout's. A lift's first ever workout doesn't count.
+ */
+export function sessionRecords(sets: StatSet[], sessions: Pick<StatSession, "id" | "start_time">[]): Map<string, string[]> {
+  const order = new Map(sessions.map((s) => [s.id, Date.parse(s.start_time)]));
+  const bestIn = new Map<string, Map<string, number>>(); // session → exercise → best
+  for (const s of sets) {
+    if (s.set_type === "warmup" || !order.has(s.session_id)) continue;
+    const e = bestE1rm([s]);
+    if (!e) continue;
+    const m = bestIn.get(s.session_id) ?? new Map<string, number>();
+    m.set(s.exercise_id, Math.max(m.get(s.exercise_id) ?? 0, e));
+    bestIn.set(s.session_id, m);
+  }
+  const ever = new Map<string, number>();
+  const out = new Map<string, string[]>();
+  for (const id of [...bestIn.keys()].sort((a, b) => order.get(a)! - order.get(b)!)) {
+    const hits: string[] = [];
+    for (const [ex, e] of bestIn.get(id)!) {
+      const before = ever.get(ex);
+      if (before != null && e > before + 1e-6) hits.push(ex);
+      ever.set(ex, Math.max(before ?? 0, e));
+    }
+    if (hits.length) out.set(id, hits);
+  }
+  return out;
+}
+
+export interface TrainingSummary {
+  totalSec: number;
+  liftingSec: number;
+  restSec: number;
+  idleSec: number;
+  exercises: number;
+  sets: number;
+  volume: number;
+}
+
+/** Longest gap between sets still counted as rest; anything past it is idle. */
+export const REST_CAP_SEC = 5 * 60;
+
+/** Rough time under the bar for one set: about 4 s a rep, 15–90 s. */
+export const setWorkSec = (reps: number) => Math.min(90, Math.max(15, reps * 4));
+
+/**
+ * Splits a workout's time into lifting, rest and idle, from when each set was
+ * ticked off. Each gap before a set is that set's work plus the rest before
+ * it; rest past REST_CAP_SEC, and time after the last set, counts as idle.
+ */
+export function trainingSummary(session: StatSession, sets: StatSet[]): TrainingSummary {
+  const start = Date.parse(session.start_time);
+  const end = session.end_time ? Date.parse(session.end_time) : start;
+  const done = sets
+    .filter((s) => s.completed_at)
+    .map((s) => ({ ...s, t: Math.min(end, Math.max(start, Date.parse(s.completed_at!))) }))
+    .sort((a, b) => a.t - b.t);
+  let lifting = 0;
+  let rest = 0;
+  let prev = start;
+  for (const s of done) {
+    const gap = (s.t - prev) / 1000;
+    const work = Math.min(gap, setWorkSec(s.reps));
+    lifting += work;
+    rest += Math.min(gap - work, REST_CAP_SEC);
+    prev = s.t;
+  }
+  const total = Math.max(0, (end - start) / 1000);
+  return {
+    totalSec: Math.round(total),
+    liftingSec: Math.round(lifting),
+    restSec: Math.round(rest),
+    idleSec: Math.max(0, Math.round(total - lifting - rest)),
+    exercises: new Set(done.filter((s) => s.set_type !== "warmup").map((s) => s.exercise_id)).size,
+    sets: done.length,
+    volume: session.volume,
+  };
+}
+
+/** "1h 05m", "42m", "35s". */
+export function formatDuration(sec: number): string {
+  if (sec < 60) return `${Math.round(sec)}s`;
+  const m = Math.round(sec / 60);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
+}

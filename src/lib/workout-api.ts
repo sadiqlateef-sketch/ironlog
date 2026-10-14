@@ -3,6 +3,7 @@
 // user's rows, so there is no user_id filtering to forget here.
 
 import { getSupabase } from "@/lib/supabase/client";
+import { bestE1rm } from "@/lib/workout-logic";
 import type { Database, Tables } from "@/types/database";
 
 export type Exercise = Tables<"exercises">;
@@ -637,4 +638,29 @@ export async function countFinishedSessions(): Promise<number> {
 
 export async function getSession(id: string): Promise<WorkoutSession> {
   return unwrap(await getSupabase().from("workout_sessions").select("*").eq("id", id).single());
+}
+
+/**
+ * Your best estimated 1RM (kg) for each exercise from every other workout,
+ * so the logger can tell when a set beats it. Warm-ups don't count.
+ */
+export async function getBestE1rms(exerciseIds: string[], excludeSessionId: string): Promise<Map<string, number>> {
+  const best = new Map<string, number>(exerciseIds.map((id) => [id, 0]));
+  if (!exerciseIds.length) return best;
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const rows = unwrap(
+      await getSupabase()
+        .from("workout_sets")
+        .select("exercise_id, weight, reps")
+        .in("exercise_id", exerciseIds)
+        .eq("is_completed", true)
+        .neq("set_type", "warmup")
+        .neq("session_id", excludeSessionId)
+        .order("id")
+        .range(from, from + page - 1),
+    );
+    for (const r of rows) best.set(r.exercise_id, Math.max(best.get(r.exercise_id) ?? 0, bestE1rm([r])));
+    if (rows.length < page) return best;
+  }
 }

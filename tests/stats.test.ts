@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   comparisonRanges,
+  formatDuration,
+  sessionRecords,
+  trainingSummary,
   dayKey,
   insights,
   monthGrid,
@@ -103,4 +106,58 @@ test("insights need enough data and mention lagging legs", () => {
   assert.ok(out.some((t) => t.startsWith("You've averaged 1 workout a week")));
   assert.ok(out.some((t) => t.startsWith("Legs got only 0%")));
   assert.ok(out.some((t) => t.startsWith("Bench Press is your fastest-growing lift")));
+});
+
+test("session records only count beating an earlier workout", () => {
+  const sessions = [
+    { id: "a", start_time: "2026-10-01T10:00:00Z" },
+    { id: "b", start_time: "2026-10-03T10:00:00Z" },
+    { id: "c", start_time: "2026-10-05T10:00:00Z" },
+  ];
+  const set = (session_id: string, exercise_id: string, weight: number, reps: number, set_type = "normal") => ({
+    session_id,
+    exercise_id,
+    set_type,
+    weight,
+    reps,
+    completed_at: null,
+  });
+  const recs = sessionRecords(
+    [
+      set("a", "bench", 100, 5),
+      set("a", "squat", 140, 5),
+      set("b", "bench", 105, 5), // beats a
+      set("b", "squat", 140, 5), // ties, no record
+      set("b", "row", 80, 8), // first time, no record
+      set("c", "bench", 200, 1, "warmup"), // warm-ups never count
+      set("c", "squat", 150, 3), // 165 vs 163.3: record
+    ],
+    sessions,
+  );
+  assert.deepEqual([...recs.entries()], [
+    ["b", ["bench"]],
+    ["c", ["squat"]],
+  ]);
+});
+
+test("training summary splits lifting, rest and idle", () => {
+  const t = (min: number, sec = 0) => new Date(Date.UTC(2026, 9, 1, 10, min, sec)).toISOString();
+  const session = { id: "s", name: "Push", start_time: t(0), end_time: t(30), volume: 1234 };
+  const set = (at: string, reps: number, exercise_id = "bench", set_type = "normal") => ({
+    session_id: "s",
+    exercise_id,
+    set_type,
+    weight: 60,
+    reps,
+    completed_at: at,
+  });
+  const s = trainingSummary(session, [
+    set(t(1), 10, "bench", "warmup"), // 60 s gap: 40 s lifting, 20 s rest
+    set(t(4), 5), // 180 s gap: 20 s lifting, 160 s rest
+    set(t(14), 5, "row"), // 600 s gap: 20 s lifting, 300 s rest, 280 s idle
+  ]);
+  assert.deepEqual(s, { totalSec: 1800, liftingSec: 80, restSec: 480, idleSec: 1240, exercises: 2, sets: 3, volume: 1234 });
+  assert.equal(formatDuration(35), "35s");
+  assert.equal(formatDuration(42 * 60), "42m");
+  assert.equal(formatDuration(65 * 60), "1h 05m");
 });

@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { BarChart } from "@/components/charts/bar-chart";
 import { LineChart } from "@/components/charts/line-chart";
 import { PeriodizationCard } from "@/components/periodization-card";
+import { ActivityTab } from "@/components/progress/activity";
 import { BodyTab } from "@/components/progress/body";
 import {
   CalendarCard,
@@ -50,7 +51,7 @@ export default function ProgressPage() {
   );
 }
 
-type ProgressTab = "overview" | "body";
+type ProgressTab = "overview" | "body" | "activity";
 
 function Progress() {
   const [tab, setTab] = useState<ProgressTab>("overview");
@@ -63,8 +64,8 @@ function Progress() {
   return (
     <div className="flex flex-col gap-4">
       <ProfileHeader syncing={loading} onSync={() => setReload((r) => r + 1)} />
-      <div className="bg-secondary grid grid-cols-2 gap-1 rounded-xl p-1" role="tablist" aria-label="Progress">
-        {(["overview", "body"] as const).map((t) => (
+      <div className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Progress">
+        {(["overview", "body", "activity"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -80,6 +81,7 @@ function Progress() {
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       {tab === "body" && <BodyTab />}
+      {tab === "activity" && <ActivityTab reloadKey={reload} />}
 
       {tab === "overview" && (
         <>
