@@ -418,3 +418,8 @@ enabled = true
 # so this function checks the caller itself instead of requiring a JWT.
 [functions.watch-pair]
 verify_jwt = false
+
+# Google sends you back here after you sign in, without an Ironlog session,
+# so this function checks the caller itself instead of requiring a JWT.
+[functions.gym-calendar]
+verify_jwt = false
