@@ -140,7 +140,7 @@ function WorkoutCard({ session, feed, onOpen }: { session: WorkoutSession; feed:
 
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <Button variant="secondary" onClick={onOpen}>
-          View details <ChevronRight />
+          View, edit or delete <ChevronRight />
         </Button>
         <Button variant="secondary" size="icon" aria-label={`Share ${title} as an image`} disabled={sharing === "Making the image…"} onClick={share}>
           <Share2 />
