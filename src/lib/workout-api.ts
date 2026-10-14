@@ -3,6 +3,7 @@
 // user's rows, so there is no user_id filtering to forget here.
 
 import { getSupabase } from "@/lib/supabase/client";
+import type { EditPlan } from "@/lib/session-edit";
 import { bestE1rm } from "@/lib/workout-logic";
 import type { Database, Tables } from "@/types/database";
 
@@ -664,6 +665,42 @@ export async function getBestE1rms(exerciseIds: string[], excludeSessionId: stri
     if (rows.length < page) return best;
   }
 }
+
+// ---------- Fix or delete a finished workout ----------
+
+/** Finished workouts that started on this local calendar day, earliest first. */
+export async function listSessionsOn(day: Date): Promise<WorkoutSession[]> {
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+  const end = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+  return unwrap(
+    await getSupabase()
+      .from("workout_sessions")
+      .select("*")
+      .not("end_time", "is", null)
+      .gte("start_time", start.toISOString())
+      .lt("start_time", end.toISOString())
+      .order("start_time"),
+  );
+}
+
+/**
+ * Save fixes to a finished workout. Removals go first so nothing collides;
+ * volume, records, charts and recovery all read the sets, so they follow.
+ */
+export async function saveSessionEdits(sessionId: string, name: string | null, plan: EditPlan): Promise<void> {
+  const supabase = getSupabase();
+  if (name !== null) {
+    unwrap(await supabase.from("workout_sessions").update({ name: name.trim() || "Workout" }).eq("id", sessionId).select("id"));
+  }
+  await deleteSets(plan.remove);
+  await Promise.all(plan.update.map((u) => updateSet(u.id, u.patch)));
+  if (plan.insert.length) {
+    await insertSets(plan.insert.map((s) => ({ ...s, session_id: sessionId, is_completed: true, superset_group: null })));
+  }
+}
+
+/** Delete a finished workout and every set in it. */
+export const deleteSession = discardSession;
 
 // ---------- Import a finished workout ----------
 

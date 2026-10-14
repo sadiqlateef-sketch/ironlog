@@ -81,14 +81,14 @@ function Progress() {
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       {tab === "body" && <BodyTab />}
-      {tab === "activity" && <ActivityTab reloadKey={reload} />}
+      {tab === "activity" && <ActivityTab reloadKey={reload} onChanged={() => setReload((r) => r + 1)} />}
 
       {tab === "overview" && (
         <>
           {data ? (
             <>
               <WeekCards data={data} />
-              <CalendarCard data={data} />
+              <CalendarCard data={data} onChanged={() => setReload((r) => r + 1)} />
               <ProgressIndexCard data={data} />
               <MuscleBreakdownCard data={data} />
               <TopLiftsCard data={data} />

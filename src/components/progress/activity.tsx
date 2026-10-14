@@ -23,7 +23,7 @@ type Feed = {
 };
 
 /** Every finished workout, newest first, with its training summary and records. */
-export function ActivityTab({ reloadKey }: { reloadKey: number }) {
+export function ActivityTab({ reloadKey, onChanged }: { reloadKey: number; onChanged?: () => void }) {
   const [feed, setFeed] = useState<{ key: number; data: Feed } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
@@ -69,7 +69,7 @@ export function ActivityTab({ reloadKey }: { reloadKey: number }) {
           Show more workouts
         </Button>
       )}
-      <SessionSheet sessionId={open} onOpenChange={(o) => !o && setOpen(null)} />
+      <SessionSheet sessionId={open} onOpenChange={(o) => !o && setOpen(null)} onChanged={onChanged} />
     </>
   );
 }
