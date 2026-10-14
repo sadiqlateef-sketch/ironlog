@@ -17,7 +17,7 @@ export type EquipmentType =
   | "bodyweight" | "band" | "smith_machine" | "ez_bar" | "trap_bar" | "other";
 export type ExerciseMechanic = "compound" | "isolation";
 export type UnitSystem = "metric" | "imperial";
-export type SessionSource = "web" | "phone" | "watch";
+export type SessionSource = "web" | "phone" | "watch" | "import";
 export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
 export type AdjustmentStatus = "pending" | "applied" | "dismissed";
 
@@ -297,6 +297,7 @@ export type Database = {
           superset_group?: number | null;
           parent_set_id?: string | null;
           is_completed?: boolean;
+          completed_at?: string | null;
           notes?: string | null;
           client_id?: string | null;
         };
@@ -366,7 +367,7 @@ export type Database = {
         Row: {
           id: number;
           user_id: string;
-          kind: "generate_plan" | "adjust_session";
+          kind: "generate_plan" | "adjust_session" | "import_workout";
           model: string | null;
           input_tokens: number | null;
           output_tokens: number | null;

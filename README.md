@@ -199,7 +199,7 @@ Hosted:
 
 ```bash
 npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-npx supabase functions deploy generate-plan suggest-adjustments
+npx supabase functions deploy generate-plan suggest-adjustments import-workout
 ```
 
 The app uses `claude-opus-5-5` with adaptive thinking, and the system
@@ -207,6 +207,28 @@ prompts are cached. A program is one request (a few thousand input tokens plus
 the plan and Claude's thinking); a post-workout check is a smaller one. Real
 token counts land in `ai_usage`, so you can compare them with current pricing
 at https://www.anthropic.com/pricing.
+
+## Import a finished workout
+
+Workout > **Import** (or Home > **Import a workout from a photo or notes**)
+adds a workout you already did somewhere else.
+
+1. **Add it.** Take a photo of your notebook, pick screenshots from another app
+   (Strong, Hevy, JEFIT, a spreadsheet...), or type/paste it ("Squat 3x5 225").
+   Very tall screenshots are cut into readable pieces before sending.
+2. **Claude reads it** (the `import-workout` Edge Function). It expands
+   shorthand like `3x5 @ 225` into separate sets, keeps warm-up/drop/failure
+   marks, and matches each exercise to your library ("DB Row" is Dumbbell
+   Row). Nothing is saved yet.
+3. **Check it.** Every exercise, set, weight and rep can be fixed. Anything
+   that isn't in your library is outlined in yellow: **Choose exercise** to
+   pick the right one, or **New exercise** to add it (the name is filled in).
+   Set the date, start time and length. Weights are shown in your unit.
+4. **Save.** It's stored as a finished workout on that date, with every set
+   ticked, so charts, records, recovery and "last time" all include it.
+
+The server converts units to kg, drops impossible numbers and dates in the
+future, and limits imports to 20 per person per day (logged in `ai_usage`).
 
 ## Progress screen (Phase 3)
 

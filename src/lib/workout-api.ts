@@ -664,3 +664,92 @@ export async function getBestE1rms(exerciseIds: string[], excludeSessionId: stri
     if (rows.length < page) return best;
   }
 }
+
+// ---------- Import a finished workout ----------
+
+/** What the import-workout Edge Function sends back (weights in kg). */
+export interface ImportedWorkout {
+  title: string;
+  date: string | null;
+  start_time: string | null;
+  duration_minutes: number | null;
+  notes: string;
+  source_unit: "lb" | "kg" | null;
+  exercises: {
+    name_as_written: string;
+    exercise_id: string | null;
+    match: "claude" | "name" | "none";
+    notes: string;
+    sets: { weight_kg: number; reps: number; set_type: WorkoutSet["set_type"]; rpe: number | null }[];
+  }[];
+}
+
+export interface ImportInput {
+  images: { media_type: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; data: string }[];
+  text: string;
+  today: string;
+}
+
+/** Ask Claude to read a screenshot, photo, or text. Saves nothing. */
+export async function readWorkout(input: ImportInput): Promise<ImportedWorkout> {
+  const { data, error } = await getSupabase().functions.invoke("import-workout", { body: input });
+  if (error) throw await functionError(error);
+  return data;
+}
+
+export interface WorkoutToSave {
+  name: string;
+  start: Date;
+  minutes: number;
+  notes: string;
+  exercises: { exercise_id: string; sets: { weight_kg: number; reps: number; set_type: WorkoutSet["set_type"]; rpe: number | null }[] }[];
+}
+
+/**
+ * Save an already-finished workout: the session with its real date and
+ * length, and every set ticked off. Set times are spread across the workout
+ * so history, records and recovery see it on the right day.
+ */
+export async function saveFinishedWorkout(w: WorkoutToSave): Promise<WorkoutSession> {
+  const supabase = getSupabase();
+  const startMs = w.start.getTime();
+  const endMs = startMs + Math.max(1, w.minutes) * 60_000;
+  const session: WorkoutSession = unwrap(
+    await supabase
+      .from("workout_sessions")
+      .insert({
+        name: w.name.trim() || "Workout",
+        start_time: new Date(startMs).toISOString(),
+        end_time: new Date(endMs).toISOString(),
+        notes: w.notes.trim() || null,
+        source: "import",
+      })
+      .select()
+      .single(),
+  );
+
+  const total = w.exercises.reduce((n, x) => n + x.sets.length, 0);
+  let k = 0;
+  const sets: SetInsert[] = w.exercises.flatMap((x, i) =>
+    x.sets.map((s, j) => ({
+      session_id: session.id,
+      exercise_id: x.exercise_id,
+      exercise_order: i + 1,
+      set_number: j + 1,
+      set_type: s.set_type,
+      weight: s.weight_kg,
+      reps: s.reps,
+      rpe: s.rpe,
+      superset_group: null,
+      is_completed: true,
+      completed_at: new Date(startMs + ((++k) / (total + 1)) * (endMs - startMs)).toISOString(),
+    })),
+  );
+  try {
+    if (sets.length) unwrap(await supabase.from("workout_sets").insert(sets).select("id"));
+  } catch (e) {
+    await supabase.from("workout_sessions").delete().eq("id", session.id);
+    throw e;
+  }
+  return session;
+}

@@ -9,8 +9,8 @@ import { adminClient, HttpError } from "./http.ts";
 export const MODEL = "claude-opus-5-5";
 
 /** Calls per user per rolling 24 hours, to protect your API bill. */
-export const DAILY_LIMIT: Record<UsageKind, number> = { generate_plan: 5, adjust_session: 20 };
-type UsageKind = "generate_plan" | "adjust_session";
+export const DAILY_LIMIT: Record<UsageKind, number> = { generate_plan: 5, adjust_session: 20, import_workout: 20 };
+type UsageKind = "generate_plan" | "adjust_session" | "import_workout";
 
 let client: Anthropic | undefined;
 function getClient(): Anthropic {
@@ -44,7 +44,8 @@ export async function askStructured<S extends z.ZodType>(opts: {
   userId: string;
   kind: UsageKind;
   system: string;
-  prompt: string;
+  /** Text, or content blocks when sending images (images first, then the text). */
+  prompt: string | Anthropic.Beta.BetaContentBlockParam[];
   schema: S;
   effort: "low" | "medium" | "high";
   maxTokens: number;
