@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { OpQueue, classify, uuid, type Op, type Outcome } from "../src/queue.ts";
 import {
-  currentPosition, displayWeight, groupSets, hrZone, prefill, restSeconds, snapKg, toHrRows, weightStepKg, type WatchSet,
+  currentPosition, displayWeight, groupSets, hrZone, prefill, restSeconds, snapKg, stepKg, toHrRows, weightStepKg, type WatchSet,
 } from "../src/logic.ts";
 
 class MemoryKV {
@@ -88,6 +88,15 @@ test("weights step by 5 lb or 2.5 kg and display rounded", () => {
   assert.equal(displayWeight(snapKg(61.3, "imperial"), "imperial"), "135");
   assert.equal(snapKg(61.3, "metric"), 62.5);
   assert.equal(snapKg(-3, "metric"), 0);
+});
+
+test("+ / - keeps half-pound weights", () => {
+  const lb = (n: number) => n / 2.2046226218;
+  const shown = (kg: number) => displayWeight(kg, "imperial");
+  assert.equal(shown(stepKg(lb(42.5), weightStepKg("imperial"), "imperial")), "47.5");
+  assert.equal(shown(stepKg(lb(42.5), -weightStepKg("imperial"), "imperial")), "37.5");
+  assert.equal(shown(stepKg(lb(45), lb(0.5), "imperial")), "45.5");
+  assert.equal(stepKg(0.1, -2.5, "metric"), 0);
 });
 
 test("current position is the first unfinished set in workout order", () => {

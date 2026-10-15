@@ -27,6 +27,7 @@ import {
   instructionSteps,
   muscleShare,
   parseNumber,
+  roundHalf,
   type HistoryDay,
 } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
@@ -68,8 +69,8 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
   const [history, setHistory] = useState<HistoryDay[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const u = unit === "imperial" ? "lb" : "kg";
-  /** kg -> whole number in the user's unit */
-  const show = (kg: number) => Math.round(unit === "imperial" ? kgToLb(kg) : kg);
+  /** kg -> the user's unit, to the nearest 0.5 (42.5 lb stays 42.5) */
+  const show = (kg: number) => roundHalf(unit === "imperial" ? kgToLb(kg) : kg);
 
   useEffect(() => {
     getExercisePrefs(exercise.id).then(setPrefs).catch(() => setPrefs(null));

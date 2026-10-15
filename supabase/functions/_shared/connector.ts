@@ -53,7 +53,7 @@ export const LogWorkoutInput = z.object({
         sets: z
           .array(
             z.object({
-              weight: z.number().min(0).max(2000).nullable().optional().describe("Load per set in `unit`. Null or 0 for bodyweight."),
+              weight: z.number().min(0).max(2000).nullable().optional().describe("Load per set in `unit`, decimals allowed (42.5). Null or 0 for bodyweight."),
               reps: z.number().int().min(0).max(999),
               set_type: z.enum(SET_TYPES).optional().describe("Default 'normal'"),
               rpe: z.number().min(1).max(10).optional().describe("Only if the lifter said it"),

@@ -14,6 +14,7 @@ export function roundLoadKg(kg: number, unit: UnitSystem): number {
   return Math.round(kg / 2.5) * 2.5;
 }
 
+/** A stored kg value in the lifter's unit, to the nearest 0.5 lb or 0.1 kg (42.5 lb stays 42.5). */
 export function formatKg(kg: number, unit: UnitSystem): string {
-  return unit === "imperial" ? `${Math.round(kg * LB_PER_KG)} lb` : `${Math.round(kg * 10) / 10} kg`;
+  return unit === "imperial" ? `${Math.round(kg * LB_PER_KG * 2) / 2} lb` : `${Math.round(kg * 10) / 10} kg`;
 }

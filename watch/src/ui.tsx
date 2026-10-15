@@ -73,10 +73,27 @@ export function Btn({
 }
 
 /** [-]  value  [+]  with large round buttons for sweaty fingers. */
-export function Stepper({ value, unit, onMinus, onPlus, label }: { value: string; unit?: string; onMinus: () => void; onPlus: () => void; label: string }) {
+/** Big - value + control. A long press on - / + makes a small step when given. */
+export function Stepper({
+  value,
+  unit,
+  onMinus,
+  onPlus,
+  onLongMinus,
+  onLongPlus,
+  label,
+}: {
+  value: string;
+  unit?: string;
+  onMinus: () => void;
+  onPlus: () => void;
+  onLongMinus?: () => void;
+  onLongPlus?: () => void;
+  label: string;
+}) {
   return (
     <View style={styles.stepper}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Less ${label}`} onPress={onMinus} style={({ pressed }) => [styles.round, pressed && { opacity: 0.6 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Less ${label}`} accessibilityHint={onLongMinus ? "Hold for a small step" : undefined} onPress={onMinus} onLongPress={onLongMinus} style={({ pressed }) => [styles.round, pressed && { opacity: 0.6 }]}>
         <Text style={styles.roundText}>−</Text>
       </Pressable>
       <View style={styles.valueBox} accessible accessibilityLabel={`${label} ${value} ${unit ?? ""}`}>
@@ -85,7 +102,7 @@ export function Stepper({ value, unit, onMinus, onPlus, label }: { value: string
         </Text>
         {unit ? <Text style={styles.unit}>{unit}</Text> : null}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`More ${label}`} onPress={onPlus} style={({ pressed }) => [styles.round, pressed && { opacity: 0.6 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`More ${label}`} accessibilityHint={onLongPlus ? "Hold for a small step" : undefined} onPress={onPlus} onLongPress={onLongPlus} style={({ pressed }) => [styles.round, pressed && { opacity: 0.6 }]}>
         <Text style={styles.roundText}>+</Text>
       </Pressable>
     </View>
