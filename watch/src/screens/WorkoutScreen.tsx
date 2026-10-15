@@ -9,7 +9,8 @@ import {
   hrZone,
   prefill,
   restSeconds,
-  snapKg,
+  fineStepKg,
+  stepKg,
   toHrRows,
   weightStepKg,
   type WatchSet,
@@ -270,6 +271,7 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
   // ---- Log a set ----
   const unitLabel = unit === "imperial" ? "lb" : "kg";
   const step = weightStepKg(unit);
+  const fine = fineStepKg(unit);
   const working = group ? group.sets.filter((s) => s.set_type !== "warmup") : [];
   const label =
     set == null
@@ -308,8 +310,10 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
             label="weight"
             value={displayWeight(draft.weight, unit)}
             unit={unitLabel}
-            onMinus={() => setDraft((d) => ({ ...d, weight: snapKg(d.weight - step, unit) }))}
-            onPlus={() => setDraft((d) => ({ ...d, weight: snapKg(d.weight + step, unit) }))}
+            onMinus={() => setDraft((d) => ({ ...d, weight: stepKg(d.weight, -step, unit) }))}
+            onPlus={() => setDraft((d) => ({ ...d, weight: stepKg(d.weight, step, unit) }))}
+            onLongMinus={() => setDraft((d) => ({ ...d, weight: stepKg(d.weight, -fine, unit) }))}
+            onLongPlus={() => setDraft((d) => ({ ...d, weight: stepKg(d.weight, fine, unit) }))}
           />
           <Stepper
             label="reps"

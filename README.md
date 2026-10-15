@@ -21,7 +21,7 @@ Supabase database as the phone, so a workout started on either shows up on both.
   your phone, go to Home > **Link watch** and enter it. Codes last 10 minutes
   and work once, and 10 wrong tries locks code entry for a while.
 - **Log from the wrist.** Start a routine or continue the phone's workout.
-  Each set shows big **−/+** buttons for weight (5 lb or 2.5 kg) and reps,
+  Each set shows big **−/+** buttons for weight (5 lb or 2.5 kg a tap; hold for 0.5 lb or 0.25 kg) and reps,
   pre-filled from the plan or your last set, then **✓ Done**. Tap the
   exercise name to jump to the next exercise. **+ Add set** adds a bonus set.
 - **Rest timer** with the same rules as the phone, −15 / +15 / Skip, and a

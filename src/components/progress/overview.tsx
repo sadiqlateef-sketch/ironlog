@@ -26,6 +26,7 @@ import {
   type StatSet,
 } from "@/lib/stats";
 import { kgToLb } from "@/lib/units";
+import { roundHalf } from "@/lib/workout-logic";
 import {
   countFinishedSessions,
   listExercises,
@@ -352,7 +353,7 @@ export function TopLiftsCard({ data }: { data: StatsData }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{ex?.name ?? "Exercise"}</span>
                     <span className="text-muted-foreground text-xs">
-                      {Math.round(t.weight)} {u} × {t.reps}
+                      {roundHalf(t.weight)} {u} × {t.reps}
                     </span>
                   </span>
                   <span className="text-primary-text font-mono text-xl font-extrabold">

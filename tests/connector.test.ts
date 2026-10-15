@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
-import { LogWorkoutInput, localToUtc, planWorkout } from "../supabase/functions/_shared/connector.ts";
+import { LogWorkoutInput, describeSet, localToUtc, planWorkout } from "../supabase/functions/_shared/connector.ts";
 import { rankMatches, type LibraryExercise } from "../supabase/functions/_shared/import.ts";
 import { handleMessage, text, tool, ToolError } from "../supabase/functions/_shared/mcp.ts";
 
@@ -41,6 +41,20 @@ test("a just-finished workout ends now, with lb converted to kg", () => {
   // Matched by name, bodyweight
   assert.equal(w.exercises[1].exercise_id, "pull-up");
   assert.equal(w.exercises[1].sets[0].weight_kg, 0);
+});
+
+test("half-pound weights are kept and shown as typed", () => {
+  const w = planWorkout(input({ exercises: [{ exercise: "barbell-row", sets: [{ reps: 8, weight: 42.5 }] }] }), ctx);
+  const kg = w.exercises[0].sets[0].weight_kg;
+  assert.equal(describeSet({ weight_kg: kg, reps: 8, set_type: "normal", rpe: null }, "imperial"), "42.5 lb x 8");
+  assert.equal(describeSet({ weight_kg: 19.3, reps: 8, set_type: "normal", rpe: null }, "metric"), "19.3 kg x 8");
+});
+
+test("machine names people use find the right exercise", () => {
+  const gym = [lib("butterfly", "Machine Fly", ["Butterfly", "Pec Deck"]), lib("reverse-machine-flyes", "Reverse Machine Flyes", ["Reverse Pec Deck"])];
+  assert.equal(rankMatches("machine fly", gym)[0].exercise.slug, "butterfly");
+  assert.equal(rankMatches("pec deck", gym)[0].exercise.slug, "butterfly");
+  assert.equal(rankMatches("reverse pec deck", gym)[0].exercise.slug, "reverse-machine-flyes");
 });
 
 test("unknown exercises are refused with the closest slugs, nothing planned", () => {

@@ -43,6 +43,20 @@ export function displayWeight(kg: number, unit: UnitSystem): string {
   return `${Math.round(kg * 4) / 4}`;
 }
 
+/** One long-press on + / -: 0.5 lb or 0.25 kg, for machines with small add-on weights. */
+export function fineStepKg(unit: UnitSystem): number {
+  return unit === "imperial" ? 0.5 / LB_PER_KG : 0.25;
+}
+
+/**
+ * Move a weight by a step, landing on the nearest 0.5 lb or 0.25 kg so
+ * half-pound weights like 42.5 lb survive a + / - tap (42.5 -> 47.5).
+ */
+export function stepKg(kg: number, deltaKg: number, unit: UnitSystem): number {
+  const fine = fineStepKg(unit);
+  return Math.max(0, Math.round((kg + deltaKg) / fine) * fine);
+}
+
 /** Snap a kg value to the nearest loadable step in the lifter's unit. */
 export function snapKg(kg: number, unit: UnitSystem): number {
   const step = weightStepKg(unit);
