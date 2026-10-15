@@ -10,6 +10,8 @@
 //                 (last 14 days) that isn't on the calendar yet
 // GET ?code&state is where Google sends you back after signing in, so this
 // function checks the caller itself instead of requiring a JWT.
+// GET ?page=home|privacy|terms are the public pages Google's sign-in screen
+// links to (it needs them before the app can be published).
 
 import { adminClient, corsHeaders, handle, HttpError, json, userClient } from "../_shared/http.ts";
 import {
@@ -154,6 +156,56 @@ async function sync(userId: string, db: Awaited<ReturnType<typeof userClient>>["
   return { added };
 }
 
+// ---------- Public pages for Google's sign-in screen ----------
+
+const PAGES: Record<string, string> = {
+  home: `Ironlog
+
+Ironlog is a personal strength-training log: workouts, sets, progress charts
+and a Wear OS watch companion. It's a private app built for its owner.
+
+Google Calendar: if you connect it, Ironlog adds gym workouts longer than
+30 minutes to the calendar you choose. Nothing else is read or changed.
+
+Privacy policy: ?page=privacy   Terms: ?page=terms
+Contact: sadiq.lateef@gmail.com
+`,
+  privacy: `Ironlog privacy policy
+
+What Ironlog stores: your account email, the workouts you log, and (only if
+you save one) your gym's location. It's kept in Ironlog's database and is
+never sold or shared.
+
+Location: the app checks your phone's location only while a workout is open,
+to tell whether you're at your gym. Only "at the gym: yes/no" is saved for
+each workout. There is no background tracking.
+
+Google Calendar: when you connect it, Ironlog asks Google for permission to
+see your list of calendars and to add events. It uses that only to add your
+gym workouts to the calendar you pick. It doesn't read your other events.
+Google user data is used in line with the Google API Services User Data
+Policy, including its Limited Use requirements.
+
+Disconnecting: tap Disconnect in Settings > Gym & calendar, or remove Ironlog
+at https://myaccount.google.com/connections. Either one revokes access, and
+the stored Google sign-in is deleted.
+
+Deleting your data or questions: email sadiq.lateef@gmail.com.
+`,
+  terms: `Ironlog terms of service
+
+Ironlog is a personal project provided as is, without warranties. It is a
+training log, not medical advice: check with a qualified professional before
+starting or changing an exercise program. You're responsible for how you use
+it. Questions: sadiq.lateef@gmail.com.
+`,
+};
+
+function page(name: string): Response {
+  const body = PAGES[name];
+  return new Response(body ?? "Not found\n", { status: body ? 200 : 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+}
+
 // ---------- Router ----------
 
 const post = handle(async (req) => {
@@ -212,7 +264,10 @@ const post = handle(async (req) => {
 Deno.serve(async (req) => {
   if (req.method === "GET") {
     try {
-      return await callback(new URL(req.url));
+      const url = new URL(req.url);
+      const name = url.searchParams.get("page");
+      if (name) return page(name);
+      return await callback(url);
     } catch (e) {
       console.error(e);
       return new Response("Something went wrong. Go back to Ironlog and try again.\n", { status: 500, headers: { ...corsHeaders, "Content-Type": "text/plain" } });
