@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calculator, ChevronRight, Dumbbell, Heart, LogOut, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
+import { Calculator, ChevronRight, Dumbbell, Heart, Settings, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { SessionSheet } from "@/components/session-sheet";
@@ -13,7 +13,6 @@ import { Card } from "@/components/ui/card";
 import { formatWeight } from "@/lib/units";
 import { WATCH_LINKING } from "@/lib/features";
 import { getActiveSession, listRecentSessions, type WorkoutSession } from "@/lib/workout-api";
-import { cn } from "@/lib/utils";
 
 export default function Home() {
   return (
@@ -24,7 +23,7 @@ export default function Home() {
 }
 
 function Dashboard() {
-  const { profile, unit, setUnit, signOut } = useAuth();
+  const { profile, unit } = useAuth();
   const [active, setActive] = useState<WorkoutSession | null>(null);
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
   const [plates, setPlates] = useState(false);
@@ -48,8 +47,10 @@ function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Ironlog</h1>
           <p className="text-muted-foreground truncate text-sm">{profile?.email}</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
-          <LogOut />
+        <Button asChild variant="ghost" size="icon" aria-label="Settings">
+          <Link href="/settings/">
+            <Settings />
+          </Link>
         </Button>
       </header>
 
@@ -94,22 +95,11 @@ function Dashboard() {
         <Button variant="secondary" onClick={() => setPlates(true)}>
           <Calculator /> Plates
         </Button>
-        <div className="bg-secondary grid grid-cols-2 rounded-xl p-1" role="group" aria-label="Weight unit">
-          {(["imperial", "metric"] as const).map((u) => (
-            <button
-              key={u}
-              type="button"
-              onClick={() => setUnit(u)}
-              aria-pressed={unit === u}
-              className={cn(
-                "rounded text-sm font-semibold",
-                unit === u ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
-              )}
-            >
-              {u === "imperial" ? "lb" : "kg"}
-            </button>
-          ))}
-        </div>
+        <Button asChild variant="secondary">
+          <Link href="/settings/">
+            <Settings /> Settings
+          </Link>
+        </Button>
       </div>
 
       <section className="flex flex-col gap-2">

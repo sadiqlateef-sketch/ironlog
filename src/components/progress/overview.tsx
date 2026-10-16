@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Flame, Lightbulb, RefreshCw, Settings } from "lucide-react";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { useAuth } from "@/components/providers/auth-provider";
 import { DaySheet } from "@/components/session-sheet";
-import { SettingsSheet } from "@/components/settings-sheet";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MUSCLE_FILTERS } from "@/lib/labels";
@@ -89,7 +89,6 @@ const groupFor = (exercises: Map<string, Exercise>) => (id: string) => {
 
 export function ProfileHeader({ onSync, syncing }: { onSync: () => void; syncing: boolean }) {
   const { profile } = useAuth();
-  const [settings, setSettings] = useState(false);
   const name = profile?.display_name || profile?.email?.split("@")[0] || "You";
   return (
     <header className="flex items-center gap-3">
@@ -103,10 +102,11 @@ export function ProfileHeader({ onSync, syncing }: { onSync: () => void; syncing
       <Button variant="secondary" size="icon" aria-label="Refresh" onClick={onSync} disabled={syncing}>
         <RefreshCw className={cn(syncing && "animate-spin")} />
       </Button>
-      <Button variant="secondary" size="icon" aria-label="Settings" onClick={() => setSettings(true)}>
-        <Settings />
+      <Button asChild variant="secondary" size="icon" aria-label="Settings">
+        <Link href="/settings/">
+          <Settings />
+        </Link>
       </Button>
-      <SettingsSheet open={settings} onOpenChange={setSettings} />
     </header>
   );
 }
