@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the folders the app actually hands to other apps:
+   * share/        workout and record images sent to the share sheet (src/lib/native.ts)
+   * Pictures/     photos taken with the camera from a file picker (Capacitor's
+                   BridgeWebChromeClient saves them in the app's own Pictures folder)
+-->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <cache-path name="shared_images" path="share/" />
+    <external-files-path name="camera_photos" path="Pictures/" />
 </paths>

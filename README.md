@@ -505,3 +505,24 @@ Authentication > Providers > Email while you're developing.
   adds a trigger that keeps `workout_sessions.avg_hr` / `max_hr` up to date as
   `heart_rate_samples` arrive from the watch.
 - Only one unfinished workout per user is allowed at a time.
+
+## Security
+
+The app's public key is inside the APK, so the database is locked down on the
+server rather than trusting the app:
+
+- Every table has Row Level Security: you can only see and change your own
+  rows, and rows can only point at things you own (your routines, programs,
+  sessions, and built-in or your own exercises).
+- Signed-out callers get nothing at all (`20261016000000_lockdown.sql`), and
+  the same applies to anything added later.
+- Every Edge Function checks who is calling: the app's functions check your
+  sign-in, `watch-pair` and `claude-connector` check their own one-time code or
+  secret link, and `gym-calendar`'s Google callback checks a signed, expiring
+  state value.
+- The phone app turns off Android backups and phone-to-phone transfers of its
+  data, and only shares files from its own share and camera folders.
+
+Since Ironlog is just for you, you can also stop anyone else from making an
+account: in Supabase, open **Authentication > Sign In / Providers** and turn off
+**Allow new users to sign up** (your own account keeps working).

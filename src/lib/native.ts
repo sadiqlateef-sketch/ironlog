@@ -122,7 +122,8 @@ export async function shareImage(blob: Blob, fileName: string, title: string): P
         r.onerror = () => reject(r.error);
         r.readAsDataURL(blob);
       });
-      const { uri } = await Filesystem.writeFile({ path: fileName, data, directory: Directory.Cache });
+      // Only cache/share/ is exposed to other apps (android/app/src/main/res/xml/file_paths.xml).
+      const { uri } = await Filesystem.writeFile({ path: `share/${fileName}`, data, directory: Directory.Cache, recursive: true });
       await Share.share({ title, files: [uri], dialogTitle: title });
       return "shared";
     }

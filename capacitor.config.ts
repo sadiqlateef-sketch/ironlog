@@ -10,6 +10,16 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: "#0b0b0b",
   },
+  // Goes into the generated config.xml as <access origin> tags instead of the
+  // default "*". Only Cordova plugins read it (the app has none today), so this
+  // is a guard for later rather than a change you'll notice.
+  cordova: {
+    accessOrigins: [
+      "https://*.supabase.co",
+      "https://accounts.google.com",
+      "https://oauth2.googleapis.com",
+    ],
+  },
   plugins: {
     SystemBars: {
       // Light icons on the app's near-black background.
