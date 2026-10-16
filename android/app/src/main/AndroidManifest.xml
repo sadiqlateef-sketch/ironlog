@@ -27,6 +27,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.ironlog.app" android:host="gym-calendar" />
             </intent-filter>
+            <!-- The "reset password" email link opens the app to choose a new password. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.ironlog.app" android:host="reset-password" />
+            </intent-filter>
         </activity>
 
         <provider
