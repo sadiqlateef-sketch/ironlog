@@ -4,10 +4,11 @@
 // equipment, gym and calendar, the Claude connector, alerts, and sign out.
 
 import { useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Dumbbell, FileDown, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { Bell, ChevronRight, Dumbbell, FileDown, HeartPulse, LogOut, MapPin, MessageCircle } from "lucide-react";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
+import { HealthSheet } from "@/components/health-sheet";
 import { AboutYouForm } from "@/components/progress/body";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ export function SettingsScreen() {
   const { profile, unit, setUnit, updateProfile, signOut } = useAuth();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [note, setNote] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | null>(null);
+  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | "health" | null>(null);
 
   async function save(patch: Parameters<typeof updateProfile>[0], message = "Saved.") {
     try {
@@ -155,6 +156,7 @@ export function SettingsScreen() {
         <div className="flex flex-col">
           <Row icon={Dumbbell} label="Bar, plates and rest time" detail="What the plate calculator and rest timer use" onClick={() => setSheet("weights")} />
           <Row icon={MapPin} label="Gym & calendar" detail={profile?.gym_name ?? "Check in at your gym, add workouts to Google Calendar"} onClick={() => setSheet("gym")} />
+          <Row icon={HeartPulse} label="Health Connect" detail="Share workouts with Samsung Health; bring in heart rate and weight" onClick={() => setSheet("health")} />
           <Row icon={MessageCircle} label="Connect to Claude" detail="Log workouts from a Claude chat" onClick={() => setSheet("claude")} />
         </div>
       </Section>
@@ -185,6 +187,7 @@ export function SettingsScreen() {
       <EquipmentSheet open={sheet === "weights"} onOpenChange={(o) => !o && setSheet(null)} />
       <GymSheet open={sheet === "gym"} onOpenChange={(o) => !o && setSheet(null)} />
       <ClaudeConnectSheet open={sheet === "claude"} onOpenChange={(o) => !o && setSheet(null)} />
+      <HealthSheet open={sheet === "health"} onOpenChange={(o) => !o && setSheet(null)} />
     </div>
   );
 }
