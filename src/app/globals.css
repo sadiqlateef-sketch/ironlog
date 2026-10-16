@@ -176,3 +176,11 @@
 }
 .record-confetti { animation: record-confetti 1.4s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .record-confetti { display: none; } }
+
+/* Exercise form demo: the end photo fades over the start photo and back, like a GIF. */
+@keyframes demo-flip {
+  0%, 35% { opacity: 0; }
+  50%, 85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.demo-flip { animation: demo-flip 2.8s ease-in-out infinite; }

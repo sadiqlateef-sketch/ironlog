@@ -369,6 +369,15 @@ only the Edge Function can read (RLS on, no policies).
   timer only starts after the last exercise of the round.
 - 🧮 (barbell lifts) opens the **plate calculator** with the set's weight filled in.
 - ⋮ shows delete buttons for sets and the exercise.
+- Tap the round photo next to an exercise's name to open its **form demo**
+  right in the logger: the start and end photos fade back and forth like a GIF
+  (tap it to pause). With "reduce motion" on in your phone's settings, the two
+  photos sit side by side instead. The same demo is on the exercise's Guide tab.
+  Photos come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db)
+  (public domain). Some machine and cable exercises borrow the photos of the
+  same movement on other equipment and say so under the demo; a few with no
+  close match show a placeholder. If you set `animation_url` on an exercise to a
+  GIF, MP4 or WebM, that plays instead.
 - **Finish** drops unchecked sets and saves the workout. Unit (lb / kg) is on
   the home screen.
 
