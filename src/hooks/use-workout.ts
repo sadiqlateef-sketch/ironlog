@@ -5,26 +5,29 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useRestTimer } from "@/components/providers/rest-timer-provider";
 import { kgToLb, toKg, type UnitSystem } from "@/lib/units";
 import {
-  deleteSets,
-  discardSession,
-  finishSession,
-  getActiveSession,
   getBestE1rms,
   getLastPerformance,
   getRoutineTargets,
-  insertSets,
   listExercises,
-  listSessionSets,
-  moveSetsToExercise,
   startSession,
-  updateSessionNotes,
-  updateSet,
   type Exercise,
   type LastPerformance,
   type Routine,
   type WorkoutSession,
   type WorkoutSet,
 } from "@/lib/workout-api";
+import {
+  deleteSets,
+  discardSession,
+  finishSession,
+  getActiveSession,
+  insertSets,
+  listActiveSets,
+  updateSessionNotes,
+  updateSet,
+  updateSets,
+} from "@/lib/offline/workout-store";
+import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz } from "@/lib/native";
 import { bestE1rm, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
@@ -144,7 +147,7 @@ export function useWorkout() {
     const active = await getActiveSession();
     if (!active) return { session: null, blocks: [] };
     const [sets, exercises, targets] = await Promise.all([
-      listSessionSets(active.id),
+      listActiveSets(active.id),
       listExercises(),
       active.routine_id ? getRoutineTargets(active.routine_id) : Promise.resolve([]),
     ]);
@@ -205,6 +208,19 @@ export function useWorkout() {
     if (profile) load();
   }, [profile, load]);
 
+  // The server refused a change made offline: show the workout as it really is.
+  useEffect(() => {
+    let last = getSyncStatus().error;
+    return subscribeSync(() => {
+      const { error: e } = getSyncStatus();
+      if (e && e !== last && profile) {
+        fail(new Error(e));
+        load();
+      }
+      last = e;
+    });
+  }, [profile, load, fail]);
+
   // ---- Gym check-in ----
   // Once per workout, as soon as it's open on the phone (that also covers a
   // workout started on the watch): are we at the gym? No fix yet = try again at Finish.
@@ -254,7 +270,7 @@ export function useWorkout() {
     if (!session) return null;
     const done = blocksRef.current.flatMap((b) => b.sets.filter((s) => s.done));
     try {
-      await finishSession(session.id);
+      const { synced } = await finishSession(session);
       restTimer.stop();
       const endedAt = Date.now();
       const gym = gymOf(profile);
@@ -278,6 +294,8 @@ export function useWorkout() {
         sets: done.length,
         exercises: blocksRef.current.filter((b) => b.sets.some((s) => s.done)).length,
         records: recordsRef.current.size,
+        /** False when it's saved on the phone and still waiting for signal. */
+        synced,
       };
       recordsRef.current = new Set();
       setSession(null);
@@ -400,7 +418,7 @@ export function useWorkout() {
       try {
         const [previous] = await Promise.all([
           getLastPerformance(exercise.id),
-          moveSetsToExercise(block.sets.map((s) => s.id), exercise.id),
+          updateSets(block.sets.map((s) => s.id), { exercise_id: exercise.id }),
         ]);
         setBlocks((prev) =>
           prev.map((b) =>

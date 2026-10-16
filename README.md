@@ -506,6 +506,17 @@ Authentication > Providers > Email while you're developing.
   `heart_rate_samples` arrive from the watch.
 - Only one unfinished workout per user is allowed at a time.
 
+## Logging without signal
+
+The workout logger keeps working with no signal. Every change is saved on the
+phone first (IndexedDB) and sent to Supabase in order as soon as there's a
+connection; a banner says "Saved offline, will sync" while anything is waiting.
+Closing the app keeps the queue, and a workout can be started, logged, reopened
+and finished offline. The exercise library, your programs and routines, and
+last time's numbers are kept from the last time you were online. Sets and
+workouts get their ids on the phone, so a retried sync never duplicates them.
+Code: `src/lib/offline/`.
+
 ## Security
 
 The app's public key is inside the APK, so the database is locked down on the

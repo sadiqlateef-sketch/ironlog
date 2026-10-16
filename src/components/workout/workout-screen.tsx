@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, FileUp, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, CloudOff, FileUp, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -76,7 +76,13 @@ export function WorkoutScreen() {
                 {summary.durationMin > 30 ? `At ${summary.atGym}, so it's going on your Google Calendar if it's connected.` : `At ${summary.atGym}. Workouts over 30 minutes go on your calendar.`}
               </p>
             )}
-            {summary?.routineId && <NextTime sessionId={summary.sessionId} />}
+            {summary && !summary.synced && (
+              <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                <CloudOff className="size-4 shrink-0" aria-hidden />
+                Saved on your phone. It will sync{summary.routineId ? ", and next time's targets will be checked," : ""} when you have signal.
+              </p>
+            )}
+            {summary?.routineId && summary.synced && <NextTime sessionId={summary.sessionId} />}
             <Button onClick={() => (setSummary(null), router.push("/"))}>Done</Button>
           </DialogContent>
         </Dialog>

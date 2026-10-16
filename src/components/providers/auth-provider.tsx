@@ -3,6 +3,9 @@
 import { createContext, use, useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
+import { cachedRead } from "@/lib/offline/cache";
+import { kvClear } from "@/lib/offline/kv";
+import { discardPending, flush, getSyncStatus } from "@/lib/offline/queue";
 import type { Tables, UnitSystem } from "@/types/database";
 
 type Profile = Tables<"users">;
@@ -37,12 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!userId) return;
-    getSupabase()
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle()
-      .then(({ data }) => setProfile(data));
+    // Kept on the phone too, so the app opens (and logs workouts) without signal.
+    cachedRead(`profile:${userId}`, async () => {
+      const { data, error } = await getSupabase().from("users").select("*").eq("id", userId).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data;
+    })
+      .then(setProfile)
+      .catch(() => {});
   }, [userId]);
 
   const setUnit = useCallback(
@@ -65,7 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    // Send any workout changes still waiting for signal before they're forgotten.
+    if (!(await flush())) {
+      const n = getSyncStatus().pending;
+      if (n > 0 && !confirm(`${n} workout ${n === 1 ? "change hasn't" : "changes haven't"} synced yet. Sign out anyway and lose ${n === 1 ? "it" : "them"}?`)) return;
+    }
     await getSupabase().auth.signOut();
+    await discardPending();
+    await kvClear();
   }, []);
 
   return (

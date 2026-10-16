@@ -6,6 +6,7 @@ import { useEffect, type ReactNode } from "react";
 import { ChartLine, Dumbbell, House, ListChecks } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { RestTimerBar } from "@/components/rest-timer-bar";
+import { SyncBanner } from "@/components/sync-banner";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -35,6 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       <main className="mx-auto w-full max-w-md flex-1 px-4 pt-6 pb-40">{children}</main>
       <div className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
+        <SyncBanner />
         <RestTimerBar />
         {/* Pages can put a sticky action bar here (the workout's "Log Set"). */}
         <div id="bottom-bar-slot" />

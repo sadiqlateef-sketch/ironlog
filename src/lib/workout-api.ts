@@ -3,6 +3,10 @@
 // user's rows, so there is no user_id filtering to forget here.
 
 import { getSupabase } from "@/lib/supabase/client";
+import { cachedRead } from "@/lib/offline/cache";
+import { kvGet } from "@/lib/offline/kv";
+import { isNetworkError } from "@/lib/offline/queue";
+import { startPlannedSession, type PlannedExercise } from "@/lib/offline/workout-store";
 import type { EditPlan } from "@/lib/session-edit";
 import { bestE1rm } from "@/lib/workout-logic";
 import type { Database, Tables } from "@/types/database";
@@ -23,7 +27,7 @@ function unwrap<T>(res: { data: T | null; error: { message: string } | null }): 
 // ---------- Exercises ----------
 
 export async function listExercises(): Promise<Exercise[]> {
-  return unwrap(await getSupabase().from("exercises").select("*").order("name"));
+  return cachedRead("exercises", async () => unwrap(await getSupabase().from("exercises").select("*").order("name")));
 }
 
 export async function getExercise(id: string): Promise<Exercise> {
@@ -50,7 +54,10 @@ export async function createExercise(input: {
 }
 
 export async function getLastPerformance(exerciseId: string): Promise<LastPerformance> {
-  return unwrap(await getSupabase().rpc("get_last_performance", { p_exercise_id: exerciseId })) ?? [];
+  return cachedRead(`last:${exerciseId}`, async () =>
+    unwrap(await getSupabase().rpc("get_last_performance", { p_exercise_id: exerciseId })) ?? [],
+    [],
+  );
 }
 
 export type ExercisePrefs = Tables<"exercise_prefs">;
@@ -103,11 +110,8 @@ export async function getExerciseHistory(exerciseId: string) {
 
 // ---------- Sessions ----------
 
-export async function getActiveSession(): Promise<WorkoutSession | null> {
-  return unwrap(
-    await getSupabase().from("workout_sessions").select("*").is("end_time", null).maybeSingle(),
-  );
-}
+// The workout in progress lives in the offline store (works without signal).
+export { getActiveSession, startPlannedSession, type PlannedExercise } from "@/lib/offline/workout-store";
 
 export async function listRecentSessions(limit = 5): Promise<WorkoutSession[]> {
   return unwrap(
@@ -122,8 +126,8 @@ export async function listRecentSessions(limit = 5): Promise<WorkoutSession[]> {
 
 /** Your own routines. Program workouts are reached through their program. */
 export async function listRoutines(): Promise<Routine[]> {
-  return unwrap(
-    await getSupabase().from("routines").select("*").eq("archived", false).is("program_id", null).order("position"),
+  return cachedRead("routines", async () =>
+    unwrap(await getSupabase().from("routines").select("*").eq("archived", false).is("program_id", null).order("position")),
   );
 }
 
@@ -131,17 +135,9 @@ export async function listRoutines(): Promise<Routine[]> {
  * Start a workout. From a routine, the sets are created up front with the
  * routine's targets so logging is just "check, check, check".
  */
-export interface PlannedExercise {
-  exercise_id: string;
-  sets: number;
-  warmups?: number;
-  superset_group?: number | null;
-  weight_kg?: number | null;
-}
-
 export async function startSession(routine?: Routine): Promise<WorkoutSession> {
   const items = routine
-    ? unwrap(await getSupabase().from("routine_exercises").select("*").eq("routine_id", routine.id).order("position")).map(
+    ? (await getRoutineTargets(routine.id)).map(
         (x): PlannedExercise => ({
           exercise_id: x.exercise_id,
           sets: x.target_sets,
@@ -154,53 +150,27 @@ export async function startSession(routine?: Routine): Promise<WorkoutSession> {
   return startPlannedSession({ name: routine?.name ?? "Workout", routineId: routine?.id ?? null }, items);
 }
 
-/** Start a workout with these exercises' sets laid out, ready to fill in. */
-export async function startPlannedSession(
-  info: { name: string; routineId?: string | null },
-  items: PlannedExercise[],
-): Promise<WorkoutSession> {
-  const supabase = getSupabase();
-  const session: WorkoutSession = unwrap(
-    await supabase
-      .from("workout_sessions")
-      .insert({ routine_id: info.routineId ?? null, name: info.name, source: "web" })
-      .select()
-      .single(),
-  );
-
-  // Every row spells out weight and reps: in a bulk insert, a key missing
-  // from one row is sent as null rather than the column default.
-  const sets: SetInsert[] = [];
-  items.forEach((item, i) => {
-    let n = 1;
-    const base = { session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, superset_group: item.superset_group ?? null, reps: 0 };
-    for (let w = 0; w < (item.warmups ?? 0); w++) sets.push({ ...base, set_number: n++, set_type: "warmup", weight: 0 });
-    for (let s = 0; s < item.sets; s++) sets.push({ ...base, set_number: n++, set_type: "normal", weight: item.weight_kg ?? 0 });
-  });
-  if (sets.length) unwrap(await supabase.from("workout_sets").insert(sets).select("id"));
-  return session;
-}
-
-export async function finishSession(sessionId: string): Promise<void> {
-  const supabase = getSupabase();
-  // Unchecked sets were never done, so they don't belong in your history.
-  unwrap(await supabase.from("workout_sets").delete().eq("session_id", sessionId).eq("is_completed", false).select("id"));
-  unwrap(await supabase.from("workout_sessions").update({ end_time: new Date().toISOString() }).eq("id", sessionId).select("id"));
-}
-
-export async function updateSessionNotes(sessionId: string, notes: string): Promise<void> {
-  unwrap(await getSupabase().from("workout_sessions").update({ notes: notes.trim() || null }).eq("id", sessionId).select("id"));
-}
-
 export async function discardSession(sessionId: string): Promise<void> {
   unwrap(await getSupabase().from("workout_sessions").delete().eq("id", sessionId).select("id"));
 }
 
 /** Routine targets (rest time, rep range) for the exercises in a session. */
-export async function getRoutineTargets(routineId: string) {
-  return unwrap(
-    await getSupabase().from("routine_exercises").select("*").eq("routine_id", routineId).order("position"),
-  );
+export async function getRoutineTargets(routineId: string): Promise<RoutineExercise[]> {
+  try {
+    return await cachedRead(`targets:${routineId}`, async () =>
+      unwrap(await getSupabase().from("routine_exercises").select("*").eq("routine_id", routineId).order("position")),
+    );
+  } catch (e) {
+    // Offline and never opened this one: the saved program/routine lists have it too.
+    if (!isNetworkError(e)) throw e;
+    const [programs, routines] = await Promise.all([
+      kvGet<ProgramWithWorkouts[]>("cache:programs"),
+      kvGet<RoutineWithExercises[]>("cache:routines-full"),
+    ]);
+    const found = [...(programs ?? []).flatMap((p) => p.routines), ...(routines ?? [])].find((r) => r.id === routineId);
+    if (!found) throw e;
+    return [...found.routine_exercises].sort((a, b) => a.position - b.position);
+  }
 }
 
 // ---------- Sets ----------
@@ -308,7 +278,7 @@ export async function claimWatchCode(code: string): Promise<void> {
 }
 
 export async function listRoutinesWithExercises(): Promise<RoutineWithExercises[]> {
-  return unwrap(
+  return cachedRead("routines-full", async () => unwrap(
     await getSupabase()
       .from("routines")
       .select("*, routine_exercises(*, exercises(name, equipment, primary_muscle, image_urls))")
@@ -316,7 +286,7 @@ export async function listRoutinesWithExercises(): Promise<RoutineWithExercises[
       .is("program_id", null)
       .order("position")
       .order("position", { referencedTable: "routine_exercises" }),
-  ) as unknown as RoutineWithExercises[];
+  ) as unknown as RoutineWithExercises[]);
 }
 
 // ---------- Programs ----------
@@ -326,7 +296,7 @@ export type ProgramWithWorkouts = Program & { routines: RoutineWithExercises[] }
 export type ProgramProgress = Database["public"]["Functions"]["program_progress"]["Returns"][number];
 
 export async function listPrograms(): Promise<ProgramWithWorkouts[]> {
-  return unwrap(
+  return cachedRead("programs", async () => unwrap(
     await getSupabase()
       .from("programs")
       .select("*, routines(*, routine_exercises(*, exercises(name, equipment, primary_muscle, image_urls)))")
@@ -334,13 +304,15 @@ export async function listPrograms(): Promise<ProgramWithWorkouts[]> {
       .order("created_at", { ascending: false })
       .order("program_week", { referencedTable: "routines" })
       .order("program_day", { referencedTable: "routines" }),
-  ) as unknown as ProgramWithWorkouts[];
+  ) as unknown as ProgramWithWorkouts[]);
 }
 
 /** Where you are in a program (your active one when no id is given). */
 export async function getProgramProgress(programId?: string): Promise<ProgramProgress | null> {
-  const rows = unwrap(await getSupabase().rpc("program_progress", programId ? { p_program_id: programId } : {}));
-  return rows[0] ?? null;
+  return cachedRead(`progress:${programId ?? "active"}`, async () => {
+    const rows = unwrap(await getSupabase().rpc("program_progress", programId ? { p_program_id: programId } : {}));
+    return rows[0] ?? null;
+  });
 }
 
 /** Make this your one active program and start it from week 1, day 1. */
@@ -520,14 +492,14 @@ export async function reorderProgramDays(programId: string, week: number, routin
 
 /** Finished workouts from the last year, newest first: which routine and when. */
 export async function listWorkoutLog(): Promise<Pick<WorkoutSession, "id" | "routine_id" | "name" | "start_time">[]> {
-  return unwrap(
+  return cachedRead("workout-log", async () => unwrap(
     await getSupabase()
       .from("workout_sessions")
       .select("id, routine_id, name, start_time")
       .not("end_time", "is", null)
       .gte("start_time", new Date(Date.now() - 365 * 86_400_000).toISOString())
       .order("start_time", { ascending: false }),
-  );
+  ));
 }
 
 type TemplateLike = {
@@ -650,7 +622,9 @@ export async function getBestE1rms(exerciseIds: string[], excludeSessionId: stri
   if (!exerciseIds.length) return best;
   const page = 1000;
   for (let from = 0; ; from += page) {
-    const rows = unwrap(
+    let rows;
+    try {
+      rows = unwrap(
       await getSupabase()
         .from("workout_sets")
         .select("exercise_id, weight, reps")
@@ -660,7 +634,12 @@ export async function getBestE1rms(exerciseIds: string[], excludeSessionId: stri
         .neq("session_id", excludeSessionId)
         .order("id")
         .range(from, from + page - 1),
-    );
+      );
+    } catch (e) {
+      // No signal: no record pop-ups this time rather than no logging.
+      if (isNetworkError(e)) return best;
+      throw e;
+    }
     for (const r of rows) best.set(r.exercise_id, Math.max(best.get(r.exercise_id) ?? 0, bestE1rm([r])));
     if (rows.length < page) return best;
   }
