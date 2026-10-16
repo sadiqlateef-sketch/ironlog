@@ -229,6 +229,22 @@ export async function updateSets(ids: string[], patch: SetUpdate): Promise<void>
 
 export const updateSet = (id: string, patch: SetUpdate) => updateSets([id], patch);
 
+/**
+ * Give exercises new slots in the workout. Slots are unique per set number,
+ * so swapping two would clash halfway: park each moved exercise on a
+ * negative slot first, then move it to its real one.
+ */
+export async function reorderExercises(moves: { ids: string[]; order: number }[]): Promise<void> {
+  moves = moves.filter((m) => m.ids.length);
+  if (!moves.length) return;
+  const slot = new Map(moves.flatMap((m) => m.ids.map((id) => [id, m.order] as const)));
+  await changeMirror((m) => ({ ...m, sets: m.sets.map((s) => (slot.has(s.id) ? { ...s, exercise_order: slot.get(s.id)! } : s)) }));
+  await commit(
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: m.ids, patch: { exercise_order: -m.order } })),
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: m.ids, patch: { exercise_order: m.order } })),
+  );
+}
+
 export async function deleteSets(ids: string[]): Promise<void> {
   if (!ids.length) return;
   await changeMirror((m) => ({ ...m, sets: m.sets.filter((s) => !ids.includes(s.id)) }));

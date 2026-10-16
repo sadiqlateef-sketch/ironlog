@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
+import { ArrowUpDown, ArrowUpToLine, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -14,6 +14,7 @@ import { useSlot } from "@/hooks/use-slot";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
 import { IntervalTimer } from "@/components/workout/interval-timer";
 import { NotesSheet } from "@/components/workout/notes-sheet";
+import { ReorderSheet } from "@/components/workout/reorder-sheet";
 import { ProgressionSheet } from "@/components/workout/progression-sheet";
 import { RestSheet } from "@/components/workout/rest-sheet";
 import { SwapSheet } from "@/components/workout/swap-sheet";
@@ -31,7 +32,17 @@ import {
   type Exercise,
   type Routine,
 } from "@/lib/workout-api";
-import { focusAfterLog, formatClock, nextUnfinished, segmentStates } from "@/lib/workout-logic";
+import {
+  doNextIndex,
+  exerciseUnits,
+  focusAfterLog,
+  formatClock,
+  moveUnit,
+  nextUnfinished,
+  segmentStates,
+  unitIndex,
+  workingOn,
+} from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
 import { keepScreenOn, openExactAlarmSettings, requestNotifications, restAlertStatus, tap } from "@/lib/native";
 
@@ -119,6 +130,11 @@ function ActiveWorkout({
 }) {
   const session = w.session!;
   const [picking, setPicking] = useState(false);
+  /** Where the picker's exercise goes, counting supersets as one; null = at the end. */
+  const [insertAt, setInsertAt] = useState<number | null>(null);
+  const [reordering, setReordering] = useState(false);
+  /** Just added at the end: offer to do it next. */
+  const [added, setAdded] = useState<{ order: number; name: string } | null>(null);
   const [plates, setPlates] = useState<{ open: boolean; weight: number | null }>({ open: false, weight: null });
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [view, setViewState] = useState<View>(savedView);
@@ -158,6 +174,59 @@ function ActiveWorkout({
     } catch {}
   }
 
+  /** Save a new order and keep pointing at the same exercise. */
+  function reorder(next: Block[]): Map<number, number> {
+    const slots = w.reorder(next);
+    setFocus((f) => (f == null ? f : (slots.get(f) ?? f)));
+    return slots;
+  }
+
+  /** Move an exercise to straight after the one you're on (or ahead of it if you haven't started it). */
+  function doNext(order: number) {
+    const list = w.blocksNow();
+    const current = workingOn(list, focusOrder, order);
+    const startedCurrent = list.some((b) => b.order === current && b.sets.some((s) => s.done));
+    const slots = reorder(moveUnit(list, order, doNextIndex(list, order, current)));
+    if (!startedCurrent) setFocus(slots.get(order) ?? order);
+    setAdded(null);
+    tap();
+    const name = list.find((b) => b.order === order)?.exercise.name;
+    if (name && startedCurrent) {
+      setNudge(`${name} is up next`);
+      setTimeout(() => setNudge(null), 2500);
+    }
+  }
+
+  function moveBy(order: number, step: -1 | 1) {
+    const list = w.blocksNow();
+    reorder(moveUnit(list, order, unitIndex(list, order) + step));
+  }
+
+  /** Whether "Do next" would change anything for this exercise. */
+  function canDoNext(b: Block): boolean {
+    if (b.sets.some((s) => s.done) || b.sets.every((s) => s.done)) return false;
+    const current = workingOn(blocks, focusOrder, b.order);
+    if (current == null) return false;
+    return doNextIndex(blocks, b.order, current) !== unitIndex(blocks, b.order);
+  }
+
+  async function addPicked(e: Exercise) {
+    const at = insertAt;
+    setInsertAt(null);
+    const order = await w.addExercise(e);
+    if (order == null) return;
+    if (at != null) {
+      reorder(moveUnit(w.blocksNow(), order, at));
+      return;
+    }
+    const list = w.blocksNow();
+    const current = workingOn(list, focusOrder, order);
+    if (current != null && doNextIndex(list, order, current) !== unitIndex(list, order)) {
+      setAdded({ order, name: e.name });
+      setTimeout(() => setAdded((a) => (a?.order === order ? null : a)), 8000);
+    }
+  }
+
   function jumpTo(order: number) {
     setFocus(order);
     if (view === "list") document.getElementById(`exercise-${order}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -192,6 +261,7 @@ function ActiveWorkout({
   const logLabel = !focus ? "Add exercise" : nextSet ? "Log Set" : after != null ? "Next exercise" : "Finish workout";
   const shown = view === "focus" && focus ? [focus] : blocks;
   const states = segmentStates(blocks, focusOrder);
+  const units = exerciseUnits(blocks);
 
   return (
     <div className="flex flex-col gap-4">
@@ -236,6 +306,16 @@ function ActiveWorkout({
               </li>
             ))}
           </ol>
+          {units.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setReordering(true)}
+              aria-label="Reorder exercises"
+              className="bg-secondary text-muted-foreground hover:text-foreground grid size-8 shrink-0 place-items-center rounded-lg"
+            >
+              <ArrowUpDown className="size-4" />
+            </button>
+          )}
           <div className="bg-secondary flex rounded-lg p-0.5 text-xs font-semibold" role="group" aria-label="Layout">
             {(["focus", "list"] as const).map((v) => (
               <button
@@ -281,8 +361,24 @@ function ActiveWorkout({
         );
       })()}
 
-      {shown.map((block) => (
+      {shown.map((block, i) => {
+        const u = unitIndex(blocks, block.order);
+        // In the full list, a thin "add here" between exercises (not inside a superset).
+        const gap = view === "list" && i > 0 && unitIndex(blocks, shown[i - 1].order) !== u;
+        return (
         <div key={block.order} id={`exercise-${block.order}`} className="scroll-mt-4">
+          {gap && (
+            <button
+              type="button"
+              onClick={() => (setInsertAt(u), setPicking(true))}
+              className="text-muted-foreground hover:text-foreground -mt-2 mb-2 flex h-8 w-full items-center gap-2 text-xs font-semibold"
+              aria-label={`Add an exercise before ${block.exercise.name}`}
+            >
+              <span className="bg-foreground/15 h-px flex-1" />
+              <Plus className="size-4" aria-hidden /> Add here
+              <span className="bg-foreground/15 h-px flex-1" />
+            </button>
+          )}
           <ExerciseBlock
             block={block}
             focused={view === "focus"}
@@ -296,6 +392,11 @@ function ActiveWorkout({
             onPlates={(weight) => setPlates({ open: true, weight })}
             onToggleSuperset={() => w.toggleSuperset(block.order)}
             onRemove={() => w.removeExercise(block.order)}
+            onDoNext={canDoNext(block) ? () => doNext(block.order) : undefined}
+            onMoveUp={u > 0 ? () => moveBy(block.order, -1) : undefined}
+            onMoveDown={u < units.length - 1 ? () => moveBy(block.order, 1) : undefined}
+            onReorder={() => setReordering(true)}
+            onAddAfter={() => (setInsertAt(u + 1), setPicking(true))}
             onAddSet={() => w.addSet(block.order)}
             onRemoveSet={(id) => w.removeSet(block.order, id)}
             onChangeSet={(id, patch) => w.patchSet(block.order, id, patch)}
@@ -308,9 +409,10 @@ function ActiveWorkout({
             }}
           />
         </div>
-      ))}
+        );
+      })}
 
-      <Button size="lg" variant="outline" onClick={() => setPicking(true)}>
+      <Button size="lg" variant="outline" onClick={() => (setInsertAt(null), setPicking(true))}>
         <Plus /> Add exercise
       </Button>
 
@@ -342,6 +444,25 @@ function ActiveWorkout({
                 <Sparkles className="text-ai size-4" /> New progression
               </button>
             )}
+            {added && !nudge && (
+              <div
+                role="status"
+                className={cn(
+                  "glass-strong absolute right-3 flex items-center gap-2 rounded-full py-1 pr-1 pl-4 text-sm font-semibold",
+                  focusAdjustment ? "-top-28" : "-top-14",
+                )}
+                data-testid="added-toast"
+              >
+                <span className="max-w-40 truncate">Added {added.name}</span>
+                <button
+                  type="button"
+                  onClick={() => doNext(added.order)}
+                  className="bg-primary text-primary-foreground flex h-9 items-center gap-1.5 rounded-full px-3"
+                >
+                  <ArrowUpToLine className="size-4" aria-hidden /> Do next
+                </button>
+              </div>
+            )}
             {nudge && (
               <p role="status" className="glass-strong absolute -top-12 right-3 rounded-full px-4 py-2 text-sm font-semibold">
                 {nudge}
@@ -370,7 +491,8 @@ function ActiveWorkout({
           slot,
         )}
 
-      <ExercisePicker open={picking} onOpenChange={setPicking} onPick={w.addExercise} />
+      <ExercisePicker open={picking} onOpenChange={setPicking} onPick={addPicked} />
+      <ReorderSheet open={reordering} onOpenChange={setReordering} blocks={blocks} current={workingOn(blocks, focusOrder)} onReorder={reorder} />
       <ExerciseDetail exercise={info} onOpenChange={(o) => !o && onInfo(null)} />
       <ExerciseDetail exercise={chartFor} onOpenChange={(o) => !o && setChartFor(null)} showChart />
       <PlateCalculator

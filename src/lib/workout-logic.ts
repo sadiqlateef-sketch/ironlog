@@ -287,3 +287,95 @@ export function instructionSteps(text: string | null): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+// ---------- Reordering exercises mid-workout ----------
+
+type Orderable = { order: number; supersetGroup: number | null; sets: { done: boolean }[] };
+
+/** Exercises grouped so a superset moves as one: [[A], [B1, B2], [C]]. */
+export function exerciseUnits<T extends Orderable>(blocks: T[]): T[][] {
+  const units: T[][] = [];
+  for (const b of blocks) {
+    const last = units.at(-1);
+    if (last && b.supersetGroup != null && last[0].supersetGroup === b.supersetGroup) last.push(b);
+    else units.push([b]);
+  }
+  return units;
+}
+
+/**
+ * Move an exercise (and its superset partners) so its group sits at `to`,
+ * counted among the other groups: 0 is first, `units - 1` is last.
+ */
+export function moveUnit<T extends Orderable>(blocks: T[], order: number, to: number): T[] {
+  const units = exerciseUnits(blocks);
+  const i = units.findIndex((u) => u.some((b) => b.order === order));
+  if (i < 0) return blocks;
+  const [unit] = units.splice(i, 1);
+  units.splice(Math.max(0, Math.min(to, units.length)), 0, unit);
+  return units.flat();
+}
+
+/** Which group this exercise is in, counting supersets as one. */
+export function unitIndex(blocks: Orderable[], order: number): number {
+  return exerciseUnits(blocks).findIndex((u) => u.some((b) => b.order === order));
+}
+
+/**
+ * Where "Do next" puts an exercise: straight after the one you're on, or in
+ * its place if you haven't logged anything there yet. `current` is the
+ * exercise you're on (null when there isn't one).
+ */
+export function doNextIndex(blocks: Orderable[], order: number, current: number | null): number {
+  const units = exerciseUnits(blocks);
+  const own = units.findIndex((u) => u.some((b) => b.order === order));
+  const others = units.filter((_, i) => i !== own);
+  const c = others.findIndex((u) => u.some((b) => b.order === current));
+  if (c < 0) {
+    if (current != null && units[own]?.some((b) => b.order === current)) return own; // already on it
+    // Nothing in progress: go after the last exercise you've started.
+    let last = -1;
+    others.forEach((u, i) => u.some((b) => b.sets.some((s) => s.done)) && (last = i));
+    return last + 1;
+  }
+  const started = others[c].some((b) => b.sets.some((s) => s.done));
+  return started ? c + 1 : c;
+}
+
+/** The exercise you're working on, ignoring `except` (e.g. the one being moved). */
+export function workingOn(blocks: Orderable[], focus: number | null, except?: number): number | null {
+  const moving = new Set(exerciseUnits(blocks).find((u) => u.some((b) => b.order === except))?.map((b) => b.order));
+  const open = (b: Orderable) => !moving.has(b.order) && b.sets.some((s) => !s.done);
+  if (blocks.some((b) => b.order === focus && open(b))) return focus;
+  return blocks.find(open)?.order ?? null;
+}
+
+/**
+ * Pair each exercise in a routine workout with its plan row. Workouts start
+ * numbered in plan order, but you can reorder them, so: same slot and
+ * exercise first, then the first unclaimed plan row for that exercise.
+ * Returns block order -> index into `targets`.
+ */
+export function matchTargets(
+  targets: { position: number; exercise_id: string }[],
+  blocks: { order: number; exerciseId: string }[],
+): Map<number, number> {
+  const out = new Map<number, number>();
+  const used = new Set<number>();
+  for (const b of blocks) {
+    const t = targets.findIndex((x) => x.position === b.order && x.exercise_id === b.exerciseId);
+    if (t >= 0 && !used.has(t)) {
+      out.set(b.order, t);
+      used.add(t);
+    }
+  }
+  for (const b of blocks) {
+    if (out.has(b.order)) continue;
+    const t = targets.findIndex((x, i) => !used.has(i) && x.exercise_id === b.exerciseId);
+    if (t >= 0) {
+      out.set(b.order, t);
+      used.add(t);
+    }
+  }
+  return out;
+}

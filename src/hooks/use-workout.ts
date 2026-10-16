@@ -23,6 +23,7 @@ import {
   getActiveSession,
   insertSets,
   listActiveSets,
+  reorderExercises,
   updateSessionNotes,
   updateSet,
   updateSets,
@@ -31,7 +32,7 @@ import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
-import { bestE1rm, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
+import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import type { SetType } from "@/types/database";
 
@@ -134,12 +135,12 @@ export function useWorkout() {
   const recordsRef = useRef(new Set<string>());
   const [record, setRecord] = useState<RecordHit | null>(null);
 
+  // The ref is updated straight away so a change made right after another
+  // (add an exercise, then move it) sees the first one.
   const setBlocks = useCallback((fn: (prev: Block[]) => Block[]) => {
-    setBlocksState((prev) => {
-      const next = fn(prev);
-      blocksRef.current = next;
-      return next;
-    });
+    const next = fn(blocksRef.current);
+    blocksRef.current = next;
+    setBlocksState(next);
   }, []);
 
   const fail = useCallback((e: unknown) => setError((e as Error).message ?? String(e)), []);
@@ -162,11 +163,17 @@ export function useWorkout() {
     const grouped = new Map<number, WorkoutSet[]>();
     for (const s of sets) grouped.set(s.exercise_order, [...(grouped.get(s.exercise_order) ?? []), s]);
 
+    const planned = matchTargets(
+      targets,
+      [...grouped.entries()].map(([order, rows]) => ({ order, exerciseId: rows[0].exercise_id })),
+    );
+
     const loaded = await Promise.all(
       [...grouped.entries()].map(async ([order, rows]): Promise<Block | null> => {
         const exercise = byId.get(rows[0].exercise_id);
         if (!exercise) return null;
-        const target = targets.find((t) => t.position === order && t.exercise_id === exercise.id);
+        const t = planned.get(order);
+        const target = t == null ? undefined : targets[t];
         return {
           order,
           exercise,
@@ -341,9 +348,30 @@ export function useWorkout() {
   }, [session, restTimer, fail, setBlocks]);
 
   // ---- Exercises ----
+  /**
+   * Put the exercises in this order (same blocks, new sequence) and save it.
+   * Returns old slot -> new slot, for anything holding on to a slot number.
+   */
+  const reorder = useCallback(
+    (next: Block[]): Map<number, number> => {
+      const slots = new Map(next.map((b, i) => [b.order, i + 1]));
+      const moved = blocksRef.current.filter((b) => slots.has(b.order) && slots.get(b.order) !== b.order);
+      if (!moved.length) return slots;
+      setBlocks((prev) =>
+        prev
+          .map((b) => (slots.has(b.order) ? { ...b, order: slots.get(b.order)! } : b))
+          .sort((a, b) => a.order - b.order),
+      );
+      reorderExercises(moved.map((b) => ({ ids: b.sets.map((s) => s.id), order: slots.get(b.order)! }))).catch(fail);
+      return slots;
+    },
+    [fail, setBlocks],
+  );
+
+  /** Add an exercise at the end. Returns its slot, or null if it couldn't be added. */
   const addExercise = useCallback(
-    async (exercise: Exercise) => {
-      if (!session) return;
+    async (exercise: Exercise): Promise<number | null> => {
+      if (!session) return null;
       try {
         const previous = await getLastPerformance(exercise.id);
         const order = Math.max(0, ...blocksRef.current.map((b) => b.order)) + 1;
@@ -374,8 +402,10 @@ export function useWorkout() {
             repMax: null,
           },
         ]);
+        return order;
       } catch (e) {
         fail(e);
+        return null;
       }
     },
     [session, unit, defaultRest, fail, setBlocks],
@@ -501,11 +531,10 @@ export function useWorkout() {
 
   // ---- Sets ----
   const patchSet = useCallback(
-    (order: number, id: string, patch: Partial<UiSet>) =>
+    // Found by set id, not slot: a set finishing saving after its exercise was moved still lands.
+    (_order: number, id: string, patch: Partial<UiSet>) =>
       setBlocks((prev) =>
-        prev.map((b) =>
-          b.order !== order ? b : { ...b, sets: b.sets.map((s) => (s.id === id ? { ...s, ...patch } : s)) },
-        ),
+        prev.map((b) => (b.sets.some((s) => s.id === id) ? { ...b, sets: b.sets.map((s) => (s.id === id ? { ...s, ...patch } : s)) } : b)),
       ),
     [setBlocks],
   );
@@ -703,6 +732,9 @@ export function useWorkout() {
     finish,
     discard,
     addExercise,
+    reorder,
+    /** The exercises as they are right now (after any change still settling into state). */
+    blocksNow: () => blocksRef.current,
     removeExercise,
     swapExercise,
     setRest,
