@@ -186,7 +186,7 @@ export async function openExactAlarmSettings(): Promise<void> {
 }
 
 /**
- * Share an image: the Android share sheet in the app, the browser's share
+ * Share a file (an image, a CSV...): the Android share sheet in the app, the browser's share
  * sheet where it has one, otherwise a download. Returns which one happened.
  */
 export async function shareImage(blob: Blob, fileName: string, title: string): Promise<"shared" | "downloaded" | "cancelled"> {

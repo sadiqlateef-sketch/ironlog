@@ -4,7 +4,7 @@
 // equipment, gym and calendar, the Claude connector, alerts, and sign out.
 
 import { useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Dumbbell, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { Bell, ChevronRight, Dumbbell, FileDown, LogOut, MapPin, MessageCircle } from "lucide-react";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
@@ -13,7 +13,9 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { isNative, recoveryReminderOn, setRecoveryReminder } from "@/lib/native";
+import { toCsv } from "@/lib/export-csv";
+import { isNative, recoveryReminderOn, setRecoveryReminder, shareImage } from "@/lib/native";
+import { listSetsForExport } from "@/lib/workout-api";
 import { EQUIPMENT, EQUIPMENT_LABEL, GOALS } from "@/lib/plan-options";
 import { cn } from "@/lib/utils";
 
@@ -155,6 +157,25 @@ export function SettingsScreen() {
           <Row icon={MapPin} label="Gym & calendar" detail={profile?.gym_name ?? "Check in at your gym, add workouts to Google Calendar"} onClick={() => setSheet("gym")} />
           <Row icon={MessageCircle} label="Connect to Claude" detail="Log workouts from a Claude chat" onClick={() => setSheet("claude")} />
         </div>
+      </Section>
+
+      <Section title="Your data">
+        <Row
+          icon={FileDown}
+          label="Export workouts (CSV)"
+          detail="Every set you've logged, for a spreadsheet"
+          onClick={async () => {
+            setNote("Preparing your export…");
+            try {
+              const csv = toCsv(await listSetsForExport(), unit);
+              const day = new Date().toISOString().slice(0, 10);
+              const how = await shareImage(new Blob([csv], { type: "text/csv" }), `ironlog-workouts-${day}.csv`, "Ironlog workouts");
+              setNote(how === "downloaded" ? "Export downloaded." : how === "shared" ? "Export ready." : null);
+            } catch (e) {
+              setNote(`Couldn't export: ${(e as Error).message}`);
+            }
+          }}
+        />
       </Section>
 
       <Button variant="secondary" size="lg" className="text-destructive" onClick={signOut}>

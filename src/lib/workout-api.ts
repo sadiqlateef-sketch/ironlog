@@ -7,6 +7,7 @@ import { cachedRead } from "@/lib/offline/cache";
 import { kvGet } from "@/lib/offline/kv";
 import { isNetworkError } from "@/lib/offline/queue";
 import { startPlannedSession, type PlannedExercise } from "@/lib/offline/workout-store";
+import type { ExportSet } from "@/lib/export-csv";
 import type { EditPlan } from "@/lib/session-edit";
 import { bestE1rm } from "@/lib/workout-logic";
 import type { Database, Tables } from "@/types/database";
@@ -783,4 +784,49 @@ export async function saveFinishedWorkout(w: WorkoutToSave): Promise<WorkoutSess
     throw e;
   }
   return session;
+}
+
+// ---------- Export ----------
+
+/** Every completed set from finished workouts, oldest first, for the CSV export. */
+export async function listSetsForExport(): Promise<ExportSet[]> {
+  type Row = {
+    set_number: number; set_type: string; weight: number; reps: number; rpe: number | null;
+    duration_seconds: number | null; distance_m: number | null; notes: string | null;
+    exercises: { name: string } | null;
+    workout_sessions: { name: string | null; start_time: string } | null;
+  };
+  const page = 1000;
+  const out: ExportSet[] = [];
+  for (let from = 0; ; from += page) {
+    const rows: Row[] = unwrap(
+      await getSupabase()
+        .from("workout_sets")
+        .select("set_number, set_type, weight, reps, rpe, duration_seconds, distance_m, notes, exercises(name), workout_sessions!inner(name, start_time, end_time)")
+        .eq("is_completed", true)
+        .not("workout_sessions.end_time", "is", null)
+        .order("session_id")
+        .order("exercise_order")
+        .order("set_number")
+        .range(from, from + page - 1),
+    ) as unknown as Row[];
+    for (const r of rows) {
+      out.push({
+        start_time: r.workout_sessions?.start_time ?? "",
+        workout: r.workout_sessions?.name ?? null,
+        exercise: r.exercises?.name ?? "Exercise",
+        set_number: r.set_number,
+        set_type: r.set_type,
+        weight: Number(r.weight),
+        reps: r.reps,
+        rpe: r.rpe,
+        duration_seconds: r.duration_seconds,
+        distance_m: r.distance_m == null ? null : Number(r.distance_m),
+        notes: r.notes,
+      });
+    }
+    if (rows.length < page) break;
+  }
+  // Pages come in a stable order; put them by date (the sort keeps each workout's own order).
+  return out.sort((a, b) => a.start_time.localeCompare(b.start_time));
 }
