@@ -53,6 +53,8 @@ jobs:
           fi
           echo "NEXT_PUBLIC_SUPABASE_URL=$URL" >> .env.production.local
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$KEY" >> .env.production.local
+          # Optional switches (repository variables): FEATURE_WATCH=1 shows "Link watch".
+          echo "NEXT_PUBLIC_FEATURE_WATCH=${{ vars.FEATURE_WATCH }}" >> .env.production.local
 
       - name: Build web app and copy it into Android
         run: npm run android:sync

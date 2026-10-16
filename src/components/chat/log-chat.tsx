@@ -8,8 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
-import { ArrowLeft, ArrowUp, ClipboardCheck, Loader2, Mic, Sparkles, Square } from "lucide-react";
+import { ArrowUp, ClipboardCheck, Loader2, Mic, Sparkles, Square } from "lucide-react";
 import { Review, Saved, showWeight, toDraft, type Draft } from "@/components/import/import-screen";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -38,7 +37,11 @@ export function chatText(said: string[]): string {
   return said.length === 1 ? said[0] : said.map((t, i) => `Message ${i + 1}: ${t}`).join("\n");
 }
 
-export function LogChat() {
+/**
+ * `mode`: "voice" puts the microphone first, "type" the keyboard.
+ * `active`: false while another Log tab is showing (keeps the chat, hides its message box).
+ */
+export function LogChat({ mode = "type", active = true }: { mode?: "voice" | "type"; active?: boolean }) {
   const { unit } = useAuth();
   const [messages, setMessages] = useState<Message[]>([{ id: 0, from: "claude", text: GREETING }]);
   const [step, setStep] = useState<"chat" | "review" | "saved">("chat");
@@ -82,7 +85,17 @@ export function LogChat() {
       />
     );
   }
-  return <Chat messages={messages} setMessages={setMessages} unit={unit} latestId={latest?.id ?? null} onReview={review} />;
+  return (
+    <Chat
+      messages={messages}
+      setMessages={setMessages}
+      unit={unit}
+      latestId={latest?.id ?? null}
+      onReview={review}
+      mode={mode}
+      active={active}
+    />
+  );
 }
 
 function Chat({
@@ -91,17 +104,21 @@ function Chat({
   unit,
   latestId,
   onReview,
+  mode,
+  active,
 }: {
   messages: Message[];
   setMessages: (fn: (m: Message[]) => Message[]) => void;
   unit: UnitSystem;
   latestId: number | null;
   onReview: () => void;
+  mode: "voice" | "type";
+  active: boolean;
 }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [names, setNames] = useState<Map<string, string>>(new Map());
-  const [voice, setVoice] = useState(false);
+  const [voice, setVoice] = useState<boolean | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const dictation = useRef<Dictation | null>(null);
@@ -222,17 +239,16 @@ function Chat({
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" aria-label="Back">
-          <Link href="/workout/">
-            <ArrowLeft />
-          </Link>
+      {mode === "voice" && voice === false && (
+        <p className="glass text-muted-foreground rounded-2xl px-4 py-3 text-sm">
+          Speaking isn&apos;t available on this device. Type your workout below instead.
+        </p>
+      )}
+      {mode === "voice" && voice && messages.length === 1 && !listening && (
+        <Button size="lg" variant="secondary" className="h-16 text-base" onClick={toggleMic}>
+          <Mic className="size-6" /> Tap and say your workout
         </Button>
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold">Tell Claude</h1>
-          <p className="text-muted-foreground text-xs">Type or speak a workout you finished.</p>
-        </div>
-      </header>
+      )}
 
       <ol className="flex flex-col gap-3" aria-label="Chat" aria-live="polite">
         {messages.map((m) => (
@@ -272,7 +288,7 @@ function Chat({
       {/* Room so the last message clears the message box. */}
       <div ref={end} className="h-28" />
 
-      {slot && createPortal(composer, slot)}
+      {slot && active && createPortal(composer, slot)}
     </div>
   );
 }

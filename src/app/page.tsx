@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calculator, ChevronRight, Dumbbell, FileUp, Heart, LogOut, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
+import { Calculator, ChevronRight, Dumbbell, Heart, LogOut, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { SessionSheet } from "@/components/session-sheet";
@@ -11,6 +11,7 @@ import { UpNext, useActiveProgram } from "@/components/up-next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatWeight } from "@/lib/units";
+import { WATCH_LINKING } from "@/lib/features";
 import { getActiveSession, listRecentSessions, type WorkoutSession } from "@/lib/workout-api";
 import { cn } from "@/lib/utils";
 
@@ -75,24 +76,19 @@ function Dashboard() {
           </Link>
         </Button>
         <Button asChild variant="secondary">
-          <Link href="/link-watch/">
-            <Watch /> Link watch
+          <Link href="/log/">
+            <MessageSquareText /> Log past workout
           </Link>
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {WATCH_LINKING && (
         <Button asChild variant="secondary">
-          <Link href="/log/">
-            <MessageSquareText /> Tell Claude
+          <Link href="/link-watch/">
+            <Watch /> Link watch
           </Link>
         </Button>
-        <Button asChild variant="secondary">
-          <Link href="/import/">
-            <FileUp /> Import photo
-          </Link>
-        </Button>
-      </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Button variant="secondary" onClick={() => setPlates(true)}>

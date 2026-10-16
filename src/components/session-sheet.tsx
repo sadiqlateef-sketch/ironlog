@@ -100,7 +100,7 @@ function DayList({ day, onChanged }: { day: Date; onChanged: () => void }) {
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground text-sm">Nothing was logged on this day. Did you train but forget to log it? You can add it from a screenshot, photo or text.</p>
           <Button asChild variant="secondary">
-            <Link href="/import/">Import a workout</Link>
+            <Link href="/log/?tab=photo">Import a workout</Link>
           </Button>
         </div>
       )}

@@ -18,7 +18,9 @@ A standalone watch app in `watch/` (React Native). It talks to the same
 Supabase database as the phone, so a workout started on either shows up on both.
 
 - **Link once, no typing on the watch.** The watch shows a 6-digit code. On
-  your phone, go to Home > **Link watch** and enter it. Codes last 10 minutes
+  your phone, go to Home > **Link watch** and enter it. That button is hidden
+  until you turn it on: add a repository variable `FEATURE_WATCH` = `1`
+  (Settings > Secrets and variables > Actions > Variables) and rebuild the APK. Codes last 10 minutes
   and work once, and 10 wrong tries locks code entry for a while.
 - **Log from the wrist.** Start a routine or continue the phone's workout.
   Each set shows big **−/+** buttons for weight (5 lb or 2.5 kg a tap; hold for 0.5 lb or 0.25 kg) and reps,
@@ -208,10 +210,16 @@ the plan and Claude's thinking); a post-workout check is a smaller one. Real
 token counts land in `ai_usage`, so you can compare them with current pricing
 at https://www.anthropic.com/pricing.
 
-## Import a finished workout
+## Log a past workout
 
-Workout > **Import** (or Home > **Import photo**)
-adds a workout you already did somewhere else.
+Workout > **Log past workout** (or the same button on Home) opens one Log
+screen with three tabs: **Voice** and **Type** (a chat with Claude, below) and
+**Photo** (screenshots or notebook photos). The old `/import/` address now
+opens the Photo tab.
+
+### Photo
+
+The Photo tab adds a workout you already did somewhere else.
 
 1. **Add it.** Take a photo of your notebook, pick screenshots from another app
    (Strong, Hevy, JEFIT, a spreadsheet...), or type/paste it ("Squat 3x5 225").
@@ -230,9 +238,9 @@ adds a workout you already did somewhere else.
 The server converts units to kg, drops impossible numbers and dates in the
 future, and limits imports to 20 per person per day (logged in `ai_usage`).
 
-## Tell Claude (log by chatting)
+### Voice and Type (log by chatting)
 
-Workout > **Tell Claude** (or Home > **Tell Claude**) opens a chat. Type or
+The Voice and Type tabs share one chat (Voice puts the mic first). Type or
 tap the mic and say what you did: "squat three sets of five at two twenty five,
 bench one eighty five for eight, eight and seven". Claude answers with what it
 understood. Send another message to add or fix something ("forgot curls 3x12

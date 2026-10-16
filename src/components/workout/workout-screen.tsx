@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, CloudOff, FileUp, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -472,12 +472,7 @@ function StartWorkout({
         <div className="flex gap-2">
           <Button asChild variant="secondary" size="sm">
             <Link href="/log/">
-              <MessageSquareText /> Tell Claude
-            </Link>
-          </Button>
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/import/">
-              <FileUp /> Import
+              <MessageSquareText /> Log past workout
             </Link>
           </Button>
         </div>
