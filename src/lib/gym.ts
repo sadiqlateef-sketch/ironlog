@@ -6,6 +6,7 @@
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Geolocation } from "@capacitor/geolocation";
+import { explainFirst } from "@/lib/rationale";
 import { isNative } from "@/lib/native";
 import { getSupabase } from "@/lib/supabase/client";
 import { isAtGym, type GymPlace, type LatLng } from "@/lib/gym-logic";
@@ -21,7 +22,10 @@ export type Fix = LatLng & { accuracy: number };
 export async function currentPosition(maxAgeMs = 0): Promise<Fix> {
   if (isNative()) {
     let perm = await Geolocation.checkPermissions().catch(() => null);
-    if (perm && (perm.location === "prompt" || perm.location === "prompt-with-rationale")) perm = await Geolocation.requestPermissions({ permissions: ["location", "coarseLocation"] });
+    if (perm && (perm.location === "prompt" || perm.location === "prompt-with-rationale")) {
+      if (!(await explainFirst("location"))) throw new Error("Location is off for Ironlog, so gym check-in is skipped.");
+      perm = await Geolocation.requestPermissions({ permissions: ["location", "coarseLocation"] });
+    }
     if (perm && perm.location === "denied" && perm.coarseLocation !== "granted") {
       throw new Error("Ironlog needs location access. Turn it on in Android Settings > Apps > Ironlog > Permissions.");
     }

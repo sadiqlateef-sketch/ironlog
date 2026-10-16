@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { AuthProvider, useAuth } from "@/components/providers/auth-provider";
 import { RestTimerProvider } from "@/components/providers/rest-timer-provider";
+import { RationaleHost } from "@/components/rationale-host";
 import { syncGymCalendar } from "@/lib/gym";
 import { initNative } from "@/lib/native";
 
@@ -14,6 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <AuthProvider>
       <GymCalendarCatchUp />
       <RestTimerProvider>{children}</RestTimerProvider>
+      <RationaleHost />
     </AuthProvider>
   );
 }

@@ -51,13 +51,14 @@ export async function initNative(): Promise<void> {
 
 /**
  * Schedule the "rest over" alert for when the app is in the background
- * (JavaScript timers pause then). Asks for notification permission the first time.
+ * (JavaScript timers pause then). Only when notifications are already allowed:
+ * the app is going to the background here, so Android couldn't show its prompt.
+ * The workout screen asks first, with an explanation (see restAlertStatus).
  */
 export async function scheduleRestAlert(endsAt: number, label: string): Promise<void> {
   if (!isNative() || endsAt <= Date.now() + 1000) return;
   try {
-    let { display } = await LocalNotifications.checkPermissions();
-    if (display === "prompt" || display === "prompt-with-rationale") ({ display } = await LocalNotifications.requestPermissions());
+    const { display } = await LocalNotifications.checkPermissions();
     if (display !== "granted") return;
     await LocalNotifications.schedule({
       notifications: [
@@ -73,6 +74,33 @@ export async function scheduleRestAlert(endsAt: number, label: string): Promise<
     });
   } catch {
     // Notifications are a bonus; the in-app timer still works.
+  }
+}
+
+/**
+ * Whether rest alerts can reach a locked phone:
+ * "ask" (notifications not decided yet), "blocked" (turned off), "late"
+ * (allowed, but Android 14+ exact alarms are off), "ok", or "n/a" in a browser.
+ */
+export async function restAlertStatus(): Promise<"ask" | "blocked" | "late" | "ok" | "n/a"> {
+  if (!isNative()) return "n/a";
+  try {
+    const { display } = await LocalNotifications.checkPermissions();
+    if (display === "prompt" || display === "prompt-with-rationale") return "ask";
+    if (display !== "granted") return "blocked";
+    return (await exactAlarmStatus()) === "denied" ? "late" : "ok";
+  } catch {
+    return "n/a";
+  }
+}
+
+/** Ask Android to allow notifications (call only after explaining why). */
+export async function requestNotifications(): Promise<boolean> {
+  if (!isNative()) return false;
+  try {
+    return (await LocalNotifications.requestPermissions()).display === "granted";
+  } catch {
+    return false;
   }
 }
 

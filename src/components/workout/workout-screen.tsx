@@ -33,7 +33,7 @@ import {
 } from "@/lib/workout-api";
 import { focusAfterLog, formatClock, nextUnfinished, segmentStates } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
-import { exactAlarmStatus, keepScreenOn, openExactAlarmSettings, tap } from "@/lib/native";
+import { keepScreenOn, openExactAlarmSettings, requestNotifications, restAlertStatus, tap } from "@/lib/native";
 
 export function WorkoutScreen() {
   const w = useWorkout();
@@ -260,7 +260,7 @@ function ActiveWorkout({
         </button>
       )}
 
-      <ExactAlarmHint />
+      <RestAlertHint />
 
       {shown.map((block) => (
         <div key={block.order} id={`exercise-${block.order}`} className="scroll-mt-4">
@@ -530,30 +530,82 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** Android 14+: rest alerts can arrive late unless exact alarms are allowed. */
-function ExactAlarmHint() {
-  const [denied, setDenied] = useState(false);
+const REST_ALERT_DISMISSED = "ironlog:rest-alert-dismissed";
+
+/**
+ * Rest alerts on a locked phone need notifications (and, on Android 14+,
+ * exact alarms). Explain that here, in the app, before Android asks.
+ */
+function RestAlertHint() {
+  const [status, setStatus] = useState<Awaited<ReturnType<typeof restAlertStatus>>>("n/a");
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
-    exactAlarmStatus().then((s) => live && setDenied(s === "denied"));
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(REST_ALERT_DISMISSED) === "1";
+    } catch {}
+    restAlertStatus().then((s) => live && setStatus(dismissed && s === "ask" ? "n/a" : s));
     return () => {
       live = false;
     };
   }, []);
-  if (!denied) return null;
+  if (status !== "ask" && status !== "late") return null;
+
+  const notNow = () => {
+    try {
+      localStorage.setItem(REST_ALERT_DISMISSED, "1");
+    } catch {}
+    setStatus("n/a");
+  };
+
   return (
-    <div className="bg-secondary flex items-center gap-3 rounded-lg p-3 text-sm">
-      <p className="flex-1">Rest alerts may arrive late while the phone is locked.</p>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={async () => {
-          await openExactAlarmSettings();
-          setDenied((await exactAlarmStatus()) === "denied");
-        }}
-      >
-        Allow
-      </Button>
+    <div className="bg-secondary flex flex-col gap-2 rounded-lg p-3 text-sm" data-testid="rest-alert-hint">
+      {status === "ask" ? (
+        <>
+          <p className="font-semibold">Rest alerts when your phone is locked</p>
+          <p className="text-muted-foreground">
+            When your rest is over, Ironlog can buzz you with a notification even if the screen is off. It only uses notifications for the rest
+            timer and reminders you turn on. Android will ask you to allow notifications next.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await requestNotifications();
+                let next = await restAlertStatus();
+                if (next === "late") {
+                  await openExactAlarmSettings();
+                  next = await restAlertStatus();
+                }
+                setStatus(next);
+                setBusy(false);
+              }}
+            >
+              Continue
+            </Button>
+            <Button size="sm" variant="ghost" onClick={notNow}>
+              Not now
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center gap-3">
+          <p className="flex-1">Rest alerts may arrive late while the phone is locked. Allowing exact alarms fixes that.</p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              await openExactAlarmSettings();
+              setStatus(await restAlertStatus());
+            }}
+          >
+            Allow
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
