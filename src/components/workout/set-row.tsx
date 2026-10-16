@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Check, X } from "lucide-react";
 import type { UiSet } from "@/hooks/use-workout";
+import { formatDuration, parseDuration } from "@/lib/cardio";
+import type { Tracking } from "@/types/database";
 import { setLabel } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +24,9 @@ export function SetRow({
   weightPlaceholder,
   previousText,
   repPlaceholder,
+  tracking = "weight_reps",
+  timePlaceholder = "0:00",
+  distancePlaceholder = "0",
   current,
   editing,
   onChange,
@@ -35,6 +40,10 @@ export function SetRow({
   weightPlaceholder: string;
   previousText: string;
   repPlaceholder: string;
+  /** weight_reps: weight + reps; time: added weight + time; distance_time: distance + time. */
+  tracking?: Tracking;
+  timePlaceholder?: string;
+  distancePlaceholder?: string;
   /** The next set to do: highlighted so it is easy to find mid-workout. */
   current: boolean;
   editing: boolean;
@@ -77,32 +86,69 @@ export function SetRow({
         {previousText}
       </span>
 
-      <input
-        aria-label="Weight"
-        inputMode="decimal"
-        className={inputClass}
-        placeholder={weightPlaceholder}
-        value={set.weight}
-        onChange={(e) => onChange({ weight: e.target.value })}
-        onBlur={onCommit}
-        onFocus={(e) => e.target.select()}
-      />
-      <input
-        aria-label="Reps"
-        inputMode="numeric"
-        className={inputClass}
-        placeholder={repPlaceholder}
-        value={set.reps}
-        onChange={(e) => onChange({ reps: e.target.value.replace(/\D/g, "") })}
-        onBlur={onCommit}
-        onFocus={(e) => e.target.select()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            (e.target as HTMLInputElement).blur();
-            done();
-          }
-        }}
-      />
+      {tracking === "distance_time" ? (
+        <input
+          aria-label="Distance"
+          inputMode="decimal"
+          className={inputClass}
+          placeholder={distancePlaceholder}
+          value={set.distance}
+          onChange={(e) => onChange({ distance: e.target.value })}
+          onBlur={onCommit}
+          onFocus={(e) => e.target.select()}
+        />
+      ) : (
+        <input
+          aria-label={tracking === "time" ? "Added weight" : "Weight"}
+          inputMode="decimal"
+          className={inputClass}
+          placeholder={weightPlaceholder}
+          value={set.weight}
+          onChange={(e) => onChange({ weight: e.target.value })}
+          onBlur={onCommit}
+          onFocus={(e) => e.target.select()}
+        />
+      )}
+      {tracking === "weight_reps" ? (
+        <input
+          aria-label="Reps"
+          inputMode="numeric"
+          className={inputClass}
+          placeholder={repPlaceholder}
+          value={set.reps}
+          onChange={(e) => onChange({ reps: e.target.value.replace(/\D/g, "") })}
+          onBlur={onCommit}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              (e.target as HTMLInputElement).blur();
+              done();
+            }
+          }}
+        />
+      ) : (
+        <input
+          aria-label="Time (seconds or minutes:seconds)"
+          inputMode="numeric"
+          className={cn(inputClass, "text-base")}
+          placeholder={timePlaceholder}
+          value={set.time}
+          onChange={(e) => onChange({ time: e.target.value.replace(/[^\d:]/g, "") })}
+          onBlur={() => {
+            // "90" reads as 1:30.
+            const sec = parseDuration(set.time);
+            if (sec != null) onChange({ time: formatDuration(sec) });
+            onCommit();
+          }}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              (e.target as HTMLInputElement).blur();
+              done();
+            }
+          }}
+        />
+      )}
 
       {editing ? (
         <button

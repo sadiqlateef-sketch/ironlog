@@ -21,6 +21,7 @@ import {
 import { formatDuration, trainingSummary } from "@/lib/stats";
 import { workingSetNumbers } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
+import { describeTimedSet } from "@/lib/cardio";
 
 let exerciseCache: Promise<Map<string, Exercise>> | null = null;
 const exerciseMap = () => (exerciseCache ??= listExercises().then((xs) => new Map(xs.map((x) => [x.id, x]))));
@@ -202,7 +203,7 @@ function Details({ id, inDay = false, onChanged, onDeleted }: { id: string; inDa
                         {s.set_type === "normal" ? numbers[i] : s.set_type[0].toUpperCase()}
                       </span>
                       <span className="font-bold">
-                        {formatWeight(s.weight, unit)} × {s.reps}
+                        {describeTimedSet(s, unit, (kg) => formatWeight(kg, unit)) ?? `${formatWeight(s.weight, unit)} × ${s.reps}`}
                       </span>
                     </li>
                   ))}

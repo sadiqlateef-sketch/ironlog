@@ -17,6 +17,8 @@ export type EquipmentType =
   | "bodyweight" | "band" | "smith_machine" | "ez_bar" | "trap_bar" | "other";
 export type ExerciseMechanic = "compound" | "isolation";
 export type UnitSystem = "metric" | "imperial";
+/** What a set of this exercise records (see migration 20261016020000_timed_sets.sql). */
+export type Tracking = "weight_reps" | "time" | "distance_time";
 export type TrainingGoal = "strength" | "hypertrophy" | "powerbuilding" | "general";
 export type SessionSource = "web" | "phone" | "watch" | "import" | "claude";
 export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
@@ -92,6 +94,7 @@ export type Database = {
           created_by: string | null;
           aliases: string[];
           image_urls: string[];
+          tracking: Tracking;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -106,6 +109,7 @@ export type Database = {
           created_by?: string | null;
           aliases?: string[];
           image_urls?: string[];
+          tracking?: Tracking;
         };
         Update: Partial<Database["public"]["Tables"]["exercises"]["Insert"]>;
         Relationships: [];
@@ -303,6 +307,8 @@ export type Database = {
           estimated_1rm: number | null;
           notes: string | null;
           client_id: string | null;
+          duration_seconds: number | null;
+          distance_m: number | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -321,6 +327,8 @@ export type Database = {
           completed_at?: string | null;
           notes?: string | null;
           client_id?: string | null;
+          duration_seconds?: number | null;
+          distance_m?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sets"]["Insert"]>;
         Relationships: [
@@ -435,6 +443,8 @@ export type Database = {
           weight: number;
           reps: number;
           rpe: number | null;
+          duration_seconds: number | null;
+          distance_m: number | null;
         }[];
       };
       apply_routine_adjustment: {

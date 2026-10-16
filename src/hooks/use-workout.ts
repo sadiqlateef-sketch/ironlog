@@ -31,6 +31,7 @@ import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz } from "@/lib/native";
 import { bestE1rm, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
+import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import type { SetType } from "@/types/database";
 
 /** A set that just beat your best estimated 1RM for that exercise. */
@@ -49,6 +50,9 @@ export interface UiSet {
   parentSetId: string | null;
   weight: string;
   reps: string;
+  /** Timed and cardio exercises: "1:30" and distance in mi/km. */
+  time: string;
+  distance: string;
   done: boolean;
 }
 
@@ -111,6 +115,8 @@ function toUiSet(s: WorkoutSet, unit: UnitSystem): UiSet {
     parentSetId: s.parent_set_id,
     weight: toDisplay(s.weight, unit),
     reps: s.is_completed || s.reps ? String(s.reps) : "",
+    time: s.duration_seconds ? formatDuration(s.duration_seconds) : "",
+    distance: s.distance_m ? toDistanceDisplay(s.distance_m, unit) : "",
     done: s.is_completed,
   };
 }
@@ -508,7 +514,7 @@ export function useWorkout() {
           },
         ]);
         // Copy the last set's numbers so a repeat set is one tap.
-        const ui = { ...toUiSet(row, unit), weight: last?.weight ?? "", reps: last?.reps ?? "" };
+        const ui = { ...toUiSet(row, unit), weight: last?.weight ?? "", reps: last?.reps ?? "", time: last?.time ?? "", distance: last?.distance ?? "" };
         setBlocks((prev) => prev.map((b) => (b.order === order ? { ...b, sets: [...b.sets, ui] } : b)));
       } catch (e) {
         fail(e);
@@ -534,10 +540,15 @@ export function useWorkout() {
     async (order: number, id: string) => {
       const set = blocksRef.current.find((b) => b.order === order)?.sets.find((s) => s.id === id);
       if (!set) return;
+      const tracking = blocksRef.current.find((b) => b.order === order)?.exercise.tracking ?? "weight_reps";
       try {
         await updateSet(id, {
-          weight: toKg(parseNumber(set.weight) ?? 0, unit),
+          weight: tracking === "distance_time" ? 0 : toKg(parseNumber(set.weight) ?? 0, unit),
           reps: Math.round(parseNumber(set.reps) ?? 0),
+          ...(tracking !== "weight_reps" && {
+            duration_seconds: parseDuration(set.time),
+            distance_m: tracking === "distance_time" ? toMetres(parseNumber(set.distance) ?? 0, unit) || null : null,
+          }),
         });
       } catch (e) {
         fail(e);
@@ -607,18 +618,49 @@ export function useWorkout() {
       }
 
       const prev = block.previous[idx];
+      const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
+      const startRest = () => {
+        if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
+          restTimer.start(block.restSeconds, block.exercise.name);
+        } else if (set.type === "warmup") {
+          restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
+        }
+      };
+
+      // Timed and cardio sets: empty fields fall back to last time, then the target.
+      const tracking = block.exercise.tracking;
+      if (tracking !== "weight_reps") {
+        const time =
+          set.time ||
+          (prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "") : "");
+        const distance = tracking === "distance_time" ? set.distance || (prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "") : "";
+        const seconds = parseDuration(time);
+        const metres = toMetres(parseNumber(distance) ?? 0, unit);
+        if (!seconds && !metres) return false;
+        const weight = tracking === "time" ? set.weight || (prev?.weight ? toDisplay(prev.weight, unit) : "") : "";
+        patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
+        startRest();
+        try {
+          await updateSet(id, {
+            weight: toKg(parseNumber(weight) ?? 0, unit),
+            reps: 0,
+            duration_seconds: seconds,
+            distance_m: metres || null,
+            is_completed: true,
+          });
+        } catch (e) {
+          fail(e);
+        }
+        return true;
+      }
+
       const weight = set.weight || (prev ? toDisplay(prev.weight, unit) : "");
       const reps = set.reps || (prev ? String(prev.reps) : block.repTarget?.split("-")[0] ?? "");
       const repsNum = parseNumber(reps);
       if (repsNum == null || repsNum === 0) return false;
 
       patchSet(order, id, { weight, reps, done: true });
-      const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
-      if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
-        restTimer.start(block.restSeconds, block.exercise.name);
-      } else if (set.type === "warmup") {
-        restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
-      }
+      startRest();
       const kg = toKg(parseNumber(weight) ?? 0, unit);
       if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
       try {

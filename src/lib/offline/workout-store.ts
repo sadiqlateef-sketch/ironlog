@@ -199,6 +199,8 @@ function toRow(s: SetInsert, uid: string): WorkoutSet {
     estimated_1rm: null,
     notes: s.notes ?? null,
     client_id: null,
+    duration_seconds: s.duration_seconds ?? null,
+    distance_m: s.distance_m ?? null,
     created_at: t,
     updated_at: t,
   };
@@ -206,8 +208,8 @@ function toRow(s: SetInsert, uid: string): WorkoutSet {
 
 /** The columns sent to the server (the rest are filled in there). */
 function insertable(r: WorkoutSet): Record<string, unknown> {
-  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes } = r;
-  return { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes };
+  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m } = r;
+  return { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m };
 }
 
 export async function insertSets(inserts: SetInsert[]): Promise<WorkoutSet[]> {

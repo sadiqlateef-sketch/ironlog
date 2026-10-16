@@ -89,7 +89,7 @@ export async function getExerciseHistory(exerciseId: string) {
   const sets = unwrap(
     await getSupabase()
       .from("workout_sets")
-      .select("session_id, set_number, set_type, weight, reps, completed_at")
+      .select("session_id, set_number, set_type, weight, reps, completed_at, duration_seconds, distance_m")
       .eq("exercise_id", exerciseId)
       .eq("is_completed", true)
       .order("completed_at", { ascending: false })

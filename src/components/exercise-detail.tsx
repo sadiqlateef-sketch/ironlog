@@ -31,6 +31,7 @@ import {
   type HistoryDay,
 } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
+import { describeTimedSet } from "@/lib/cardio";
 import type { MuscleGroup } from "@/types/database";
 
 export type Tab = "history" | "chart" | "guide";
@@ -225,6 +226,7 @@ function GoalButton({
 }
 
 function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: (kg: number) => number; u: string }) {
+  const { unit } = useAuth();
   if (!history) return <p className="text-muted-foreground text-sm">Loading…</p>;
   if (!history.length) return <p className="text-muted-foreground text-sm">You haven&apos;t logged this yet. Your sets will show up here.</p>;
   return (
@@ -256,7 +258,7 @@ function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: 
                       {label}
                     </span>
                     <span className={cn("text-lg font-extrabold", best && "text-primary-text")}>
-                      {show(s.weight)} {u} × {s.reps}
+                      {describeTimedSet({ ...s, duration_seconds: s.duration_seconds ?? null, distance_m: s.distance_m ?? null }, unit, (kg) => `${show(kg)} ${u}`) ?? `${show(s.weight)} ${u} × ${s.reps}`}
                     </span>
                     {best && <span className="text-primary-text font-sans text-xs font-semibold">Best set</span>}
                   </li>

@@ -514,6 +514,16 @@ Authentication > Providers > Email while you're developing.
   `heart_rate_samples` arrive from the watch.
 - Only one unfinished workout per user is allowed at a time.
 
+## Timed and cardio sets
+
+Each exercise records one of three things (`exercises.tracking`): weight × reps
+(most lifts), **time** (planks, wall sits, dead hangs, jump rope; optional added
+weight), or **distance + time** (treadmill, outdoor run, walk, rower, bike,
+elliptical), with your pace worked out from the two. Times can be typed as
+seconds (`90`) or minutes:seconds (`1:30`); distance is in miles or km to
+match your unit. Stored in `workout_sets.duration_seconds` and `distance_m`.
+Cardio doesn't count toward the muscle recovery map.
+
 ## First run
 
 A new account starts with five quick questions (name, lb or kg, goal,

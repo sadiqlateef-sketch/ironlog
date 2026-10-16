@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { toDisplay, type Block, type UiSet } from "@/hooks/use-workout";
 import { PLATE_LOADED } from "@/lib/labels";
 import { formatWeight } from "@/lib/units";
+import { describeTimedSet, distanceUnit, formatDuration, pace, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import { bestE1rm, formatClock, parseNumber, workingSetNumbers } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +77,17 @@ export function ExerciseBlock({
   const nextUndone = block.sets.find((s) => !s.done);
   const last = block.sets.at(-1);
   const lastPrev = block.previous.at(-1);
+  const tracking = block.exercise.tracking ?? "weight_reps";
+  const timed = tracking !== "weight_reps";
+  const lastRun = tracking === "distance_time" ? block.sets.filter((x) => x.done).at(-1) : undefined;
+  const todayPace = lastRun ? pace(parseDuration(lastRun.time), toMetres(parseNumber(lastRun.distance) ?? 0, unit), unit) : null;
+  /** "Last time" for one set, short enough for its column. */
+  const prevText = (p: (typeof block.previous)[number] | undefined) => {
+    if (!p) return "–";
+    if (tracking === "distance_time") return [p.distance_m ? toDistanceDisplay(p.distance_m, unit) : null, p.duration_seconds ? formatDuration(p.duration_seconds) : null].filter(Boolean).join("/") || "–";
+    if (tracking === "time") return p.duration_seconds ? formatDuration(p.duration_seconds) : "–";
+    return `${toDisplay(p.weight, unit) || "0"}×${p.reps}`;
+  };
 
   // Live estimated 1RM: today's best logged set, else your best from last time.
   const today = bestE1rm(
@@ -125,18 +137,27 @@ export function ExerciseBlock({
             {block.exercise.name}
           </h2>
           <p className="text-muted-foreground text-sm">
-            {bestPrev ? (
+            {timed && block.previous.length ? (
+              <>Last time: {describeTimedSet(block.previous.at(-1)!, unit, (kg) => formatWeight(kg, unit)) ?? "–"}</>
+            ) : !timed && bestPrev ? (
               <>
                 Last time: {formatWeight(bestPrev.weight, unit)} × {bestPrev.reps}
               </>
             ) : (
               "First time logging this"
             )}
-            {block.repTarget && <> · Target {block.repTarget}</>}
+            {block.repTarget && (
+              <>
+                {" "}
+                · Target {block.repTarget}
+                {tracking === "time" ? " sec" : ""}
+              </>
+            )}
           </p>
           {block.targetNote && <p className="text-foreground/80 text-xs">{block.targetNote}</p>}
+          {todayPace && <p className="text-primary-text text-sm font-semibold">Pace {todayPace}</p>}
         </button>
-        {e1rm > 0 && (
+        {e1rm > 0 && !timed && (
           <div className="shrink-0 px-1 text-right" aria-label={`Estimated one rep max ${e1rm} ${u}`}>
             <p className="text-muted-foreground text-[11px] font-bold tracking-wider">EST. 1RM</p>
             <p className="text-primary-text font-mono text-xl font-extrabold">{e1rm}</p>
@@ -172,8 +193,8 @@ export function ExerciseBlock({
       <div className="text-muted-foreground grid grid-cols-[2.5rem_1fr_4.5rem_4rem_3rem] gap-2 px-1 text-center text-[11px] font-semibold tracking-wide uppercase">
         <span>Set</span>
         <span>Last time</span>
-        <span>{u}</span>
-        <span>Reps</span>
+        <span>{tracking === "distance_time" ? distanceUnit(unit) : tracking === "time" ? `+${u}` : u}</span>
+        <span>{timed ? "Time" : "Reps"}</span>
         <span />
       </div>
 
@@ -184,7 +205,10 @@ export function ExerciseBlock({
             key={set.id}
             set={set}
             workingNumber={numbers[i]}
-            previousText={prev ? `${toDisplay(prev.weight, unit) || "0"}×${prev.reps}` : "–"}
+            previousText={prevText(prev)}
+            tracking={tracking}
+            timePlaceholder={prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "0:00") : "0:00"}
+            distancePlaceholder={prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "0"}
             weightPlaceholder={prev ? toDisplay(prev.weight, unit) || "0" : "0"}
             repPlaceholder={prev ? String(prev.reps) : (block.repTarget?.split("-")[0] ?? "0")}
             current={set === nextUndone}
@@ -207,10 +231,10 @@ export function ExerciseBlock({
       >
         <Plus className="text-muted-foreground mx-auto size-5" />
         <span aria-hidden className="text-muted-foreground/70 font-mono text-sm">
-          {lastPrev ? `${toDisplay(lastPrev.weight, unit) || "0"}×${lastPrev.reps}` : ""}
+          {lastPrev ? prevText(lastPrev) : ""}
         </span>
-        <span aria-hidden className="text-foreground/35 font-mono text-xl font-extrabold">{last?.weight || ""}</span>
-        <span aria-hidden className="text-foreground/35 font-mono text-xl font-extrabold">{last?.reps || ""}</span>
+        <span aria-hidden className="text-foreground/35 font-mono text-xl font-extrabold">{(tracking === "distance_time" ? last?.distance : last?.weight) || ""}</span>
+        <span aria-hidden className="text-foreground/35 font-mono text-xl font-extrabold">{(timed ? last?.time : last?.reps) || ""}</span>
         <span className="text-muted-foreground text-xs font-semibold">Add</span>
       </button>
 
