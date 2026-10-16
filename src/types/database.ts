@@ -95,6 +95,8 @@ export type Database = {
           aliases: string[];
           image_urls: string[];
           tracking: Tracking;
+          /** Caption under the form demo, e.g. when the photos show a similar movement. */
+          demo_note?: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
