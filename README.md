@@ -525,6 +525,18 @@ last time's numbers are kept from the last time you were online. Sets and
 workouts get their ids on the phone, so a retried sync never duplicates them.
 Code: `src/lib/offline/`.
 
+## Forgot password
+
+The sign-in screen has **Forgot password?**: enter your email, then type the
+code from the email and a new password. Supabase's standard reset email only
+has a link, so make it show the code (one time):
+
+1. Open your project's [email templates](https://supabase.com/dashboard/project/_/auth/templates)
+   and pick **Reset Password**.
+2. Set the subject to `Your Ironlog password reset code`.
+3. Replace the message body with the contents of `supabase/templates/recovery.html`
+   and save.
+
 ## Security
 
 The app's public key is inside the APK, so the database is locked down on the
