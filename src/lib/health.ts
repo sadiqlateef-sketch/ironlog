@@ -23,7 +23,7 @@ export type HealthStatus = {
 
 interface HealthConnectPlugin {
   status(): Promise<HealthStatus>;
-  requestPermissions(): Promise<HealthStatus>;
+  askPermissions(): Promise<HealthStatus>;
   openHealthConnect(): Promise<void>;
   writeWorkouts(o: { workouts: (HealthWorkout & { version: number })[] }): Promise<{ written: number }>;
   deleteWorkouts(o: { ids: string[] }): Promise<void>;
@@ -77,7 +77,7 @@ export async function healthStatus(): Promise<HealthStatus | null> {
 
 /** Shows Health Connect's permission screen, and turns syncing on if anything was allowed. */
 export async function connectHealth(): Promise<HealthStatus> {
-  const status = await HealthConnect.requestPermissions();
+  const status = await HealthConnect.askPermissions();
   if (status.granted.length) writePrefs({ ...readPrefs(), on: true });
   return status;
 }

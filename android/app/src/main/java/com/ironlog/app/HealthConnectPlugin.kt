@@ -113,7 +113,7 @@ class HealthConnectPlugin : Plugin() {
 
     /** Shows Health Connect's own permission screen. Resolves with the new status. */
     @PluginMethod
-    fun requestPermissions(call: PluginCall) {
+    fun askPermissions(call: PluginCall) {
         call.withClient { client ->
             val have = client.permissionController.getGrantedPermissions()
             if (have.containsAll(permissions.values)) {
