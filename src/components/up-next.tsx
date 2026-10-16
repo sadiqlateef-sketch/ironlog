@@ -56,7 +56,7 @@ export function UpNext({ progress }: { progress: ProgramProgress }) {
       </div>
       {finished ? (
         <Button asChild variant="secondary">
-          <Link href="/plans/">Pick your next program</Link>
+          <Link href="/plans/?build=1">Build my next program</Link>
         </Button>
       ) : (
         <Button size="lg" onClick={start} disabled={busy}>
