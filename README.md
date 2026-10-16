@@ -556,6 +556,32 @@ has a link, so make it show the code (one time):
 3. Replace the message body with the contents of `supabase/templates/recovery.html`
    and save.
 
+## Sign in with Google
+
+The sign-in screen has **Continue with Google**. In the Android app Google
+opens in a browser tab and sends you straight back into Ironlog, signed in.
+If you already have an Ironlog account with the same Gmail address, Google
+sign-in opens that same account (Supabase links them by email), so your
+workouts are all there. A new Google user gets a fresh account and the
+usual first-run setup.
+
+It reuses the Google keys from [Google Calendar](#turning-on-google-calendar-one-time-no-command-line).
+With those already set up, it's two steps:
+
+1. Open https://console.cloud.google.com/auth/clients (project **Ironlog**
+   selected at the top) and click your **Ironlog** client. Under **Authorized
+   redirect URIs** click **Add URI**, paste
+   `https://<your project ref>.supabase.co/auth/v1/callback`, and **Save**.
+   (Keep the `gym-calendar` one that's already there.)
+2. Run **Actions > Deploy database and functions**, then rebuild the APK.
+   The deploy turns on Supabase's Google provider with your
+   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` secrets and adds the app's
+   return link `com.ironlog.app://auth-callback` to the allowed redirect URLs.
+
+Sign-in uses PKCE: the link back into the app carries a one-time code that
+only the phone that started the sign-in can turn into a session. Code:
+`src/lib/google-sign-in.ts`.
+
 ## Security
 
 The app's public key is inside the APK, so the database is locked down on the
