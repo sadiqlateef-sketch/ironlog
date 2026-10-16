@@ -4,7 +4,7 @@ import { createContext, use, useCallback, useEffect, useState, type ReactNode } 
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 import { cachedRead } from "@/lib/offline/cache";
-import { kvClear } from "@/lib/offline/kv";
+import { kvClear, kvSet } from "@/lib/offline/kv";
 import { discardPending, flush, getSyncStatus } from "@/lib/offline/queue";
 import type { Tables, UnitSystem } from "@/types/database";
 
@@ -17,7 +17,7 @@ interface AuthState {
   unit: UnitSystem;
   setUnit: (unit: UnitSystem) => Promise<void>;
   /** Save profile settings (bar, plates, rest time...) and update them here. */
-  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m">>) => Promise<void>;
+  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -65,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select().single();
       if (error) throw new Error(error.message);
       setProfile(data);
+      void kvSet(`cache:profile:${userId}`, data);
     },
     [userId],
   );

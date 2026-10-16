@@ -17,6 +17,7 @@ export type EquipmentType =
   | "bodyweight" | "band" | "smith_machine" | "ez_bar" | "trap_bar" | "other";
 export type ExerciseMechanic = "compound" | "isolation";
 export type UnitSystem = "metric" | "imperial";
+export type TrainingGoal = "strength" | "hypertrophy" | "powerbuilding" | "general";
 export type SessionSource = "web" | "phone" | "watch" | "import" | "claude";
 export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
 export type AdjustmentStatus = "pending" | "applied" | "dismissed";
@@ -51,6 +52,10 @@ export type Database = {
           gym_lat: number | null;
           gym_lng: number | null;
           gym_radius_m: number;
+          training_goal: TrainingGoal | null;
+          training_equipment: string[];
+          training_days_per_week: number | null;
+          onboarded_at: string | null;
         } & Timestamps;
         Insert: {
           id: string;
@@ -65,6 +70,10 @@ export type Database = {
           gym_lat?: number | null;
           gym_lng?: number | null;
           gym_radius_m?: number;
+          training_goal?: TrainingGoal | null;
+          training_equipment?: string[];
+          training_days_per_week?: number | null;
+          onboarded_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
         Relationships: [];

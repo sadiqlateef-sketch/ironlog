@@ -514,6 +514,15 @@ Authentication > Providers > Email while you're developing.
   `heart_rate_samples` arrive from the watch.
 - Only one unfinished workout per user is allowed at a time.
 
+## First run
+
+A new account starts with five quick questions (name, lb or kg, goal,
+equipment, days a week), saved to your profile (`users.training_*`,
+`onboarded_at`). **Build my program** opens the program builder with those
+answers filled in, and once Claude has built it, **Start Day 1** makes it your
+active program and opens the first workout. Accounts that already had
+workouts or programs skip the questions.
+
 ## Logging without signal
 
 The workout logger keeps working with no signal. Every change is saved on the

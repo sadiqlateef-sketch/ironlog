@@ -18,13 +18,19 @@ const tabs = [
 
 /** Signed-in layout: page content, rest timer, and the bottom tab bar. */
 export function AppShell({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     if (session === null) router.replace("/login/");
   }, [session, router]);
+
+  // New account: the welcome steps come first.
+  const needsWelcome = !!profile && !profile.onboarded_at && !pathname.startsWith("/welcome");
+  useEffect(() => {
+    if (needsWelcome) router.replace("/welcome/");
+  }, [needsWelcome, router]);
 
   if (!session) {
     return (
