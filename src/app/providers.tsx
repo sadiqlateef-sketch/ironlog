@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/components/providers/auth-provider";
 import { RestTimerProvider } from "@/components/providers/rest-timer-provider";
 import { RationaleHost } from "@/components/rationale-host";
 import { syncGymCalendar } from "@/lib/gym";
 import { initNative } from "@/lib/native";
+import { listenForResetLinks } from "@/lib/password-reset";
 
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -13,6 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
   }, []);
   return (
     <AuthProvider>
+      <ResetLinks />
       <GymCalendarCatchUp />
       <RestTimerProvider>{children}</RestTimerProvider>
       <RationaleHost />
@@ -30,5 +33,12 @@ function GymCalendarCatchUp() {
   useEffect(() => {
     if (userId) syncGymCalendar();
   }, [userId]);
+  return null;
+}
+
+/** A tapped "reset password" email link opens the sign-in screen's new-password step. */
+function ResetLinks() {
+  const router = useRouter();
+  useEffect(() => listenForResetLinks(() => router.replace("/login/")), [router]);
   return null;
 }
