@@ -16,6 +16,9 @@ export const isNative = () => Capacitor.isNativePlatform();
 
 const REST_NOTIFICATION_ID = 1001;
 const REST_CHANNEL = "rest-timer";
+const RECOVERY_NOTIFICATION_ID = 1002;
+const REMINDER_CHANNEL = "reminders";
+const RECOVERY_PREF = "ironlog:recovery-reminder";
 
 /** Light tap when a set is ticked off. */
 export function tap(): void {
@@ -45,6 +48,13 @@ export async function initNative(): Promise<void> {
     description: "Tells you when your rest is over",
     importance: 5,
     vibration: true,
+    visibility: 1,
+  }).catch(() => {});
+  await LocalNotifications.createChannel({
+    id: REMINDER_CHANNEL,
+    name: "Reminders",
+    description: "Recovery-day tips the morning after a workout",
+    importance: 3,
     visibility: 1,
   }).catch(() => {});
 }
@@ -102,6 +112,44 @@ export async function requestNotifications(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Recovery-day reminder on this phone (off until turned on in Settings). */
+export function recoveryReminderOn(): boolean {
+  try {
+    return localStorage.getItem(RECOVERY_PREF) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Turn the reminder on (asks Android for notifications) or off. Returns whether it's on. */
+export async function setRecoveryReminder(on: boolean): Promise<boolean> {
+  if (on && !(await requestNotifications())) on = false;
+  try {
+    localStorage.setItem(RECOVERY_PREF, on ? "1" : "0");
+  } catch {}
+  if (!on) await cancelRecoveryReminder();
+  return on;
+}
+
+/** After a workout: remind tomorrow morning that it's a recovery day. */
+export async function scheduleRecoveryReminder(at: Date, title: string, body: string): Promise<void> {
+  if (!isNative() || !recoveryReminderOn()) return;
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await LocalNotifications.schedule({
+      notifications: [{ id: RECOVERY_NOTIFICATION_ID, title, body, channelId: REMINDER_CHANNEL, schedule: { at, allowWhileIdle: true }, autoCancel: true }],
+    });
+  } catch {
+    // A missed tip is fine.
+  }
+}
+
+/** Starting another workout makes tomorrow's "recovery day" wrong, so drop it. */
+export async function cancelRecoveryReminder(): Promise<void> {
+  if (!isNative()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: RECOVERY_NOTIFICATION_ID }] }).catch(() => {});
 }
 
 export async function cancelRestAlert(): Promise<void> {

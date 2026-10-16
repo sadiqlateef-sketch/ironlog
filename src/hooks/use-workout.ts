@@ -29,7 +29,8 @@ import {
 } from "@/lib/offline/workout-store";
 import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
-import { buzz } from "@/lib/native";
+import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
+import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { bestE1rm, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import type { SetType } from "@/types/database";
@@ -227,6 +228,12 @@ export function useWorkout() {
     });
   }, [profile, load, fail]);
 
+  // A workout in progress means tomorrow's "recovery day" tip from the last one is stale.
+  const sessionId = session?.id;
+  useEffect(() => {
+    if (sessionId) cancelRecoveryReminder();
+  }, [sessionId]);
+
   // ---- Gym check-in ----
   // Once per workout, as soon as it's open on the phone (that also covers a
   // workout started on the watch): are we at the gym? No fix yet = try again at Finish.
@@ -278,6 +285,13 @@ export function useWorkout() {
     try {
       const { synced } = await finishSession(session);
       restTimer.stop();
+      const trained = blocksRef.current.flatMap((b) =>
+        b.exercise.tracking === "distance_time" ? [] : b.sets.filter((s) => s.done && s.type !== "warmup").map(() => b.exercise.primary_muscle),
+      );
+      if (trained.length) {
+        const { title, body } = recoveryMessage(trained);
+        scheduleRecoveryReminder(nextMorning(new Date()), title, body);
+      }
       const endedAt = Date.now();
       const gym = gymOf(profile);
       // Workouts at the gym longer than 30 minutes go on your Google Calendar.

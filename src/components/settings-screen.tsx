@@ -4,7 +4,7 @@
 // equipment, gym and calendar, the Claude connector, alerts, and sign out.
 
 import { useState, type ReactNode } from "react";
-import { ChevronRight, Dumbbell, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { Bell, ChevronRight, Dumbbell, LogOut, MapPin, MessageCircle } from "lucide-react";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
@@ -13,6 +13,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { isNative, recoveryReminderOn, setRecoveryReminder } from "@/lib/native";
 import { EQUIPMENT, EQUIPMENT_LABEL, GOALS } from "@/lib/plan-options";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +145,10 @@ export function SettingsScreen() {
         </div>
       </Section>
 
+      <Section title="Reminders">
+        <RecoveryToggle />
+      </Section>
+
       <Section title="Gym and connections">
         <div className="flex flex-col">
           <Row icon={Dumbbell} label="Bar, plates and rest time" detail="What the plate calculator and rest timer use" onClick={() => setSheet("weights")} />
@@ -159,6 +164,45 @@ export function SettingsScreen() {
       <EquipmentSheet open={sheet === "weights"} onOpenChange={(o) => !o && setSheet(null)} />
       <GymSheet open={sheet === "gym"} onOpenChange={(o) => !o && setSheet(null)} />
       <ClaudeConnectSheet open={sheet === "claude"} onOpenChange={(o) => !o && setSheet(null)} />
+    </div>
+  );
+}
+
+function RecoveryToggle() {
+  const [on, setOn] = useState(recoveryReminderOn);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  if (!isNative()) return <p className="text-muted-foreground text-sm">Recovery-day reminders are available in the Android app.</p>;
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          const want = !on;
+          const now = await setRecoveryReminder(want);
+          setOn(now);
+          setNote(want && !now ? "Notifications are off for Ironlog. Turn them on in Android Settings > Apps > Ironlog > Notifications." : null);
+          setBusy(false);
+        }}
+        className="flex w-full items-center gap-3 text-left"
+      >
+        <Bell className="text-muted-foreground size-5 shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Recovery-day reminder</span>
+          <span className="text-muted-foreground block text-sm">
+            The morning after a workout, a notification says which muscles are still recovering and what helps. Turning this on asks Android to
+            allow notifications.
+          </span>
+        </span>
+        <span className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", on ? "bg-primary" : "bg-foreground/20")}>
+          <span className={cn("bg-background absolute top-0.5 size-5 rounded-full transition-all", on ? "left-[22px]" : "left-0.5")} />
+        </span>
+      </button>
+      {note && <p className="text-destructive text-sm">{note}</p>}
     </div>
   );
 }
