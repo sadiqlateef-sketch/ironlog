@@ -26,8 +26,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (session === null) router.replace("/login/");
   }, [session, router]);
 
-  // New account: the welcome steps come first.
-  const needsWelcome = !!profile && !profile.onboarded_at && !pathname.startsWith("/welcome");
+  // New account: the welcome steps come first. (No onboarded_at at all means the
+  // database hasn't been updated for onboarding yet, so don't send anyone there.)
+  const needsWelcome = !!profile && profile.onboarded_at === null && !pathname.startsWith("/welcome");
   useEffect(() => {
     if (needsWelcome) router.replace("/welcome/");
   }, [needsWelcome, router]);

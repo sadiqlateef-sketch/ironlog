@@ -21,6 +21,9 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
+/** Profile columns added by recent migrations, skipped when the database is behind the app. */
+const NEWER_COLUMNS = ["training_goal", "training_equipment", "training_days_per_week", "onboarded_at"];
+
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -62,8 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback<AuthState["updateProfile"]>(
     async (patch) => {
       if (!userId) return;
-      const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select().single();
-      if (error) throw new Error(error.message);
+      let { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select().single();
+      // A column the live database doesn't have yet (the app updated before the
+      // database did): save the rest instead of failing the whole thing.
+      const missing = error?.message.match(/Could not find the '(\w+)' column/)?.[1];
+      if (missing && missing in patch) {
+        const rest = Object.fromEntries(Object.entries(patch).filter(([k]) => !NEWER_COLUMNS.includes(k))) as typeof patch;
+        if (!Object.keys(rest).length) return;
+        ({ data, error } = await getSupabase().from("users").update(rest).eq("id", userId).select().single());
+      }
+      if (error || !data) throw new Error(error?.message ?? "Couldn't save");
       setProfile(data);
       void kvSet(`cache:profile:${userId}`, data);
     },
