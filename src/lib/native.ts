@@ -16,6 +16,9 @@ export const isNative = () => Capacitor.isNativePlatform();
 
 const REST_NOTIFICATION_ID = 1001;
 const REST_CHANNEL = "rest-timer";
+const RECOVERY_NOTIFICATION_ID = 1002;
+const REMINDER_CHANNEL = "reminders";
+const RECOVERY_PREF = "ironlog:recovery-reminder";
 
 /** Light tap when a set is ticked off. */
 export function tap(): void {
@@ -47,17 +50,25 @@ export async function initNative(): Promise<void> {
     vibration: true,
     visibility: 1,
   }).catch(() => {});
+  await LocalNotifications.createChannel({
+    id: REMINDER_CHANNEL,
+    name: "Reminders",
+    description: "Recovery-day tips the morning after a workout",
+    importance: 3,
+    visibility: 1,
+  }).catch(() => {});
 }
 
 /**
  * Schedule the "rest over" alert for when the app is in the background
- * (JavaScript timers pause then). Asks for notification permission the first time.
+ * (JavaScript timers pause then). Only when notifications are already allowed:
+ * the app is going to the background here, so Android couldn't show its prompt.
+ * The workout screen asks first, with an explanation (see restAlertStatus).
  */
 export async function scheduleRestAlert(endsAt: number, label: string): Promise<void> {
   if (!isNative() || endsAt <= Date.now() + 1000) return;
   try {
-    let { display } = await LocalNotifications.checkPermissions();
-    if (display === "prompt" || display === "prompt-with-rationale") ({ display } = await LocalNotifications.requestPermissions());
+    const { display } = await LocalNotifications.checkPermissions();
     if (display !== "granted") return;
     await LocalNotifications.schedule({
       notifications: [
@@ -74,6 +85,71 @@ export async function scheduleRestAlert(endsAt: number, label: string): Promise<
   } catch {
     // Notifications are a bonus; the in-app timer still works.
   }
+}
+
+/**
+ * Whether rest alerts can reach a locked phone:
+ * "ask" (notifications not decided yet), "blocked" (turned off), "late"
+ * (allowed, but Android 14+ exact alarms are off), "ok", or "n/a" in a browser.
+ */
+export async function restAlertStatus(): Promise<"ask" | "blocked" | "late" | "ok" | "n/a"> {
+  if (!isNative()) return "n/a";
+  try {
+    const { display } = await LocalNotifications.checkPermissions();
+    if (display === "prompt" || display === "prompt-with-rationale") return "ask";
+    if (display !== "granted") return "blocked";
+    return (await exactAlarmStatus()) === "denied" ? "late" : "ok";
+  } catch {
+    return "n/a";
+  }
+}
+
+/** Ask Android to allow notifications (call only after explaining why). */
+export async function requestNotifications(): Promise<boolean> {
+  if (!isNative()) return false;
+  try {
+    return (await LocalNotifications.requestPermissions()).display === "granted";
+  } catch {
+    return false;
+  }
+}
+
+/** Recovery-day reminder on this phone (off until turned on in Settings). */
+export function recoveryReminderOn(): boolean {
+  try {
+    return localStorage.getItem(RECOVERY_PREF) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Turn the reminder on (asks Android for notifications) or off. Returns whether it's on. */
+export async function setRecoveryReminder(on: boolean): Promise<boolean> {
+  if (on && !(await requestNotifications())) on = false;
+  try {
+    localStorage.setItem(RECOVERY_PREF, on ? "1" : "0");
+  } catch {}
+  if (!on) await cancelRecoveryReminder();
+  return on;
+}
+
+/** After a workout: remind tomorrow morning that it's a recovery day. */
+export async function scheduleRecoveryReminder(at: Date, title: string, body: string): Promise<void> {
+  if (!isNative() || !recoveryReminderOn()) return;
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await LocalNotifications.schedule({
+      notifications: [{ id: RECOVERY_NOTIFICATION_ID, title, body, channelId: REMINDER_CHANNEL, schedule: { at, allowWhileIdle: true }, autoCancel: true }],
+    });
+  } catch {
+    // A missed tip is fine.
+  }
+}
+
+/** Starting another workout makes tomorrow's "recovery day" wrong, so drop it. */
+export async function cancelRecoveryReminder(): Promise<void> {
+  if (!isNative()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: RECOVERY_NOTIFICATION_ID }] }).catch(() => {});
 }
 
 export async function cancelRestAlert(): Promise<void> {
@@ -110,7 +186,7 @@ export async function openExactAlarmSettings(): Promise<void> {
 }
 
 /**
- * Share an image: the Android share sheet in the app, the browser's share
+ * Share a file (an image, a CSV...): the Android share sheet in the app, the browser's share
  * sheet where it has one, otherwise a download. Returns which one happened.
  */
 export async function shareImage(blob: Blob, fileName: string, title: string): Promise<"shared" | "downloaded" | "cancelled"> {
@@ -122,7 +198,8 @@ export async function shareImage(blob: Blob, fileName: string, title: string): P
         r.onerror = () => reject(r.error);
         r.readAsDataURL(blob);
       });
-      const { uri } = await Filesystem.writeFile({ path: fileName, data, directory: Directory.Cache });
+      // Only cache/share/ is exposed to other apps (android/app/src/main/res/xml/file_paths.xml).
+      const { uri } = await Filesystem.writeFile({ path: `share/${fileName}`, data, directory: Directory.Cache, recursive: true });
       await Share.share({ title, files: [uri], dialogTitle: title });
       return "shared";
     }

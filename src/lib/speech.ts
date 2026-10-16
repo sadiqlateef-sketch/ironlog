@@ -8,6 +8,7 @@
 import { SpeechRecognition as NativeSpeech } from "@capacitor-community/speech-recognition";
 import type { PluginListenerHandle } from "@capacitor/core";
 import { isNative } from "@/lib/native";
+import { explainFirst } from "@/lib/rationale";
 
 export interface Dictation {
   /** Stop listening. Whatever was heard so far is kept. */
@@ -68,6 +69,12 @@ export async function startDictation(h: DictationHandlers): Promise<Dictation | 
 async function startNative(h: DictationHandlers): Promise<Dictation | null> {
   try {
     let perm = await NativeSpeech.checkPermissions();
+    if (perm.speechRecognition === "prompt" || perm.speechRecognition === "prompt-with-rationale") {
+      if (!(await explainFirst("microphone"))) {
+        h.onEnd();
+        return null;
+      }
+    }
     if (perm.speechRecognition !== "granted") perm = await NativeSpeech.requestPermissions();
     if (perm.speechRecognition !== "granted") {
       h.onError("Ironlog needs the microphone to hear you. Allow it in your phone's settings, or type instead.");

@@ -21,6 +21,16 @@ export function getSupabase(): SupabaseClient<Database> {
 
   client = createClient<Database>(url, key, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    // With bad signal, fail fast and let the offline queue retry (see src/lib/offline).
+    db: { retry: false },
+    global: { fetch: fetchWithTimeout },
   });
   return client;
 }
+
+/** Database calls give up after 12 seconds, so a dead connection doesn't freeze logging. */
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!href.includes("/rest/v1/") || init?.signal) return fetch(input, init);
+  return fetch(input, { ...init, signal: AbortSignal.timeout(12_000) });
+};

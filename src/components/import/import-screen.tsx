@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Camera, Check, ImagePlus, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -149,16 +148,8 @@ function Pick({ onRead }: { onRead: (w: ImportedWorkout) => void }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" aria-label="Back">
-          <Link href="/workout/">
-            <ArrowLeft />
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-bold">Import workout</h1>
-      </header>
       <p className="text-muted-foreground text-sm">
-        Add a screenshot from another app, a photo of your notebook, or type it out. Claude reads it and you check everything before it&apos;s saved.
+        Add a screenshot from another app or a photo of your notebook. Claude reads it and you check everything before it&apos;s saved.
       </p>
 
       <div className="grid grid-cols-2 gap-3">

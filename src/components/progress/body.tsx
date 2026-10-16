@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { Camera, ChevronRight, ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { BodyHeatmap } from "@/components/body-heatmap";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -177,7 +178,6 @@ function RecoveryCard() {
 
 function CompositionCard({ rows, now }: { rows: BodyMeasurement[]; now: number }) {
   const { profile, unit } = useAuth();
-  const [editing, setEditing] = useState(false);
   const stats = (profile?.physical_stats ?? {}) as PhysicalStats;
   const weight = latestOf(rows, "weight_kg")?.value ?? stats.bodyweight_kg ?? null;
   const fat = latestOf(rows, "body_fat_pct");
@@ -199,8 +199,10 @@ function CompositionCard({ rows, now }: { rows: BodyMeasurement[]; now: number }
           <CardTitle>Body composition</CardTitle>
           <CardDescription>Worked out from your latest weight, height and body fat.</CardDescription>
         </div>
-        <Button variant="secondary" size="icon" aria-label="Edit height, sex and birth year" onClick={() => setEditing(true)}>
-          <Pencil />
+        <Button asChild variant="secondary" size="icon" aria-label="Edit height, sex and birth year in Settings">
+          <Link href="/settings/#about">
+            <Pencil />
+          </Link>
         </Button>
       </CardHeader>
       {!height || !weight ? (
@@ -209,8 +211,10 @@ function CompositionCard({ rows, now }: { rows: BodyMeasurement[]; now: number }
             {!height ? "Add your height" : "Log your weight below"} to see your BMI and lean mass.
           </p>
           {!height && (
-            <Button variant="secondary" onClick={() => setEditing(true)}>
-              <Plus /> Add your height
+            <Button asChild variant="secondary">
+              <Link href="/settings/#about">
+                <Plus /> Add your height
+              </Link>
             </Button>
           )}
         </div>
@@ -239,7 +243,6 @@ function CompositionCard({ rows, now }: { rows: BodyMeasurement[]; now: number }
         BMI reads high for muscular people, and the body fat estimate comes from BMI, age and sex. A measured body fat
         always replaces it.
       </p>
-      <AboutYouSheet open={editing} onOpenChange={setEditing} />
     </Card>
   );
 }
@@ -254,21 +257,8 @@ function Tile({ label, value, note }: { label: string; value: string; note: stri
   );
 }
 
-function AboutYouSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>About you</DialogTitle>
-          <DialogDescription>Used for BMI and the body fat estimate. Only you can see it.</DialogDescription>
-        </DialogHeader>
-        {open && <AboutYouForm onDone={() => onOpenChange(false)} />}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AboutYouForm({ onDone }: { onDone: () => void }) {
+/** Height, sex and birth year (shown in Settings). */
+export function AboutYouForm({ onDone }: { onDone: () => void }) {
   const { profile, unit, updateProfile } = useAuth();
   const stats = (profile?.physical_stats ?? {}) as PhysicalStats;
   const start = stats.height_cm ? cmToFtIn(stats.height_cm) : null;

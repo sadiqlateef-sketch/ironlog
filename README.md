@@ -18,7 +18,9 @@ A standalone watch app in `watch/` (React Native). It talks to the same
 Supabase database as the phone, so a workout started on either shows up on both.
 
 - **Link once, no typing on the watch.** The watch shows a 6-digit code. On
-  your phone, go to Home > **Link watch** and enter it. Codes last 10 minutes
+  your phone, go to Home > **Link watch** and enter it. That button is hidden
+  until you turn it on: add a repository variable `FEATURE_WATCH` = `1`
+  (Settings > Secrets and variables > Actions > Variables) and rebuild the APK. Codes last 10 minutes
   and work once, and 10 wrong tries locks code entry for a while.
 - **Log from the wrist.** Start a routine or continue the phone's workout.
   Each set shows big **−/+** buttons for weight (5 lb or 2.5 kg a tap; hold for 0.5 lb or 0.25 kg) and reps,
@@ -208,10 +210,16 @@ the plan and Claude's thinking); a post-workout check is a smaller one. Real
 token counts land in `ai_usage`, so you can compare them with current pricing
 at https://www.anthropic.com/pricing.
 
-## Import a finished workout
+## Log a past workout
 
-Workout > **Import** (or Home > **Import photo**)
-adds a workout you already did somewhere else.
+Workout > **Log past workout** (or the same button on Home) opens one Log
+screen with three tabs: **Voice** and **Type** (a chat with Claude, below) and
+**Photo** (screenshots or notebook photos). The old `/import/` address now
+opens the Photo tab.
+
+### Photo
+
+The Photo tab adds a workout you already did somewhere else.
 
 1. **Add it.** Take a photo of your notebook, pick screenshots from another app
    (Strong, Hevy, JEFIT, a spreadsheet...), or type/paste it ("Squat 3x5 225").
@@ -230,9 +238,9 @@ adds a workout you already did somewhere else.
 The server converts units to kg, drops impossible numbers and dates in the
 future, and limits imports to 20 per person per day (logged in `ai_usage`).
 
-## Tell Claude (log by chatting)
+### Voice and Type (log by chatting)
 
-Workout > **Tell Claude** (or Home > **Tell Claude**) opens a chat. Type or
+The Voice and Type tabs share one chat (Voice puts the mic first). Type or
 tap the mic and say what you did: "squat three sets of five at two twenty five,
 bench one eighty five for eight, eight and seven". Claude answers with what it
 understood. Send another message to add or fix something ("forgot curls 3x12
@@ -505,3 +513,66 @@ Authentication > Providers > Email while you're developing.
   adds a trigger that keeps `workout_sessions.avg_hr` / `max_hr` up to date as
   `heart_rate_samples` arrive from the watch.
 - Only one unfinished workout per user is allowed at a time.
+
+## Timed and cardio sets
+
+Each exercise records one of three things (`exercises.tracking`): weight × reps
+(most lifts), **time** (planks, wall sits, dead hangs, jump rope; optional added
+weight), or **distance + time** (treadmill, outdoor run, walk, rower, bike,
+elliptical), with your pace worked out from the two. Times can be typed as
+seconds (`90`) or minutes:seconds (`1:30`); distance is in miles or km to
+match your unit. Stored in `workout_sets.duration_seconds` and `distance_m`.
+Cardio doesn't count toward the muscle recovery map.
+
+## First run
+
+A new account starts with five quick questions (name, lb or kg, goal,
+equipment, days a week), saved to your profile (`users.training_*`,
+`onboarded_at`). **Build my program** opens the program builder with those
+answers filled in, and once Claude has built it, **Start Day 1** makes it your
+active program and opens the first workout. Accounts that already had
+workouts or programs skip the questions.
+
+## Logging without signal
+
+The workout logger keeps working with no signal. Every change is saved on the
+phone first (IndexedDB) and sent to Supabase in order as soon as there's a
+connection; a banner says "Saved offline, will sync" while anything is waiting.
+Closing the app keeps the queue, and a workout can be started, logged, reopened
+and finished offline. The exercise library, your programs and routines, and
+last time's numbers are kept from the last time you were online. Sets and
+workouts get their ids on the phone, so a retried sync never duplicates them.
+Code: `src/lib/offline/`.
+
+## Forgot password
+
+The sign-in screen has **Forgot password?**: enter your email, then type the
+code from the email and a new password. Supabase's standard reset email only
+has a link, so make it show the code (one time):
+
+1. Open your project's [email templates](https://supabase.com/dashboard/project/_/auth/templates)
+   and pick **Reset Password**.
+2. Set the subject to `Your Ironlog password reset code`.
+3. Replace the message body with the contents of `supabase/templates/recovery.html`
+   and save.
+
+## Security
+
+The app's public key is inside the APK, so the database is locked down on the
+server rather than trusting the app:
+
+- Every table has Row Level Security: you can only see and change your own
+  rows, and rows can only point at things you own (your routines, programs,
+  sessions, and built-in or your own exercises).
+- Signed-out callers get nothing at all (`20261016000000_lockdown.sql`), and
+  the same applies to anything added later.
+- Every Edge Function checks who is calling: the app's functions check your
+  sign-in, `watch-pair` and `claude-connector` check their own one-time code or
+  secret link, and `gym-calendar`'s Google callback checks a signed, expiring
+  state value.
+- The phone app turns off Android backups and phone-to-phone transfers of its
+  data, and only shares files from its own share and camera folders.
+
+Since Ironlog is just for you, you can also stop anyone else from making an
+account: in Supabase, open **Authentication > Sign In / Providers** and turn off
+**Allow new users to sign up** (your own account keeps working).

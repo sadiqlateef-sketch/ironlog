@@ -16,6 +16,7 @@ import {
   deleteProgram,
   generatePlan,
   getProgramProgress,
+  getRoutine,
   listPendingAdjustments,
   listPrograms,
   listRoutinesWithExercises,
@@ -29,6 +30,7 @@ import {
   type RoutineWithExercises,
 } from "@/lib/workout-api";
 import { cn } from "@/lib/utils";
+import { EQUIPMENT, EQUIPMENT_LABEL, GOALS, planDefaults } from "@/lib/plan-options";
 
 export default function PlansPage() {
   return (
@@ -39,6 +41,10 @@ export default function PlansPage() {
 }
 
 function Plans() {
+  const { profile } = useAuth();
+  const router = useRouter();
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   const [programs, setPrograms] = useState<ProgramWithWorkouts[] | null>(null);
   const [progress, setProgress] = useState<Record<string, ProgramProgress>>({});
   const [manual, setManual] = useState<RoutineWithExercises[]>([]);
@@ -58,6 +64,30 @@ function Plans() {
     listPendingAdjustments().then(setAdjustments).catch(() => {});
   }, []);
   useEffect(refresh, [refresh]);
+
+  // /plans/?build=1 (from the welcome steps or Home) opens on the builder.
+  const hasProfile = !!profile;
+  useEffect(() => {
+    if (hasProfile && new URLSearchParams(window.location.search).get("build") === "1") {
+      document.getElementById("generator")?.scrollIntoView({ block: "start" });
+    }
+  }, [hasProfile]);
+
+  /** Right after building: make it the active program and open its first workout. */
+  async function startDayOne(programId: string) {
+    setStarting(true);
+    setError(null);
+    try {
+      await startProgram(programId);
+      const p = await getProgramProgress(programId);
+      if (!p?.next_routine_id) throw new Error("That program has no workouts.");
+      await startSession(await getRoutine(p.next_routine_id));
+      router.push("/workout/");
+    } catch (e) {
+      setError((e as Error).message);
+      setStarting(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,7 +109,34 @@ function Plans() {
         <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
       ))}
 
-      <Generator onCreated={refresh} />
+      {fresh && (
+        <Card className="border-primary/60">
+          <CardHeader>
+            <CardTitle>Your program is ready</CardTitle>
+            <CardDescription>Make it your active program and start the first workout now.</CardDescription>
+          </CardHeader>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" onClick={() => setFresh(null)} disabled={starting}>
+              Later
+            </Button>
+            <Button onClick={() => startDayOne(fresh)} disabled={starting} data-testid="start-day-one">
+              <Play /> {starting ? "Starting…" : "Start Day 1"}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {profile && (
+        <Generator
+          key={profile.id}
+          initial={planDefaults(profile)}
+          onCreated={(id) => {
+            refresh();
+            setFresh(id);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
 
       {programs?.filter((p) => !p.is_active).map((p) => (
         <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
@@ -102,11 +159,6 @@ function Plans() {
 
 // ---------------- Generator form ----------------
 
-const GOALS = [
-  { v: "strength", l: "Strength" },
-  { v: "hypertrophy", l: "Muscle" },
-  { v: "powerbuilding", l: "Both" },
-] as const;
 const STYLES = [
   { v: "auto", l: "Claude picks", d: "Best fit for your goal and schedule" },
   { v: "531", l: "5/3/1", d: "Jim Wendler: steady monthly strength gains" },
@@ -114,11 +166,6 @@ const STYLES = [
   { v: "rp", l: "RP hypertrophy", d: "Renaissance Periodization volume for size" },
   { v: "linear", l: "Linear", d: "Add weight every session (newer lifters)" },
 ] as const;
-const EQUIPMENT = ["barbell", "dumbbell", "machine", "cable", "kettlebell", "band", "trap_bar", "ez_bar", "smith_machine"] as const;
-const EQUIPMENT_LABEL: Record<string, string> = {
-  barbell: "Barbell", dumbbell: "Dumbbells", machine: "Machines", cable: "Cables", kettlebell: "Kettlebells",
-  band: "Bands", trap_bar: "Trap bar", ez_bar: "EZ bar", smith_machine: "Smith machine",
-};
 
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -136,17 +183,8 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-function Generator({ onCreated }: { onCreated: () => void }) {
-  const [form, setForm] = useState<PlanInput>({
-    goal: "strength",
-    methodology: "auto",
-    days_per_week: 4,
-    weeks: 8,
-    session_minutes: 60,
-    experience: "intermediate",
-    equipment: ["barbell", "dumbbell", "machine", "cable"],
-    notes: "",
-  });
+function Generator({ initial, onCreated }: { initial: PlanInput; onCreated: (programId: string) => void }) {
+  const [form, setForm] = useState<PlanInput>(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof PlanInput>(k: K, v: PlanInput[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -156,8 +194,8 @@ function Generator({ onCreated }: { onCreated: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await generatePlan(form);
-      onCreated();
+      const { program_id } = await generatePlan(form);
+      onCreated(program_id);
     } catch (err) {
       setError((err as Error).message);
     } finally {

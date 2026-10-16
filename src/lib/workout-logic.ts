@@ -189,6 +189,8 @@ export interface HistorySet {
   weight: number;
   reps: number;
   completed_at: string | null;
+  duration_seconds?: number | null;
+  distance_m?: number | null;
 }
 
 export interface HistoryDay {

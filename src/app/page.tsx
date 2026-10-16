@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calculator, ChevronRight, Dumbbell, FileUp, Heart, LogOut, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
+import { Calculator, ChevronRight, Dumbbell, Heart, Settings, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
+import { AdjustmentList } from "@/components/adjustment-list";
 import { AppShell } from "@/components/app-shell";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { SessionSheet } from "@/components/session-sheet";
@@ -11,8 +12,8 @@ import { UpNext, useActiveProgram } from "@/components/up-next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatWeight } from "@/lib/units";
-import { getActiveSession, listRecentSessions, type WorkoutSession } from "@/lib/workout-api";
-import { cn } from "@/lib/utils";
+import { WATCH_LINKING } from "@/lib/features";
+import { getActiveSession, listPendingAdjustments, listRecentSessions, type AdjustmentWithContext, type WorkoutSession } from "@/lib/workout-api";
 
 export default function Home() {
   return (
@@ -23,11 +24,12 @@ export default function Home() {
 }
 
 function Dashboard() {
-  const { profile, unit, setUnit, signOut } = useAuth();
+  const { profile, unit } = useAuth();
   const [active, setActive] = useState<WorkoutSession | null>(null);
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
   const [plates, setPlates] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [adjustments, setAdjustments] = useState<AdjustmentWithContext[]>([]);
   // Bumped after a workout is edited or deleted, so the list and Up next refresh.
   const [reload, setReload] = useState(0);
   const program = useActiveProgram(reload);
@@ -35,6 +37,7 @@ function Dashboard() {
   useEffect(() => {
     getActiveSession().then(setActive).catch(() => {});
     listRecentSessions().then(setRecent).catch(() => setRecent([]));
+    listPendingAdjustments().then(setAdjustments).catch(() => {});
   }, [reload]);
 
   return (
@@ -47,8 +50,10 @@ function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Ironlog</h1>
           <p className="text-muted-foreground truncate text-sm">{profile?.email}</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
-          <LogOut />
+        <Button asChild variant="ghost" size="icon" aria-label="Settings">
+          <Link href="/settings/">
+            <Settings />
+          </Link>
         </Button>
       </header>
 
@@ -61,11 +66,36 @@ function Dashboard() {
       ) : program ? (
         <UpNext progress={program} />
       ) : (
-        <Button asChild size="lg">
-          <Link href="/workout/">
-            <Play /> Start workout
-          </Link>
-        </Button>
+        <Card className="border-primary gap-3 p-4" data-testid="no-program">
+          <div>
+            <p className="text-lg font-bold">No program yet</p>
+            <p className="text-muted-foreground text-sm">Claude can build one from your goal, equipment and training days.</p>
+          </div>
+          <Button asChild size="lg">
+            <Link href="/plans/?build=1">
+              <Sparkles /> Build my program
+            </Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href="/workout/">
+              <Play /> Start an empty workout
+            </Link>
+          </Button>
+        </Card>
+      )}
+
+      {adjustments.length > 0 && (
+        <section className="flex flex-col gap-2" data-testid="home-adjustments">
+          <h2 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+            <Sparkles className="text-ai size-3.5" /> Suggested for next time
+          </h2>
+          <AdjustmentList items={adjustments.slice(0, 3)} onChange={() => setReload((r) => r + 1)} />
+          {adjustments.length > 3 && (
+            <Link href="/plans/" className="text-primary-text text-sm font-semibold">
+              See all {adjustments.length} suggestions
+            </Link>
+          )}
+        </section>
       )}
 
       <div className="grid grid-cols-2 gap-3">
@@ -75,45 +105,29 @@ function Dashboard() {
           </Link>
         </Button>
         <Button asChild variant="secondary">
-          <Link href="/link-watch/">
-            <Watch /> Link watch
+          <Link href="/log/">
+            <MessageSquareText /> Log past workout
           </Link>
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {WATCH_LINKING && (
         <Button asChild variant="secondary">
-          <Link href="/log/">
-            <MessageSquareText /> Tell Claude
+          <Link href="/link-watch/">
+            <Watch /> Link watch
           </Link>
         </Button>
-        <Button asChild variant="secondary">
-          <Link href="/import/">
-            <FileUp /> Import photo
-          </Link>
-        </Button>
-      </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Button variant="secondary" onClick={() => setPlates(true)}>
           <Calculator /> Plates
         </Button>
-        <div className="bg-secondary grid grid-cols-2 rounded-xl p-1" role="group" aria-label="Weight unit">
-          {(["imperial", "metric"] as const).map((u) => (
-            <button
-              key={u}
-              type="button"
-              onClick={() => setUnit(u)}
-              aria-pressed={unit === u}
-              className={cn(
-                "rounded text-sm font-semibold",
-                unit === u ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
-              )}
-            >
-              {u === "imperial" ? "lb" : "kg"}
-            </button>
-          ))}
-        </div>
+        <Button asChild variant="secondary">
+          <Link href="/settings/">
+            <Settings /> Settings
+          </Link>
+        </Button>
       </div>
 
       <section className="flex flex-col gap-2">

@@ -1,15 +1,23 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, Watch } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { WATCH_LINKING } from "@/lib/features";
 import { claimWatchCode } from "@/lib/workout-api";
 
 export default function LinkWatchPage() {
+  const router = useRouter();
+  // Hidden until the watch app is ready (src/lib/features.ts).
+  useEffect(() => {
+    if (!WATCH_LINKING) router.replace("/");
+  }, [router]);
+  if (!WATCH_LINKING) return null;
   return (
     <AppShell>
       <LinkWatch />

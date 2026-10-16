@@ -1,10 +1,10 @@
 import { AppShell } from "@/components/app-shell";
-import { LogChat } from "@/components/chat/log-chat";
+import { LogScreen } from "@/components/log/log-screen";
 
 export default function LogPage() {
   return (
     <AppShell>
-      <LogChat />
+      <LogScreen />
     </AppShell>
   );
 }

@@ -5,29 +5,34 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useRestTimer } from "@/components/providers/rest-timer-provider";
 import { kgToLb, toKg, type UnitSystem } from "@/lib/units";
 import {
-  deleteSets,
-  discardSession,
-  finishSession,
-  getActiveSession,
   getBestE1rms,
   getLastPerformance,
   getRoutineTargets,
-  insertSets,
   listExercises,
-  listSessionSets,
-  moveSetsToExercise,
   startSession,
-  updateSessionNotes,
-  updateSet,
   type Exercise,
   type LastPerformance,
   type Routine,
   type WorkoutSession,
   type WorkoutSet,
 } from "@/lib/workout-api";
+import {
+  deleteSets,
+  discardSession,
+  finishSession,
+  getActiveSession,
+  insertSets,
+  listActiveSets,
+  updateSessionNotes,
+  updateSet,
+  updateSets,
+} from "@/lib/offline/workout-store";
+import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
-import { buzz } from "@/lib/native";
+import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
+import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { bestE1rm, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
+import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import type { SetType } from "@/types/database";
 
 /** A set that just beat your best estimated 1RM for that exercise. */
@@ -46,6 +51,9 @@ export interface UiSet {
   parentSetId: string | null;
   weight: string;
   reps: string;
+  /** Timed and cardio exercises: "1:30" and distance in mi/km. */
+  time: string;
+  distance: string;
   done: boolean;
 }
 
@@ -108,6 +116,8 @@ function toUiSet(s: WorkoutSet, unit: UnitSystem): UiSet {
     parentSetId: s.parent_set_id,
     weight: toDisplay(s.weight, unit),
     reps: s.is_completed || s.reps ? String(s.reps) : "",
+    time: s.duration_seconds ? formatDuration(s.duration_seconds) : "",
+    distance: s.distance_m ? toDistanceDisplay(s.distance_m, unit) : "",
     done: s.is_completed,
   };
 }
@@ -144,7 +154,7 @@ export function useWorkout() {
     const active = await getActiveSession();
     if (!active) return { session: null, blocks: [] };
     const [sets, exercises, targets] = await Promise.all([
-      listSessionSets(active.id),
+      listActiveSets(active.id),
       listExercises(),
       active.routine_id ? getRoutineTargets(active.routine_id) : Promise.resolve([]),
     ]);
@@ -205,6 +215,25 @@ export function useWorkout() {
     if (profile) load();
   }, [profile, load]);
 
+  // The server refused a change made offline: show the workout as it really is.
+  useEffect(() => {
+    let last = getSyncStatus().error;
+    return subscribeSync(() => {
+      const { error: e } = getSyncStatus();
+      if (e && e !== last && profile) {
+        fail(new Error(e));
+        load();
+      }
+      last = e;
+    });
+  }, [profile, load, fail]);
+
+  // A workout in progress means tomorrow's "recovery day" tip from the last one is stale.
+  const sessionId = session?.id;
+  useEffect(() => {
+    if (sessionId) cancelRecoveryReminder();
+  }, [sessionId]);
+
   // ---- Gym check-in ----
   // Once per workout, as soon as it's open on the phone (that also covers a
   // workout started on the watch): are we at the gym? No fix yet = try again at Finish.
@@ -254,8 +283,15 @@ export function useWorkout() {
     if (!session) return null;
     const done = blocksRef.current.flatMap((b) => b.sets.filter((s) => s.done));
     try {
-      await finishSession(session.id);
+      const { synced } = await finishSession(session);
       restTimer.stop();
+      const trained = blocksRef.current.flatMap((b) =>
+        b.exercise.tracking === "distance_time" ? [] : b.sets.filter((s) => s.done && s.type !== "warmup").map(() => b.exercise.primary_muscle),
+      );
+      if (trained.length) {
+        const { title, body } = recoveryMessage(trained);
+        scheduleRecoveryReminder(nextMorning(new Date()), title, body);
+      }
       const endedAt = Date.now();
       const gym = gymOf(profile);
       // Workouts at the gym longer than 30 minutes go on your Google Calendar.
@@ -278,6 +314,8 @@ export function useWorkout() {
         sets: done.length,
         exercises: blocksRef.current.filter((b) => b.sets.some((s) => s.done)).length,
         records: recordsRef.current.size,
+        /** False when it's saved on the phone and still waiting for signal. */
+        synced,
       };
       recordsRef.current = new Set();
       setSession(null);
@@ -400,7 +438,7 @@ export function useWorkout() {
       try {
         const [previous] = await Promise.all([
           getLastPerformance(exercise.id),
-          moveSetsToExercise(block.sets.map((s) => s.id), exercise.id),
+          updateSets(block.sets.map((s) => s.id), { exercise_id: exercise.id }),
         ]);
         setBlocks((prev) =>
           prev.map((b) =>
@@ -490,7 +528,7 @@ export function useWorkout() {
           },
         ]);
         // Copy the last set's numbers so a repeat set is one tap.
-        const ui = { ...toUiSet(row, unit), weight: last?.weight ?? "", reps: last?.reps ?? "" };
+        const ui = { ...toUiSet(row, unit), weight: last?.weight ?? "", reps: last?.reps ?? "", time: last?.time ?? "", distance: last?.distance ?? "" };
         setBlocks((prev) => prev.map((b) => (b.order === order ? { ...b, sets: [...b.sets, ui] } : b)));
       } catch (e) {
         fail(e);
@@ -516,10 +554,15 @@ export function useWorkout() {
     async (order: number, id: string) => {
       const set = blocksRef.current.find((b) => b.order === order)?.sets.find((s) => s.id === id);
       if (!set) return;
+      const tracking = blocksRef.current.find((b) => b.order === order)?.exercise.tracking ?? "weight_reps";
       try {
         await updateSet(id, {
-          weight: toKg(parseNumber(set.weight) ?? 0, unit),
+          weight: tracking === "distance_time" ? 0 : toKg(parseNumber(set.weight) ?? 0, unit),
           reps: Math.round(parseNumber(set.reps) ?? 0),
+          ...(tracking !== "weight_reps" && {
+            duration_seconds: parseDuration(set.time),
+            distance_m: tracking === "distance_time" ? toMetres(parseNumber(set.distance) ?? 0, unit) || null : null,
+          }),
         });
       } catch (e) {
         fail(e);
@@ -589,18 +632,49 @@ export function useWorkout() {
       }
 
       const prev = block.previous[idx];
+      const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
+      const startRest = () => {
+        if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
+          restTimer.start(block.restSeconds, block.exercise.name);
+        } else if (set.type === "warmup") {
+          restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
+        }
+      };
+
+      // Timed and cardio sets: empty fields fall back to last time, then the target.
+      const tracking = block.exercise.tracking;
+      if (tracking !== "weight_reps") {
+        const time =
+          set.time ||
+          (prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "") : "");
+        const distance = tracking === "distance_time" ? set.distance || (prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "") : "";
+        const seconds = parseDuration(time);
+        const metres = toMetres(parseNumber(distance) ?? 0, unit);
+        if (!seconds && !metres) return false;
+        const weight = tracking === "time" ? set.weight || (prev?.weight ? toDisplay(prev.weight, unit) : "") : "";
+        patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
+        startRest();
+        try {
+          await updateSet(id, {
+            weight: toKg(parseNumber(weight) ?? 0, unit),
+            reps: 0,
+            duration_seconds: seconds,
+            distance_m: metres || null,
+            is_completed: true,
+          });
+        } catch (e) {
+          fail(e);
+        }
+        return true;
+      }
+
       const weight = set.weight || (prev ? toDisplay(prev.weight, unit) : "");
       const reps = set.reps || (prev ? String(prev.reps) : block.repTarget?.split("-")[0] ?? "");
       const repsNum = parseNumber(reps);
       if (repsNum == null || repsNum === 0) return false;
 
       patchSet(order, id, { weight, reps, done: true });
-      const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
-      if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
-        restTimer.start(block.restSeconds, block.exercise.name);
-      } else if (set.type === "warmup") {
-        restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
-      }
+      startRest();
       const kg = toKg(parseNumber(weight) ?? 0, unit);
       if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
       try {

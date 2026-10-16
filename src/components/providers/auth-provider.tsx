@@ -3,6 +3,9 @@
 import { createContext, use, useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
+import { cachedRead } from "@/lib/offline/cache";
+import { kvClear, kvSet } from "@/lib/offline/kv";
+import { discardPending, flush, getSyncStatus } from "@/lib/offline/queue";
 import type { Tables, UnitSystem } from "@/types/database";
 
 type Profile = Tables<"users">;
@@ -14,7 +17,7 @@ interface AuthState {
   unit: UnitSystem;
   setUnit: (unit: UnitSystem) => Promise<void>;
   /** Save profile settings (bar, plates, rest time...) and update them here. */
-  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m">>) => Promise<void>;
+  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -37,12 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!userId) return;
-    getSupabase()
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle()
-      .then(({ data }) => setProfile(data));
+    // Kept on the phone too, so the app opens (and logs workouts) without signal.
+    cachedRead(`profile:${userId}`, async () => {
+      const { data, error } = await getSupabase().from("users").select("*").eq("id", userId).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data;
+    })
+      .then(setProfile)
+      .catch(() => {});
   }, [userId]);
 
   const setUnit = useCallback(
@@ -60,12 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select().single();
       if (error) throw new Error(error.message);
       setProfile(data);
+      void kvSet(`cache:profile:${userId}`, data);
     },
     [userId],
   );
 
   const signOut = useCallback(async () => {
+    // Send any workout changes still waiting for signal before they're forgotten.
+    if (!(await flush())) {
+      const n = getSyncStatus().pending;
+      if (n > 0 && !confirm(`${n} workout ${n === 1 ? "change hasn't" : "changes haven't"} synced yet. Sign out anyway and lose ${n === 1 ? "it" : "them"}?`)) return;
+    }
     await getSupabase().auth.signOut();
+    await discardPending();
+    await kvClear();
   }, []);
 
   return (
