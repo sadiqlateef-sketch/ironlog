@@ -262,6 +262,25 @@ function ActiveWorkout({
 
       <RestAlertHint />
 
+      {(() => {
+        const suggested = blocks.filter((b) => adjustmentFor(b));
+        if (!suggested.length) return null;
+        return (
+          <div className="border-ai/40 bg-secondary flex flex-col gap-2 rounded-lg border p-3 text-sm" data-testid="workout-adjustments">
+            <p className="flex items-center gap-2 font-semibold">
+              <Sparkles className="text-ai size-4" /> Claude suggests changes for today
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {suggested.map((b) => (
+                <Button key={b.order} size="sm" variant="outline" onClick={() => setProgressionFor(b.order)}>
+                  {b.exercise.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {shown.map((block) => (
         <div key={block.order} id={`exercise-${block.order}`} className="scroll-mt-4">
           <ExerciseBlock
