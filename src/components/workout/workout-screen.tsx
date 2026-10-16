@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
+import { DeloadOffer } from "@/components/deload-offer";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { PlateCalculator } from "@/components/plate-calculator";
@@ -27,6 +28,7 @@ import { useWorkout, type Block } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
   requestAdjustments,
+  type AdjustmentCheck,
   type AdjustmentWithContext,
   type Exercise,
   type Routine,
@@ -632,11 +634,15 @@ function RestAlertHint() {
 /** After a routine workout: compare against the plan and suggest next time's numbers. */
 function NextTime({ sessionId }: { sessionId: string }) {
   const [items, setItems] = useState<AdjustmentWithContext[] | null>(null);
+  const [check, setCheck] = useState<AdjustmentCheck>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     requestAdjustments(sessionId)
-      .then(() => listPendingAdjustments(sessionId))
+      .then((c) => {
+        setCheck(c);
+        return listPendingAdjustments(sessionId);
+      })
       .then(setItems)
       .catch((e: Error) => setError(e.message));
   }, [sessionId]);
@@ -645,9 +651,19 @@ function NextTime({ sessionId }: { sessionId: string }) {
 
   if (error) return <p className="text-muted-foreground text-sm">Couldn&apos;t check next session: {error}</p>;
   if (items === null) return <p className="text-muted-foreground animate-pulse text-sm">Checking your next session…</p>;
-  if (items.length === 0) return <p className="text-muted-foreground text-sm">Right on plan. Same targets next time.</p>;
+  const offer = check.early_deload && <DeloadOffer programId={check.early_deload.program_id} reason={check.early_deload.reason} />;
+  if (items.length === 0)
+    return (
+      <section className="flex flex-col gap-2">
+        {offer}
+        <p className="text-muted-foreground text-sm">
+          {check.deload_week ? "Deload done. Back to your planned weights after this week." : "Right on plan. Same targets next time."}
+        </p>
+      </section>
+    );
   return (
     <section className="flex flex-col gap-2">
+      {offer}
       <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Next time</h3>
       <AdjustmentList items={items} onChange={refresh} />
     </section>

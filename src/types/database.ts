@@ -165,6 +165,8 @@ export type Database = {
           program_id: string | null;
           program_week: number | null;
           program_day: number | null;
+          /** Missing until the deload-weeks migration has run. */
+          is_deload?: boolean;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -178,6 +180,7 @@ export type Database = {
           program_id?: string | null;
           program_week?: number | null;
           program_day?: number | null;
+          is_deload?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["routines"]["Insert"]>;
         Relationships: [];
@@ -196,6 +199,11 @@ export type Database = {
           ai_metadata: Json | null;
           is_active: boolean;
           started_at: string | null;
+          // Missing until the deload-weeks migration has run.
+          deload_every?: number | null;
+          deload_suggestion?: string | null;
+          deload_suggested_at?: string | null;
+          deload_checked_from?: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -210,6 +218,10 @@ export type Database = {
           ai_metadata?: Json | null;
           is_active?: boolean;
           started_at?: string | null;
+          deload_every?: number | null;
+          deload_suggestion?: string | null;
+          deload_suggested_at?: string | null;
+          deload_checked_from?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["programs"]["Insert"]>;
         Relationships: [];
@@ -474,7 +486,18 @@ export type Database = {
           next_routine_name: string | null;
           next_week: number | null;
           next_day: number | null;
+          // Missing until the deload-weeks migration has run.
+          next_is_deload?: boolean;
+          deload_suggestion?: string | null;
         }[];
+      };
+      apply_early_deload: {
+        Args: { p_program_id: string };
+        Returns: number;
+      };
+      dismiss_early_deload: {
+        Args: { p_program_id: string };
+        Returns: undefined;
       };
       get_logged_exercises: {
         Args: Record<string, never>;

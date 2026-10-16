@@ -32,6 +32,8 @@ export interface RuleResult {
   reason: string;
   /** Facts handed to Claude so it can explain the call. */
   facts: string;
+  /** Fell short of the target reps or sets (counts toward an early deload). */
+  missed: boolean;
 }
 
 /**
@@ -53,6 +55,7 @@ export function ruleFor(t: Target, sets: LoggedSet[], unit: UnitSystem): RuleRes
     suggested_reps: null,
     suggested_reps_max: null,
     facts,
+    missed: false,
   };
 
   const worstMiss = Math.max(0, ...working.map((s) => t.target_reps - s.reps));
@@ -73,6 +76,7 @@ export function ruleFor(t: Target, sets: LoggedSet[], unit: UnitSystem): RuleRes
     const next = weight ? roundLoadKg(weight * 0.9, unit) : null;
     return {
       ...base,
+      missed: true,
       action: "deload",
       suggested_weight_kg: next,
       reason: next ? `Missed the target by ${worstMiss || "several"} reps. Drop about 10% to ${formatKg(next, unit)} and rebuild.` : "Missed the target by a lot. Use a lighter weight next time.",
@@ -81,10 +85,82 @@ export function ruleFor(t: Target, sets: LoggedSet[], unit: UnitSystem): RuleRes
 
   return {
     ...base,
+    missed: true,
     action: "hold",
     suggested_weight_kg: weight,
     reason: `Missed by ${worstMiss} rep${worstMiss === 1 ? "" : "s"} on ${missedSets} set${missedSets === 1 ? "" : "s"}. Keep the weight and try again.`,
   };
+}
+
+// ---------- One whole workout ----------
+
+export const LOWER_BODY = new Set(["quads", "hamstrings", "glutes", "adductors", "abductors", "calves", "lower_back"]);
+
+export interface PlannedExercise {
+  id: string;
+  exercise_id: string;
+  target_sets: number;
+  target_reps: number;
+  target_reps_max: number | null;
+  target_weight_kg: number | string | null;
+  exercises: { name: string; primary_muscle: string } | null;
+}
+
+export interface DoneSet {
+  exercise_id: string;
+  exercise_order: number;
+  weight: number | string;
+  reps: number;
+}
+
+/** Judge every exercise you did against the routine. Skipped exercises aren't judged. */
+export function judgeSession(targets: PlannedExercise[], sets: DoneSet[], unit: UnitSystem): RuleResult[] {
+  const out: RuleResult[] = [];
+  // Workouts started from a routine number exercises 1..n in routine order.
+  targets.forEach((t, i) => {
+    const logged: LoggedSet[] = sets
+      .filter((s) => s.exercise_order === i + 1 && s.exercise_id === t.exercise_id)
+      .map((s) => ({ weight: Number(s.weight), reps: s.reps }));
+    if (logged.length === 0) return;
+    out.push(
+      ruleFor(
+        {
+          routine_exercise_id: t.id,
+          exercise_name: t.exercises?.name ?? "Exercise",
+          is_lower_body: LOWER_BODY.has(t.exercises?.primary_muscle ?? ""),
+          target_sets: t.target_sets,
+          target_reps: t.target_reps,
+          target_reps_max: t.target_reps_max,
+          target_weight_kg: t.target_weight_kg == null ? null : Number(t.target_weight_kg),
+        },
+        logged,
+        unit,
+      ),
+    );
+  });
+  return out;
+}
+
+// ---------- Early deload ----------
+
+/** A rough workout: you fell short on at least half of the exercises you did. */
+export function isRough(results: Pick<RuleResult, "missed">[]): boolean {
+  return results.length > 0 && results.filter((r) => r.missed).length * 2 >= results.length;
+}
+
+/**
+ * Time for a deload now? Yes when this workout was rough and so was at least
+ * one of the two before it (in the same program, since the last deload). One
+ * bad day is noise; two out of three is fatigue piling up.
+ */
+export function needsEarlyDeload(thisWorkout: Pick<RuleResult, "missed">[], earlier: Pick<RuleResult, "missed">[][]): boolean {
+  return isRough(thisWorkout) && earlier.slice(0, 2).some(isRough);
+}
+
+export function earlyDeloadReason(thisWorkout: Pick<RuleResult, "missed">[], earlier: Pick<RuleResult, "missed">[][]): string {
+  const recent = [thisWorkout, ...earlier.slice(0, 2)];
+  const rough = recent.filter(isRough).length;
+  return `You fell short of your targets in ${rough} of your last ${recent.length} workouts. That's usually fatigue, not lost strength. A lighter week now (half the sets, about 10% less weight) lets you recover and come back stronger.`;
 }
 
 // ---------- Claude's refinement ----------
@@ -118,7 +194,7 @@ export function clampSuggestion(
   ai: AdjustmentOutput["suggestions"][number],
   rule: RuleResult,
   unit: UnitSystem,
-): Omit<RuleResult, "facts"> {
+): Omit<RuleResult, "facts" | "missed"> {
   const cur = rule.current_weight_kg;
   let weight = ai.suggested_weight_kg;
   if (weight != null && cur) {

@@ -64,7 +64,7 @@ function Dashboard() {
           </Link>
         </Button>
       ) : program ? (
-        <UpNext progress={program} />
+        <UpNext progress={program} onChange={() => setReload((r) => r + 1)} />
       ) : (
         <Card className="border-primary gap-3 p-4" data-testid="no-program">
           <div>
