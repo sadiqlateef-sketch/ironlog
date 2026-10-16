@@ -29,5 +29,6 @@ export function planDefaults(profile: Tables<"users"> | null): PlanInput {
     experience: "intermediate",
     equipment: profile?.training_equipment?.length ? profile.training_equipment : DEFAULT_EQUIPMENT,
     notes: "",
+    deload: "auto",
   };
 }

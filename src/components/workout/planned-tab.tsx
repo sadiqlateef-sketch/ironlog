@@ -24,6 +24,7 @@ import { UnmarkDay } from "@/components/unmark-day";
 import { WorkoutEditor } from "@/components/workout-editor";
 import { ActionSheet, type SheetAction } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
+import { DeloadOffer } from "@/components/deload-offer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SortableList } from "@/components/ui/sortable-list";
 import { useSlot } from "@/hooks/use-slot";
@@ -128,7 +129,12 @@ export function PlannedTab({
     <div className="flex flex-col gap-4">
       {error && <p className="text-destructive text-sm">{error}</p>}
       {program ? (
-        <ProgramBanner program={program} progress={progress} week={week} onChange={load} onStartEmpty={() => onStart()} />
+        <>
+          <ProgramBanner program={program} progress={progress} week={week} onChange={load} onStartEmpty={() => onStart()} />
+          {program.deload_suggestion && progress?.next_routine_id && (
+            <DeloadOffer programId={program.id} reason={program.deload_suggestion} onChange={load} />
+          )}
+        </>
       ) : (
         <section className="glass flex flex-col gap-3 rounded-3xl p-5">
           <p className="text-lg font-bold">No program running</p>
@@ -146,6 +152,7 @@ export function PlannedTab({
         <section className="flex flex-col gap-2">
           <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
             Overview · Week {week}
+            {days.some((d) => d.is_deload) && <span className="text-set-warmup"> · Deload</span>}
           </h2>
           <SortableList
             items={days}

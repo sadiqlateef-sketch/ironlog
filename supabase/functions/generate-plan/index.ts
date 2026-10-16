@@ -6,6 +6,8 @@ import { askStructured, checkDailyLimit, MODEL } from "../_shared/claude.ts";
 import { handle, HttpError, json, userClient } from "../_shared/http.ts";
 import {
   buildPlanPrompt,
+  deloadInterval,
+  deloadWeeks,
   PLAN_SYSTEM_PROMPT,
   PlanRequest,
   programSchema,
@@ -56,6 +58,7 @@ Deno.serve(
     );
 
     // ---- Ask Claude ----
+    const deloads = deloadWeeks(input);
     const slugs = library.map((e) => e.slug) as [string, ...string[]];
     const program = await askStructured({
       userId,
@@ -66,6 +69,7 @@ Deno.serve(
         physicalStats: (profile?.physical_stats as Record<string, unknown>) ?? {},
         lifts,
         library: library.map(({ slug, name, primary_muscle, equipment }) => ({ slug, name, primary_muscle, equipment })),
+        deloads,
       }),
       schema: programSchema(slugs),
       effort: "high",
@@ -81,6 +85,7 @@ Deno.serve(
       },
       input.weeks,
       input.days_per_week,
+      deloads,
     );
     if (workouts.length === 0) throw new HttpError(502, "Claude's plan had no usable exercises. Please try again.");
 
@@ -95,6 +100,7 @@ Deno.serve(
         weeks: input.weeks,
         days_per_week: Math.max(...workouts.map((w) => w.day)),
         ai_generated: true,
+        deload_every: deloads.length ? deloadInterval(input) : null,
         ai_metadata: { request: input, model: MODEL, generated_at: new Date().toISOString() },
       })
       .select("id, name")
@@ -115,6 +121,7 @@ Deno.serve(
           program_id: saved.id,
           program_week: w.week,
           program_day: w.day,
+          is_deload: w.is_deload,
         })),
       )
       .select("id, program_week, program_day");
