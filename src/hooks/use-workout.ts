@@ -30,6 +30,7 @@ import {
 } from "@/lib/offline/workout-store";
 import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
+import { syncHealthConnect } from "@/lib/health";
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
@@ -313,6 +314,8 @@ export function useWorkout() {
       } else if (countsForCalendar(session.at_gym, session.start_time, endedAt)) {
         syncGymCalendar();
       }
+      // Send it to Health Connect (when that's on). Offline, it goes once it's uploaded.
+      if (synced) syncHealthConnect(unit);
       const summary = {
         atGym: session.at_gym === true ? (gym?.name ?? "the gym") : null,
         sessionId: session.id,
@@ -332,7 +335,7 @@ export function useWorkout() {
       fail(e);
       return null;
     }
-  }, [session, profile, restTimer, fail, setBlocks]);
+  }, [session, profile, unit, restTimer, fail, setBlocks]);
 
   const discard = useCallback(async () => {
     if (!session) return;
