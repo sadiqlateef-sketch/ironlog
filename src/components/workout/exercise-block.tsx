@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 import {
+  ArrowDown,
   ArrowLeftRight,
+  ArrowUp,
+  ArrowUpDown,
+  ArrowUpToLine,
   Calculator,
   ChartColumn,
   Check,
   Clock,
   Dumbbell,
   Link2,
+  ListPlus,
   MoreHorizontal,
   Pencil,
   PlayCircle,
@@ -41,6 +46,11 @@ export function ExerciseBlock({
   onPlates,
   onToggleSuperset,
   onRemove,
+  onDoNext,
+  onMoveUp,
+  onMoveDown,
+  onReorder,
+  onAddAfter,
   onAddSet,
   onRemoveSet,
   onChangeSet,
@@ -61,6 +71,15 @@ export function ExerciseBlock({
   onPlates: (weight: number | null) => void;
   onToggleSuperset: () => void;
   onRemove: () => void;
+  /** Move this exercise up to be done next. Leave out when it already is. */
+  onDoNext?: () => void;
+  /** Leave out at the top / bottom. */
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  /** Open the whole-workout reorder list. */
+  onReorder: () => void;
+  /** Pick an exercise to go straight after this one. */
+  onAddAfter: () => void;
   onAddSet: () => void;
   onRemoveSet: (id: string) => void;
   onChangeSet: (id: string, patch: Partial<UiSet>) => void;
@@ -109,6 +128,11 @@ export function ExerciseBlock({
   };
 
   const actions: SheetAction[] = [
+    ...(onDoNext ? [{ label: "Do next", icon: ArrowUpToLine, onSelect: onDoNext }] : []),
+    ...(onMoveUp ? [{ label: "Move up", icon: ArrowUp, onSelect: onMoveUp }] : []),
+    ...(onMoveDown ? [{ label: "Move down", icon: ArrowDown, onSelect: onMoveDown }] : []),
+    { label: "Reorder exercises", icon: ArrowUpDown, onSelect: onReorder },
+    { label: "Add exercise after this", icon: ListPlus, onSelect: onAddAfter },
     ...(block.supersetGroup != null
       ? [{ label: "Remove from superset", icon: Unlink, onSelect: onToggleSuperset }]
       : !isLast
@@ -157,10 +181,24 @@ export function ExerciseBlock({
           {block.targetNote && <p className="text-foreground/80 text-xs">{block.targetNote}</p>}
           {todayPace && <p className="text-primary-text text-sm font-semibold">Pace {todayPace}</p>}
         </button>
-        {e1rm > 0 && !timed && (
-          <div className="shrink-0 px-1 text-right" aria-label={`Estimated one rep max ${e1rm} ${u}`}>
-            <p className="text-muted-foreground text-[11px] font-bold tracking-wider">EST. 1RM</p>
-            <p className="text-primary-text font-mono text-xl font-extrabold">{e1rm}</p>
+        {(onDoNext || (e1rm > 0 && !timed)) && (
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {onDoNext && (
+              <button
+                type="button"
+                onClick={onDoNext}
+                className="bg-primary/20 text-primary-text flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold"
+                data-testid="do-next"
+              >
+                <ArrowUpToLine className="size-4" aria-hidden /> Do next
+              </button>
+            )}
+            {e1rm > 0 && !timed && (
+              <div className="px-1 text-right" aria-label={`Estimated one rep max ${e1rm} ${u}`}>
+                <p className="text-muted-foreground text-[11px] font-bold tracking-wider">EST. 1RM</p>
+                <p className="text-primary-text font-mono text-xl font-extrabold">{e1rm}</p>
+              </div>
+            )}
           </div>
         )}
       </header>

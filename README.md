@@ -369,6 +369,14 @@ only the Edge Function can read (RLS on, no policies).
   timer only starts after the last exercise of the round.
 - 🧮 (barbell lifts) opens the **plate calculator** with the set's weight filled in.
 - ⋮ shows delete buttons for sets and the exercise.
+- **Changing the order mid-workout:** after you add an exercise, tap **Do next**
+  on the pop-up to move it straight after the one you're on (or ahead of it, if
+  you haven't started it yet). Exercises you haven't started also show a
+  **Do next** button. ⋯ has **Move up**, **Move down**, **Add exercise after
+  this** and **Reorder exercises** (a drag list, also behind the ↑↓ button next
+  to One / All). In the All view, **Add here** between exercises drops a new
+  one in that spot. Supersets move together, and a planned workout's targets
+  and "next time" suggestions follow an exercise wherever you move it.
 - **Finish** drops unchecked sets and saves the workout. Unit (lb / kg) is on
   the home screen.
 
