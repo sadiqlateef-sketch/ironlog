@@ -383,6 +383,12 @@ export function useWorkout() {
         sets: done.length,
         exercises: blocksRef.current.filter((b) => b.sets.some((s) => s.done)).length,
         records: recordsRef.current.size,
+        /** For the finish summary screen. */
+        recordIds: [...recordsRef.current],
+        name: session.name,
+        startTime: session.start_time,
+        endTime: new Date(endedAt).toISOString(),
+        blocks: blocksRef.current,
         /** False when it's saved on the phone and still waiting for signal. */
         synced,
         /** A home workout's "Add to calendar?" answer (null for other workouts). */

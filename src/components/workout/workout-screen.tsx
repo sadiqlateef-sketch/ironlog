@@ -36,7 +36,8 @@ import { FindTab } from "@/components/workout/find-tab";
 import { HomeTab } from "@/components/workout/home-tab";
 import { InstantTab } from "@/components/workout/instant-tab";
 import { PlannedTab } from "@/components/workout/planned-tab";
-import { RecordBadge, RecordCelebration } from "@/components/workout/record";
+import { RecordCelebration } from "@/components/workout/record";
+import { FinishSummary } from "@/components/workout/finish-summary";
 import { useWorkout, type Block, type UiSet } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
@@ -106,40 +107,35 @@ export function WorkoutScreen() {
         <StartWorkout onStart={w.start} onStartWith={w.startWith} error={w.error} />
         <Dialog open={!!summary} onOpenChange={(o) => !o && closeSummary()}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Workout saved 💪</DialogTitle>
-              <DialogDescription>Nice work.</DialogDescription>
+            <DialogHeader className="sr-only">
+              <DialogTitle>Workout saved</DialogTitle>
+              <DialogDescription>Your workout summary.</DialogDescription>
             </DialogHeader>
-            {summary && summary.records > 0 && <RecordBadge count={summary.records} className="self-start" />}
             {summary && (
-              <dl className="grid grid-cols-3 gap-3 text-center">
-                <Stat label="Minutes" value={summary.durationMin} />
-                <Stat label="Exercises" value={summary.exercises} />
-                <Stat label="Sets" value={summary.sets} />
-              </dl>
+              <FinishSummary workout={summary} onDone={closeSummary}>
+                {summary.atGym && (
+                  <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                    <MapPin className="size-4 shrink-0" aria-hidden />
+                    {summary.durationMin > 30 ? `At ${summary.atGym}, so it's going on your Google Calendar if it's connected.` : `At ${summary.atGym}. Workouts over 30 minutes go on your calendar.`}
+                  </p>
+                )}
+                {!summary.synced && (
+                  <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                    <CloudOff className="size-4 shrink-0" aria-hidden />
+                    Saved on your phone. It will sync{summary.routineId ? ", and next time's targets will be checked," : ""} when you have signal.
+                  </p>
+                )}
+                {summary.routineId && summary.synced && <NextTime sessionId={summary.sessionId} />}
+                {summary.addToCalendar != null && (
+                  <Switch
+                    on={summary.addToCalendar}
+                    onClick={() => setSummary({ ...summary, addToCalendar: !summary.addToCalendar })}
+                    label="Add to calendar?"
+                    detail="Puts this workout on your Google Calendar, if it's connected. Remembered for next time."
+                  />
+                )}
+              </FinishSummary>
             )}
-            {summary?.atGym && (
-              <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                <MapPin className="size-4 shrink-0" aria-hidden />
-                {summary.durationMin > 30 ? `At ${summary.atGym}, so it's going on your Google Calendar if it's connected.` : `At ${summary.atGym}. Workouts over 30 minutes go on your calendar.`}
-              </p>
-            )}
-            {summary && !summary.synced && (
-              <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                <CloudOff className="size-4 shrink-0" aria-hidden />
-                Saved on your phone. It will sync{summary.routineId ? ", and next time's targets will be checked," : ""} when you have signal.
-              </p>
-            )}
-            {summary?.routineId && summary.synced && <NextTime sessionId={summary.sessionId} />}
-            {summary && summary.addToCalendar != null && (
-              <Switch
-                on={summary.addToCalendar}
-                onClick={() => setSummary({ ...summary, addToCalendar: !summary.addToCalendar })}
-                label="Add to calendar?"
-                detail="Puts this workout on your Google Calendar, if it's connected. Remembered for next time."
-              />
-            )}
-            <Button onClick={closeSummary}>Done</Button>
           </DialogContent>
         </Dialog>
       </>
@@ -875,15 +871,6 @@ function Elapsed({ since }: { since: string }) {
   }, []);
   return (
     <p className="text-muted-foreground num text-sm">{formatClock((now - new Date(since).getTime()) / 1000)}</p>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-secondary rounded-lg p-3">
-      <dd className="num text-2xl font-bold">{value}</dd>
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-    </div>
   );
 }
 

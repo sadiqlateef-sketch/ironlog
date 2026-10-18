@@ -27,6 +27,15 @@ export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
 export type AdjustmentStatus = "pending" | "applied" | "dismissed";
 
 /** Shape of users.physical_stats (all optional). */
+/** A weekly recap, from the weekly-recap Edge Function. */
+export type WeeklyRecap = {
+  headline: string;
+  wins: string[];
+  watch_outs: string[];
+  next_week: string[];
+  numbers: { workouts: number; sets: number; volume_kg: number; minutes: number; records: number; prev_workouts: number; prev_volume_kg: number };
+};
+
 export type PhysicalStats = {
   height_cm?: number;
   bodyweight_kg?: number;
@@ -131,6 +140,8 @@ export type Database = {
           user_id: string;
           exercise_id: string;
           goal_weight_kg: number | null;
+          goal_date: string | null;
+          goal_start_kg: number | null;
           favorite: boolean;
           notes: string | null;
           rest_seconds: number | null;
@@ -140,6 +151,8 @@ export type Database = {
           user_id?: string;
           exercise_id: string;
           goal_weight_kg?: number | null;
+          goal_date?: string | null;
+          goal_start_kg?: number | null;
           favorite?: boolean;
           notes?: string | null;
           rest_seconds?: number | null;
@@ -422,11 +435,23 @@ export type Database = {
         Row: {
           id: number;
           user_id: string;
-          kind: "generate_plan" | "adjust_session" | "import_workout";
+          kind: "generate_plan" | "adjust_session" | "import_workout" | "weekly_recap";
           model: string | null;
           input_tokens: number | null;
           output_tokens: number | null;
           ok: boolean;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      weekly_recaps: {
+        Row: {
+          user_id: string;
+          week_start: string;
+          recap: WeeklyRecap;
+          source: "ai" | "rules";
           created_at: string;
         };
         Insert: never;

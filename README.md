@@ -201,7 +201,7 @@ Hosted:
 
 ```bash
 npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-npx supabase functions deploy generate-plan suggest-adjustments import-workout
+npx supabase functions deploy generate-plan suggest-adjustments import-workout weekly-recap
 ```
 
 The app uses `claude-opus-5-5` with adaptive thinking, and the system
@@ -397,6 +397,43 @@ migration `20261018233000_kits_shifts_home.sql` and the updated
   rounded to loadable weights.
 - One range filter (4 weeks / 12 weeks / 1 year) scopes the charts. Every chart
   has a "Show as table" view, and values appear on hover, tap or keyboard focus.
+
+### Insights (Overview and Lifts tabs)
+
+- **Weekly recap** (top of Overview). From 6 PM on Sunday you get a short
+  recap of the week: a headline, wins, things to watch and what to focus on
+  next week. The `weekly-recap` Edge Function writes it once per week (Claude
+  when the key is set, otherwise simple rules) and stores it in
+  `weekly_recaps`, so reopening the app never costs another Claude call. It has
+  its own limit of 3 a day in `ai_usage`. If notifications are allowed, the
+  phone reminds you on Sundays at 6 PM.
+- **Daily strain** (0-100). Heart-rate load from the watch (minutes in each
+  zone, weighted 1-5) plus lifting load (working sets weighted by RPE; sets
+  without RPE count as about RPE 7.5). Without heart rate it estimates from
+  workout time and says so. Shows today's readout, a 14-day chart and how this
+  week compares with last.
+- **Streaks and consistency.** Week streak, longest streak, weeks in a row on
+  your weekly target (from onboarding), active days, a 26-week calendar shaded
+  by volume, and workouts per month against your target.
+- **Lifts tab: goals.** Set a target estimated 1RM and an optional date from
+  any exercise. You get a progress bar, a countdown, the pace you need per week
+  and your actual pace over the last 8 weeks.
+- **Lifts tab: relative strength.** Your best squat, bench, deadlift, overhead
+  press and row divided by your latest logged bodyweight (Body tab or Health
+  Connect), with a level from Beginner to Elite. Levels need your sex set in
+  Settings and are rounded from common strength standards.
+- **Lifts tab: plateau watch.** Lifts with 3+ workouts in a row without a new
+  best, with one suggestion each (lighter week, reset, more frequency, new rep
+  range, or smaller jumps).
+- **Exercise sheet: Overview tab.** Goal, strength level, plateau check and
+  personal records (best est. 1RM, heaviest set, most reps, best workout volume,
+  and the heaviest weight for 1, 3, 5, 8, 10 and 12 reps).
+- **Finish screen.** After Finish: time, volume, sets, exercises, new records,
+  the workout's strain, your week streak, best set per exercise and a Share
+  button for the image card.
+
+The maths is in `src/lib/insights.ts` (tested in `tests/insights.test.ts`), the
+recap logic in `supabase/functions/_shared/recap.ts`.
 
 ## Using the logger
 

@@ -7,7 +7,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
-import { LocalNotifications } from "@capacitor/local-notifications";
+import { LocalNotifications, Weekday } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { KeepAwake } from "@capacitor-community/keep-awake";
@@ -21,6 +21,7 @@ const REMINDER_CHANNEL = "reminders";
 const RECOVERY_PREF = "ironlog:recovery-reminder";
 const HOME_NOTIFICATION_ID = 1003;
 const HOME_PREF = "ironlog:home-reminder";
+const RECAP_NOTIFICATION_ID = 1004;
 
 /** Light tap when a set is ticked off. */
 export function tap(): void {
@@ -193,6 +194,32 @@ export async function setHomeReminder(time: string | null): Promise<string | nul
 export async function cancelRecoveryReminder(): Promise<void> {
   if (!isNative()) return;
   await LocalNotifications.cancel({ notifications: [{ id: RECOVERY_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+/**
+ * "Your weekly recap is ready" every Sunday at 6 PM. Only when notifications
+ * are already allowed (the app never asks just for this). Safe to call often:
+ * it replaces the same notification.
+ */
+export async function scheduleRecapReminder(): Promise<void> {
+  if (!isNative()) return;
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: RECAP_NOTIFICATION_ID,
+          title: "Your weekly recap is ready",
+          body: "See your wins and what to focus on next week.",
+          channelId: REMINDER_CHANNEL,
+          schedule: { on: { weekday: Weekday.Sunday, hour: 18, minute: 0 }, allowWhileIdle: true },
+          autoCancel: true,
+        },
+      ],
+    });
+  } catch {
+    // The recap is still on the Progress tab.
+  }
 }
 
 /** Our own Android plugin (android/.../RestCountdownPlugin.java). */
