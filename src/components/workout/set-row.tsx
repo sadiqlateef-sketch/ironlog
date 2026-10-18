@@ -27,6 +27,9 @@ export function SetRow({
   tracking = "weight_reps",
   timePlaceholder = "0:00",
   distancePlaceholder = "0",
+  sides = false,
+  leftPlaceholder = "0",
+  effort = null,
   current,
   editing,
   onChange,
@@ -44,6 +47,11 @@ export function SetRow({
   tracking?: Tracking;
   timePlaceholder?: string;
   distancePlaceholder?: string;
+  /** One side at a time: left and right reps instead of "last time" and reps. */
+  sides?: boolean;
+  leftPlaceholder?: string;
+  /** How hard it was ("2" reps left or RPE "8"), shown on the tick. */
+  effort?: string | null;
   /** The next set to do: highlighted so it is easy to find mid-workout. */
   current: boolean;
   editing: boolean;
@@ -66,7 +74,8 @@ export function SetRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[2.5rem_1fr_4.5rem_4rem_3rem] items-center gap-2 rounded-lg px-1 py-1 transition-colors",
+        "grid items-center gap-2 rounded-lg px-1 py-1 transition-colors",
+        sides ? "grid-cols-[2.5rem_4.5rem_1fr_1fr_3rem]" : "grid-cols-[2.5rem_1fr_4.5rem_4rem_3rem]",
         set.done && "bg-success/10",
         current && "bg-primary/15 ring-primary/60 ring-1",
         shake && "animate-pulse ring-destructive ring-2",
@@ -82,9 +91,11 @@ export function SetRow({
         {setLabel(set.type, workingNumber)}
       </button>
 
-      <span className="text-muted-foreground truncate text-center font-mono text-sm" title="Last time">
-        {previousText}
-      </span>
+      {!sides && (
+        <span className="text-muted-foreground truncate text-center font-mono text-sm" title={set.type === "warmup" ? "Plates per side" : "Last time"}>
+          {previousText}
+        </span>
+      )}
 
       {tracking === "distance_time" ? (
         <input
@@ -109,9 +120,21 @@ export function SetRow({
           onFocus={(e) => e.target.select()}
         />
       )}
+      {sides && (
+        <input
+          aria-label="Left reps"
+          inputMode="numeric"
+          className={inputClass}
+          placeholder={leftPlaceholder}
+          value={set.repsLeft}
+          onChange={(e) => onChange({ repsLeft: e.target.value.replace(/\D/g, "") })}
+          onBlur={onCommit}
+          onFocus={(e) => e.target.select()}
+        />
+      )}
       {tracking === "weight_reps" ? (
         <input
-          aria-label="Reps"
+          aria-label={sides ? "Right reps" : "Reps"}
           inputMode="numeric"
           className={inputClass}
           placeholder={repPlaceholder}
@@ -163,14 +186,22 @@ export function SetRow({
         <button
           type="button"
           onClick={done}
-          aria-label={set.done ? "Mark set not done" : "Complete set"}
+          aria-label={set.done ? `Mark set not done${effort ? ` (effort ${effort})` : ""}` : "Complete set"}
           aria-pressed={set.done}
           className={cn(
-            "grid size-12 place-items-center rounded-xl transition-colors",
+            "relative grid size-12 place-items-center rounded-xl transition-colors",
             set.done ? "bg-success text-[#08200d]" : "bg-secondary text-muted-foreground",
           )}
         >
           <Check className="size-6" strokeWidth={3} />
+          {set.done && effort && (
+            <span
+              className="bg-background text-foreground absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-[11px] leading-5 font-bold tabular-nums"
+              data-testid="effort-badge"
+            >
+              {effort}
+            </span>
+          )}
         </button>
       )}
     </div>

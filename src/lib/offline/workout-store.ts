@@ -201,15 +201,24 @@ function toRow(s: SetInsert, uid: string): WorkoutSet {
     client_id: null,
     duration_seconds: s.duration_seconds ?? null,
     distance_m: s.distance_m ?? null,
+    reps_left: s.reps_left ?? null,
+    reps_right: s.reps_right ?? null,
     created_at: t,
     updated_at: t,
   };
 }
 
-/** The columns sent to the server (the rest are filled in there). */
+/**
+ * The columns sent to the server (the rest are filled in there). Each side's
+ * reps go only when used, so logging still works before the database update.
+ */
 function insertable(r: WorkoutSet): Record<string, unknown> {
-  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m } = r;
-  return { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m };
+  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m, reps_left, reps_right } = r;
+  return {
+    id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m,
+    ...(reps_left != null && { reps_left }),
+    ...(reps_right != null && { reps_right }),
+  };
 }
 
 export async function insertSets(inserts: SetInsert[]): Promise<WorkoutSet[]> {
@@ -242,6 +251,20 @@ export async function reorderExercises(moves: { ids: string[]; order: number }[]
   await commit(
     ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: m.ids, patch: { exercise_order: -m.order } })),
     ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: m.ids, patch: { exercise_order: m.order } })),
+  );
+}
+
+/**
+ * Give sets new numbers within their exercise. Numbers are unique per exercise
+ * slot, so move each one well out of the way first, then to its real number.
+ */
+export async function renumberSets(moves: { id: string; setNumber: number }[]): Promise<void> {
+  if (!moves.length) return;
+  const num = new Map(moves.map((m) => [m.id, m.setNumber]));
+  await changeMirror((m) => ({ ...m, sets: m.sets.map((s) => (num.has(s.id) ? { ...s, set_number: num.get(s.id)! } : s)) }));
+  await commit(
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: [m.id], patch: { set_number: m.setNumber + 500 } })),
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: [m.id], patch: { set_number: m.setNumber } })),
   );
 }
 
