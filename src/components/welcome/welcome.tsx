@@ -160,7 +160,7 @@ export function Welcome() {
                 aria-pressed={days === d}
                 onClick={() => setDays(d)}
                 className={cn(
-                  "h-14 rounded-2xl font-mono text-xl font-bold",
+                  "h-14 rounded-2xl num text-xl font-bold",
                   days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
                 )}
               >

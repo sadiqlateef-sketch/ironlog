@@ -141,7 +141,7 @@ export function SettingsScreen() {
                 type="button"
                 aria-pressed={days === d}
                 onClick={() => save({ training_days_per_week: d })}
-                className={cn("h-10 rounded-lg font-mono font-bold", days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}
+                className={cn("h-10 rounded-lg num font-bold", days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}
               >
                 {d}
               </button>

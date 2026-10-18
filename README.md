@@ -391,6 +391,19 @@ only the Edge Function can read (RLS on, no policies).
   and "next time" suggestions follow an exercise wherever you move it.
 - **Finish** drops unchecked sets and saves the workout. Unit (lb / kg) is on
   the home screen.
+- **Swipe a set** right to finish it (or undo it), left to delete it (with an
+  Undo button for 5 seconds). **Hold a set** to duplicate it, mark it as a
+  warm-up, or add a drop set straight after it (about 20% lighter).
+- Tapping a weight or reps box opens Ironlog's **number pad**: big keys, − / +
+  buttons (weight steps switch between 5 and 2.5 lb, or 2.5 and 1.25 kg), and a
+  **Reps** / **Log set** key to move on. Weights show to the nearest 0.5 lb.
+- In the All view, finished exercises **collapse to one line**; tap to open.
+- The sliders button at the top opens **Logger display**: **Focus mode** (just the
+  set you're on and a big rest timer), **One-handed mode** (weight and reps with
+  − / + next to Log Set), the number pad, sounds and vibration. Saved per phone.
+- While resting, the countdown also shows on the **lock screen and notification
+  shade** (Android app, when notifications are allowed), and ticks in the last
+  3 seconds.
 
 ## What's in here
 
