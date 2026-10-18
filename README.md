@@ -379,7 +379,7 @@ remembered). An evening reminder can be turned on in the Home tab or
 Settings > Reminders (Android app).
 
 After this update: run **Deploy database and functions** once (adds the
-migration `20261018000000_kits_shifts_home.sql` and the updated
+migration `20261018200000_kits_shifts_home.sql` and the updated
 `gym-calendar` and `generate-plan` functions), then rebuild the APK.
 
 ## Progress screen (Phase 3)
