@@ -159,3 +159,65 @@ export function toHrRows(sessionId: string, readings: { at: number; bpm: number 
   }
   return rows;
 }
+
+/** One exercise of a saved routine, kept on the watch so it can start with no signal. */
+export interface PlanItem {
+  exerciseId: string;
+  name: string;
+  mechanic: "compound" | "isolation" | null;
+  supersetGroup: number | null;
+  sets: number;
+  warmups: number;
+  weightKg: number | null;
+  rest: number | null;
+  reps: number | null;
+}
+
+export interface PlanRoutine {
+  id: string;
+  name: string;
+  items: PlanItem[];
+}
+
+export interface NewSet {
+  id: string;
+  client_id: string;
+  session_id: string;
+  exercise_id: string;
+  exercise_order: number;
+  set_number: number;
+  set_type: SetType;
+  superset_group: number | null;
+  weight: number;
+  reps: number;
+}
+
+/**
+ * Lay out a routine as a fresh workout, same as the phone: warm-ups first
+ * (no weight), then the working sets at the plan's weight.
+ */
+export function planWorkout(routine: PlanRoutine, sessionId: string, newId: () => string) {
+  const rows: NewSet[] = [];
+  const info: Record<string, ExerciseInfo> = {};
+  const targets: Record<number, { rest: number | null; reps: number | null }> = {};
+  routine.items.forEach((item, i) => {
+    const order = i + 1;
+    info[item.exerciseId] = { name: item.name, mechanic: item.mechanic };
+    targets[order] = { rest: item.rest, reps: item.reps };
+    let n = 1;
+    const base = { session_id: sessionId, exercise_id: item.exerciseId, exercise_order: order, superset_group: item.supersetGroup, reps: 0 };
+    for (let w = 0; w < item.warmups; w++) {
+      const id = newId();
+      rows.push({ ...base, id, client_id: id, set_number: n++, set_type: "warmup", weight: 0 });
+    }
+    for (let s = 0; s < item.sets; s++) {
+      const id = newId();
+      rows.push({ ...base, id, client_id: id, set_number: n++, set_type: "normal", weight: item.weightKg ?? 0 });
+    }
+  });
+  const groups = groupSets(
+    rows.map((r) => ({ ...r, is_completed: false })),
+    info,
+  );
+  return { rows, groups, targets };
+}

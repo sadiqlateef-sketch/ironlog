@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Pressable, Vibration, View } from "react-native";
-import { loadActive, queue, type ActiveWorkout, type Profile } from "../api";
+import { currentWorkout, finishWorkout, queue, saveActive, type ActiveWorkout, type Profile } from "../api";
 import { keepScreenOn, requestHeartRate, watchHeartRate } from "../heartRate";
 import {
   currentPosition,
@@ -13,8 +13,12 @@ import {
   stepKg,
   toHrRows,
   weightStepKg,
+  LB_PER_KG,
+  type ExerciseGroup,
   type WatchSet,
 } from "../logic";
+import { canListen, listen } from "../voice";
+import { parseSpokenSet } from "../voiceSet";
 import { uuid } from "../queue";
 import { Btn, C, Screen, Stepper, T, ZONE } from "../ui";
 
@@ -30,17 +34,25 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
   const [bpm, setBpm] = useState<number | null>(null);
   const hrBuffer = useRef<{ bpm: number; at: number }[]>([]);
   const hrAll = useRef<number[]>([]);
+  const [voiceOk, setVoiceOk] = useState(false);
+  const [voice, setVoice] = useState<{ text: string; undo?: () => void } | null>(null);
+  const voiceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    canListen().then(setVoiceOk);
+    return () => clearTimeout(voiceTimer.current);
+  }, []);
   const unit = profile.unit;
 
   // ---- Load (and reload when the watch wakes, unless local changes are still syncing) ----
   const load = useCallback(async () => {
     if ((await queue.flush()) > 0 && w) return;
-    try {
-      const fresh = await loadActive();
-      setW(fresh);
-    } catch {
-      setW((cur) => cur ?? null);
-    }
+    const { workout } = await currentWorkout();
+    setW((cur) => workout ?? (cur && workout === null ? null : cur ?? null));
+  }, [w]);
+
+  // Keep a copy on the watch so the workout survives the app closing with no signal.
+  useEffect(() => {
+    if (w) saveActive(w);
   }, [w]);
 
   useEffect(() => {
@@ -143,55 +155,110 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
 
   function complete() {
     if (!set || !group || draft.reps <= 0) return;
+    logSet(group, set, draft.weight, draft.reps);
+  }
+
+  function logSet(g: ExerciseGroup, target: WatchSet, weight: number, reps: number) {
     const at = new Date().toISOString();
-    updateSet(set.id, { weight: draft.weight, reps: draft.reps, is_completed: true });
-    queue.push({ kind: "complete", setId: set.id, weight: draft.weight, reps: draft.reps, at });
+    updateSet(target.id, { weight, reps, is_completed: true });
+    queue.push({ kind: "complete", setId: target.id, weight, reps, at });
     Vibration.vibrate(40);
     setFocus(null);
 
     const rest = restSeconds({
-      type: set.set_type,
-      mechanic: group.mechanic,
-      routineRest: workout.targets[group.order]?.rest ?? null,
+      type: target.set_type,
+      mechanic: g.mechanic,
+      routineRest: workout.targets[g.order]?.rest ?? null,
       profileDefault: profile.defaultRest,
-      supersetGroup: group.supersetGroup,
-      order: group.order,
-      groups: groups.map((g) => ({ order: g.order, supersetGroup: g.supersetGroup })),
+      supersetGroup: g.supersetGroup,
+      order: g.order,
+      groups: groups.map((x) => ({ order: x.order, supersetGroup: x.supersetGroup })),
     });
     // What comes next, for the rest screen.
-    const after = groups.map((g) => ({ ...g, sets: g.sets.map((s) => (s.id === set.id ? { ...s, is_completed: true } : s)) }));
+    const after = groups.map((x) => ({ ...x, sets: x.sets.map((s) => (s.id === target.id ? { ...s, is_completed: true } : s)) }));
     const nextPos = currentPosition(after);
     const next = nextPos ? `${after[nextPos.group].name} · set ${nextPos.set + 1}` : "Last set done";
     if (rest > 0) setView({ kind: "rest", endsAt: Date.now() + rest * 1000, duration: rest, next });
   }
 
-  function addSet() {
-    if (!group) return;
-    const last = group.sets[group.sets.length - 1];
+  // ---- Say a set: "bench 185 for 8" ----
+  async function speak() {
+    const text = await listen('Say "185 for 8"');
+    if (!text) return;
+    const parsed = parseSpokenSet(text, groups.map((g, i) => ({ key: i, name: g.name })));
+    if (!parsed || parsed.reps == null || parsed.reps <= 0) return showVoice({ text: `Heard "${text}". Try "185 for 8".` });
+    if (parsed.unknownExercise) return showVoice({ text: `"${text}" isn't in this workout.` });
+    const gi = parsed.exercise ?? pos?.group ?? 0;
+    const g = groups[gi];
+    if (!g) return;
+    let target = g.sets.find((s) => !s.is_completed);
+    let added = false;
+    if (!target) {
+      target = newSetFor(g);
+      added = true;
+    }
+    const mine = unit === "imperial" ? "lb" : "kg";
+    const said = parsed.unit ?? mine;
+    const weight =
+      parsed.weight == null
+        ? gi === pos?.group
+          ? draft.weight
+          : added
+            ? target.weight
+            : prefill(g, g.sets.indexOf(target)).weight
+        : said === "kg"
+          ? parsed.weight
+          : parsed.weight / LB_PER_KG;
+    const done = { ...target, is_completed: false };
+    logSet(added ? { ...g, sets: [...g.sets, done] } : g, done, weight, parsed.reps);
+    const id = target.id;
+    showVoice({
+      text: `${g.name} ${weight > 0 ? `${displayWeight(weight, unit)} × ` : ""}${parsed.reps}`,
+      undo: () => {
+        updateSet(id, { is_completed: false });
+        queue.push({ kind: "uncomplete", setId: id });
+        setView({ kind: "log" });
+      },
+    });
+  }
+
+  function showVoice(v: { text: string; undo?: () => void }) {
+    clearTimeout(voiceTimer.current);
+    setVoice(v);
+    voiceTimer.current = setTimeout(() => setVoice(null), 8000);
+  }
+
+  /** Add a set to this exercise (copying the last one's numbers) and return it. */
+  function newSetFor(g: ExerciseGroup): WatchSet {
+    const last = g.sets[g.sets.length - 1];
     const id = uuid();
     const row = {
       id,
       client_id: id,
       session_id: workout.id,
-      exercise_id: group.exerciseId,
-      exercise_order: group.order,
+      exercise_id: g.exerciseId,
+      exercise_order: g.order,
       set_number: (last?.set_number ?? 0) + 1,
       set_type: "normal" as const,
-      superset_group: group.supersetGroup,
+      superset_group: g.supersetGroup,
       weight: last?.weight ?? 0,
       reps: last?.reps ?? 0,
     };
     setW((cur) =>
-      cur
-        ? { ...cur, groups: cur.groups.map((g) => (g.order === group.order ? { ...g, sets: [...g.sets, { ...row, is_completed: false }] } : g)) }
-        : cur,
+      cur ? { ...cur, groups: cur.groups.map((x) => (x.order === g.order ? { ...x, sets: [...x.sets, { ...row, is_completed: false }] } : x)) } : cur,
     );
     queue.push({ kind: "addSet", row });
+    return { ...row, is_completed: false };
+  }
+
+  function addSet() {
+    if (!group) return;
+    newSetFor(group);
     setFocus({ group: pos!.group, set: group.sets.length });
   }
 
   function finish() {
-    queue.push({ kind: "finish", sessionId: workout.id, at: new Date().toISOString() });
+    finishWorkout(workout);
     keepScreenOn(false);
     setView({ kind: "done" });
   }
@@ -209,6 +276,25 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
         ♥ {bpm}
       </T>
     ) : null;
+
+  const voiceBar = voice ? (
+    <View style={{ gap: 4 }}>
+      <T center small numberOfLines={2} style={{ color: voice.undo ? C.text : C.amber }}>
+        {voice.undo ? `✓ ${voice.text}` : voice.text}
+      </T>
+      {voice.undo && (
+        <Btn
+          kind="secondary"
+          label="Undo"
+          accessibilityLabel="Undo the set you just said"
+          onPress={() => {
+            voice.undo?.();
+            setVoice(null);
+          }}
+        />
+      )}
+    </View>
+  ) : null;
 
   // ---- Summary ----
   if (view.kind === "done") {
@@ -253,6 +339,7 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
         <T center muted small>
           {view.next}
         </T>
+        {voiceBar}
         <View style={{ flexDirection: "row", gap: 4 }}>
           <View style={{ flex: 1 }}>
             <Btn kind="secondary" label="−15" accessibilityLabel="15 seconds less" onPress={() => setView({ ...view, endsAt: Math.max(Date.now(), view.endsAt - 15000) })} />
@@ -330,6 +417,8 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
         </T>
       )}
 
+      {voiceBar}
+      {voiceOk && group && <Btn kind="secondary" label="🎤 Say a set" accessibilityLabel="Say your set, like 185 for 8" onPress={speak} />}
       {group && <Btn kind="secondary" label="+ Add set" onPress={addSet} />}
       {doneSets.length > 0 && <Btn kind={currentPosition(groups) ? "secondary" : "primary"} label="Finish workout" onPress={finish} />}
       <Btn kind="ghost" label="Back" onPress={onExit} />
