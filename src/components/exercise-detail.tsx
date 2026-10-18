@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { Star, Target } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { ExerciseAnimation } from "@/components/exercise-animation";
+import { OverviewTab } from "@/components/exercise-overview";
 import { LineChart } from "@/components/charts/line-chart";
 import { MuscleFigure } from "@/components/muscle-map";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   getExerciseHistory,
   getExercisePrefs,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/workout-api";
 import { shortDate } from "@/lib/chart-scale";
 import { EQUIPMENT_LABELS, MUSCLE_LABELS } from "@/lib/labels";
-import { kgToLb, toKg } from "@/lib/units";
+import { kgToLb } from "@/lib/units";
 import {
   CHART_RANGES,
   chartPoints,
@@ -26,7 +26,6 @@ import {
   groupHistory,
   instructionSteps,
   muscleShare,
-  parseNumber,
   roundHalf,
   type HistoryDay,
 } from "@/lib/workout-logic";
@@ -34,11 +33,12 @@ import { cn } from "@/lib/utils";
 import { describeTimedSet } from "@/lib/cardio";
 import type { MuscleGroup } from "@/types/database";
 
-export type Tab = "history" | "chart" | "guide";
+export type Tab = "overview" | "history" | "chart" | "guide";
 
 /**
- * Everything about one exercise in a bottom sheet: your history, a progress
- * chart with your goal, and a how-to guide with the muscles it works.
+ * Everything about one exercise in a bottom sheet: your goal, records and
+ * strength level, your history, a progress chart with your goal, and a how-to
+ * guide with the muscles it works.
  */
 export function ExerciseDetail({
   exercise,
@@ -69,6 +69,7 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
   const [prefs, setPrefs] = useState<ExercisePrefs | null>(null);
   const [history, setHistory] = useState<HistoryDay[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingGoal, setEditingGoal] = useState(false);
   const u = unit === "imperial" ? "lb" : "kg";
   /** kg -> the user's unit, to the nearest 0.5 (42.5 lb stays 42.5) */
   const show = (kg: number) => roundHalf(unit === "imperial" ? kgToLb(kg) : kg);
@@ -117,7 +118,15 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
       </DialogHeader>
 
       <div className="flex gap-2">
-        <GoalButton goalKg={prefs?.goal_weight_kg ?? null} unit={unit} show={show} onSave={(kg) => save({ goal_weight_kg: kg })} />
+        <GoalButton
+          goalKg={prefs?.goal_weight_kg ?? null}
+          unit={unit}
+          show={show}
+          onClick={() => {
+            setTab("overview");
+            setEditingGoal(true);
+          }}
+        />
         <Button
           variant="secondary"
           className="flex-1"
@@ -129,8 +138,8 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
         </Button>
       </div>
 
-      <div role="tablist" aria-label="Exercise details" className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1">
-        {(["history", "chart", "guide"] as const).map((t) => (
+      <div role="tablist" aria-label="Exercise details" className="bg-secondary grid grid-cols-4 gap-1 rounded-xl p-1">
+        {(["overview", "history", "chart", "guide"] as const).map((t) => (
           <button
             key={t}
             role="tab"
@@ -149,6 +158,16 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
+      {tab === "overview" && (
+        <OverviewTab
+          exercise={exercise}
+          history={history}
+          prefs={prefs}
+          editingGoal={editingGoal}
+          setEditingGoal={setEditingGoal}
+          onSaveGoal={(patch) => save(patch)}
+        />
+      )}
       {tab === "history" && <HistoryTab history={history} show={show} u={u} />}
       {tab === "chart" && <ChartTab history={history} show={show} u={u} goalKg={prefs?.goal_weight_kg ?? null} />}
       {tab === "guide" && <GuideTab exercise={exercise} />}
@@ -160,63 +179,27 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
 
 function emptyPrefs(exerciseId: string): ExercisePrefs {
   const now = new Date().toISOString();
-  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, favorite: false, notes: null, created_at: now, updated_at: now };
+  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, goal_date: null, goal_start_kg: null, favorite: false, notes: null, created_at: now, updated_at: now };
 }
 
 function GoalButton({
   goalKg,
   unit,
   show,
-  onSave,
+  onClick,
 }: {
   goalKg: number | null;
   unit: "metric" | "imperial";
   show: (kg: number) => number;
-  onSave: (kg: number | null) => void;
+  onClick: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState("");
   const u = unit === "imperial" ? "lb" : "kg";
-
-  if (editing) {
-    const commit = () => {
-      const v = parseNumber(text);
-      onSave(v && v > 0 ? toKg(v, unit) : null);
-      setEditing(false);
-    };
-    return (
-      <form
-        className="flex flex-1 gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          commit();
-        }}
-      >
-        <Input
-          autoFocus
-          inputMode="decimal"
-          aria-label={`Goal weight in ${u}`}
-          placeholder={`Goal (${u})`}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={commit}
-        />
-      </form>
-    );
-  }
   return (
-    <Button
-      variant="secondary"
-      className="flex-1"
-      onClick={() => {
-        setText(goalKg ? String(show(goalKg)) : "");
-        setEditing(true);
-      }}
-    >
+    <Button variant="secondary" className="flex-1" onClick={onClick}>
       <Target className="text-success" />
       {goalKg ? (
         <>
-          Goal <span className="font-mono font-bold">{show(goalKg)}</span> {u}
+          Goal <span className="font-bold tabular-nums">{show(goalKg)}</span> {u}
         </>
       ) : (
         "Set a goal"

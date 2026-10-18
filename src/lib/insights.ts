@@ -502,3 +502,52 @@ export function workoutStrain(
   const muscular = muscularLoad(sets);
   return { cardio, muscular, score: strainScore(cardio.load, muscular.load), minutes };
 }
+
+// ---------------- Best sets (exercise detail) ----------------
+
+export interface BestSetDay {
+  sessionId: string;
+  date: string;
+  sets: { set_type: string; weight: number; reps: number; completed_at?: string | null }[];
+}
+
+export interface BestSets {
+  e1rm: { value: number; weight: number; reps: number; date: string } | null;
+  heaviest: { weight: number; reps: number; date: string } | null;
+  mostReps: { weight: number; reps: number; date: string } | null;
+  volume: { value: number; date: string } | null;
+  /** Heaviest weight you've lifted for at least this many reps. */
+  repMaxes: { reps: number; weight: number; date: string }[];
+}
+
+export const REP_MAX_COUNTS = [1, 3, 5, 8, 10, 12];
+
+/** Your all-time bests on one lift from its workout history (working sets only). */
+export function bestSets(days: BestSetDay[]): BestSets {
+  const out: BestSets = { e1rm: null, heaviest: null, mostReps: null, volume: null, repMaxes: [] };
+  const rm = new Map<number, { weight: number; date: string }>();
+  for (const d of days) {
+    let vol = 0;
+    for (const s of d.sets) {
+      if (s.set_type === "warmup" || s.reps <= 0) continue;
+      vol += s.weight * s.reps;
+      const e = bestE1rm([s]);
+      if (e > (out.e1rm?.value ?? 0)) out.e1rm = { value: e, weight: s.weight, reps: s.reps, date: d.date };
+      if (s.weight > (out.heaviest?.weight ?? 0) || (s.weight === out.heaviest?.weight && s.reps > out.heaviest.reps))
+        out.heaviest = { weight: s.weight, reps: s.reps, date: d.date };
+      if (s.reps > (out.mostReps?.reps ?? 0) || (s.reps === out.mostReps?.reps && s.weight > out.mostReps.weight))
+        out.mostReps = { weight: s.weight, reps: s.reps, date: d.date };
+      if (s.weight > 0) for (const r of REP_MAX_COUNTS) if (s.reps >= r && s.weight > (rm.get(r)?.weight ?? 0)) rm.set(r, { weight: s.weight, date: d.date });
+    }
+    if (vol > (out.volume?.value ?? 0)) out.volume = { value: vol, date: d.date };
+  }
+  out.repMaxes = REP_MAX_COUNTS.filter((r) => rm.has(r)).map((r) => ({ reps: r, ...rm.get(r)! }));
+  return out;
+}
+
+/** Exercise-detail history in the shape sessionBests and findPlateaus take. */
+export function daysToStatSets(days: BestSetDay[], exerciseId: string): StatSet[] {
+  return days.flatMap((d) =>
+    d.sets.map((s) => ({ session_id: d.sessionId, exercise_id: exerciseId, set_type: s.set_type, weight: s.weight, reps: s.reps, completed_at: s.completed_at ?? d.date })),
+  );
+}

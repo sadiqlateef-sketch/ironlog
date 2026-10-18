@@ -17,6 +17,8 @@ import {
   streakStats,
   strengthLevel,
   workoutStrain,
+  bestSets,
+  daysToStatSets,
 } from "../src/lib/insights.ts";
 
 const DAY = 86_400_000;
@@ -202,4 +204,20 @@ test("workoutStrain puts heart rate and sets together", () => {
   assert.equal(noHr.minutes, 60);
   const withHr = workoutStrain({ start_time: start, end_time: end, avg_hr: 140 }, [], sets, 190);
   assert.ok(withHr.score > noHr.score);
+});
+
+test("best sets: e1RM, heaviest, most reps, volume and rep maxes", () => {
+  const days = [
+    { sessionId: "a", date: "2026-10-01", sets: [{ set_type: "warmup", weight: 150, reps: 1 }, { set_type: "normal", weight: 100, reps: 5 }, { set_type: "normal", weight: 100, reps: 8 }] },
+    { sessionId: "b", date: "2026-10-08", sets: [{ set_type: "normal", weight: 120, reps: 1 }, { set_type: "normal", weight: 60, reps: 15 }] },
+  ];
+  const b = bestSets(days);
+  assert.equal(b.e1rm?.weight, 100);
+  assert.equal(b.e1rm?.reps, 8);
+  assert.equal(b.heaviest?.weight, 120, "warm-ups don't count");
+  assert.equal(b.mostReps?.reps, 15);
+  assert.equal(b.volume?.value, 1300);
+  assert.deepEqual(b.repMaxes.map((r) => [r.reps, r.weight]), [[1, 120], [3, 100], [5, 100], [8, 100], [10, 60], [12, 60]]);
+  assert.equal(daysToStatSets(days, "x").length, 5);
+  assert.equal(bestSets([]).e1rm, null);
 });

@@ -27,7 +27,7 @@ export async function listGoals(): Promise<Goal[]> {
 
 /** Your newest logged bodyweight (kg), else the one in your profile. */
 export async function latestBodyweightKg(fallback: number | null | undefined): Promise<{ kg: number; on: string | null } | null> {
-  const row = unwrap(
+  const row: { measured_on: string; weight_kg: number | null } | null = unwrap(
     await getSupabase()
       .from("body_measurements")
       .select("measured_on, weight_kg")
