@@ -7,6 +7,7 @@ import {
   Camera,
   ChartLine,
   Dumbbell,
+  FileUp,
   House,
   ListChecks,
   Menu,
@@ -29,9 +30,9 @@ export interface Tab {
 
 export const TABS: Tab[] = [
   { href: "/", label: "Home", icon: House },
-  { href: "/workout/", label: "Workout", icon: Dumbbell, also: ["/log/", "/import/"] },
+  { href: "/workout/", label: "Workout", icon: Dumbbell, also: ["/log/"] },
   { href: "/progress/", label: "Progress", icon: ChartLine },
-  { href: "/more/", label: "More", icon: Menu, also: ["/exercises/", "/plans/", "/settings/", "/link-watch/", "/search/"] },
+  { href: "/more/", label: "More", icon: Menu, also: ["/exercises/", "/plans/", "/settings/", "/link-watch/", "/search/", "/import/"] },
 ];
 
 const strip = (p: string) => (p.length > 1 ? p.replace(/\/$/, "") : p);
@@ -68,6 +69,7 @@ export const MORE_SECTIONS: { title: string; items: MoreItem[] }[] = [
     title: "Log and import",
     items: [
       { label: "Log with AI", detail: "Say or type a workout you already did", icon: MessageSquareText, href: "/log/?tab=voice" },
+      { label: "Import & backup", detail: "Bring in JEFIT or spreadsheet history, or back up everything", icon: FileUp, href: "/import/", keywords: "jefit csv spreadsheet export backup restore file" },
       { label: "Import from a photo", detail: "A screenshot, notebook page or whiteboard", icon: Camera, href: "/log/?tab=photo", keywords: "import screenshot picture" },
     ],
   },
