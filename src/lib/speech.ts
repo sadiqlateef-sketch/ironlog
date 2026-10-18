@@ -61,9 +61,12 @@ export async function canDictate(): Promise<boolean> {
 
 const lang = () => (typeof navigator !== "undefined" && navigator.language) || "en-US";
 
-/** Start listening. Returns null if it couldn't start (onError has said why). */
-export async function startDictation(h: DictationHandlers): Promise<Dictation | null> {
-  return isNative() ? startNative(h) : startWeb(h);
+/**
+ * Start listening. Returns null if it couldn't start (onError has said why).
+ * `once`: stop by itself when you pause (a quick command) instead of waiting for stop().
+ */
+export async function startDictation(h: DictationHandlers, opts: { once?: boolean } = {}): Promise<Dictation | null> {
+  return isNative() ? startNative(h) : startWeb(h, !opts.once);
 }
 
 async function startNative(h: DictationHandlers): Promise<Dictation | null> {
@@ -126,7 +129,7 @@ async function startNative(h: DictationHandlers): Promise<Dictation | null> {
   };
 }
 
-function startWeb(h: DictationHandlers): Dictation | null {
+function startWeb(h: DictationHandlers, continuous: boolean): Dictation | null {
   const Ctor = webCtor();
   if (!Ctor) {
     h.onError("This browser can't listen. Type instead, or use your keyboard's mic.");
@@ -135,7 +138,7 @@ function startWeb(h: DictationHandlers): Dictation | null {
   }
   const r = new Ctor();
   r.lang = lang();
-  r.continuous = true;
+  r.continuous = continuous;
   r.interimResults = true;
   r.onresult = (e) => {
     let text = "";

@@ -18,6 +18,7 @@ import { ReorderSheet } from "@/components/workout/reorder-sheet";
 import { ProgressionSheet } from "@/components/workout/progression-sheet";
 import { RestSheet } from "@/components/workout/rest-sheet";
 import { SwapSheet } from "@/components/workout/swap-sheet";
+import { VoiceLogButton } from "@/components/workout/voice-log";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FindTab } from "@/components/workout/find-tab";
@@ -482,6 +483,7 @@ function ActiveWorkout({
                   </span>
                 )}
               </button>
+              <VoiceLogButton w={w} current={focusOrder} onLogged={(order) => setFocus(focusAfterLog(order, w.blocksNow()))} />
               <Button size="lg" className="h-14 flex-1 text-lg" onClick={logSet} data-testid="log-set">
                 {logLabel === "Next exercise" && <ChevronRight />}
                 {logLabel}
