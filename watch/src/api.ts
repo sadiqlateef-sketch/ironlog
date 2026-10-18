@@ -18,8 +18,8 @@ export interface ActiveWorkout {
   groups: ExerciseGroup[];
   /** From the routine, by exercise order: rest seconds and rep target. */
   targets: Record<number, { rest: number | null; reps: number | null }>;
-  /** Your own rest time per exercise id, set on the phone. */
-  myRest: Record<string, number>;
+  /** Your own rest time per exercise id, set on the phone. Missing on a workout started offline. */
+  myRest?: Record<string, number>;
 }
 
 export interface RoutineSummary {
@@ -71,7 +71,7 @@ export async function loadActive(): Promise<ActiveWorkout | null> {
   }
 
   // Rest times you picked on the phone. Older databases don't have the column: skip it.
-  const myRest: ActiveWorkout["myRest"] = {};
+  const myRest: Record<string, number> = {};
   const ids = Object.keys(info);
   if (ids.length) {
     const { data: prefs } = await supabase.from("exercise_prefs").select("exercise_id, rest_seconds").in("exercise_id", ids);
