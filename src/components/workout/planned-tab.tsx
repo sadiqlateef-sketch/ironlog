@@ -445,7 +445,7 @@ function DayDetails({
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{x.exercises?.name ?? "Exercise"}</p>
-                        <p className="text-muted-foreground font-mono text-sm">{setsLabel(x)}</p>
+                        <p className="text-muted-foreground num text-sm">{setsLabel(x)}</p>
                       </div>
                       <Button variant="ghost" size="icon" aria-label={`Muscles worked by ${x.exercises?.name}`} onClick={() => show(x.exercise_id, "guide")}>
                         <PersonStanding />

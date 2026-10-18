@@ -196,7 +196,7 @@ function Details({ id, inDay = false, onChanged, onDeleted }: { id: string; inDa
             return (
               <section key={g[0].exercise_order} className="glass rounded-2xl p-3">
                 <h4 className="mb-1 font-bold">{names.get(g[0].exercise_id)?.name ?? "Exercise"}</h4>
-                <ol className="flex flex-col gap-0.5 font-mono">
+                <ol className="flex flex-col gap-0.5 num">
                   {g.map((s, i) => (
                     <li key={s.id} className="flex gap-3">
                       <span className={cn("w-5 text-center text-sm font-bold", setTone[s.set_type])}>
@@ -262,7 +262,7 @@ function SummaryRow({ session, sets }: { session: WorkoutSession; sets: WorkoutS
       ].map(([label, sec]) => (
         <div key={label}>
           <dt className="text-muted-foreground text-xs">{label}</dt>
-          <dd className="font-mono text-lg font-extrabold">{formatDuration(Number(sec))}</dd>
+          <dd className="num text-lg font-bold">{formatDuration(Number(sec))}</dd>
         </div>
       ))}
     </dl>
