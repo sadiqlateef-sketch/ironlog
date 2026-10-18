@@ -76,7 +76,7 @@ function EquipmentForm({ onDone }: { onDone: () => void }) {
                   setPlates(next);
                 }}
                 className={cn(
-                  "h-12 rounded-xl border font-mono text-base font-bold",
+                  "h-12 rounded-xl border num text-base font-bold",
                   on ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-muted-foreground",
                 )}
               >

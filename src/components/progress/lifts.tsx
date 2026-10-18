@@ -186,7 +186,7 @@ function StrengthCard({ data, onOpen }: { data: StatsData; onOpen: (id: string, 
                 <button type="button" onClick={() => onOpen(r.id, "chart")} className="hover:bg-accent -mx-2 flex w-[calc(100%+1rem)] flex-col gap-1.5 rounded-xl px-2 py-1.5 text-left">
                   <span className="flex items-baseline gap-2">
                     <span className="flex-1 font-semibold">{LIFT_LABELS[r.lift]}</span>
-                    <span className="text-xl font-bold tabular-nums">{lv.ratio.toFixed(2)}×</span>
+                    <span className="text-xl font-bold num">{lv.ratio.toFixed(2)}×</span>
                   </span>
                   {lv.index != null ? (
                     <>

@@ -3,7 +3,7 @@
 // Phone-only extras (Android app via Capacitor). Every function is safe to
 // call on the web: it either does nothing or uses the browser fallback.
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
@@ -177,6 +177,27 @@ export async function scheduleRecapReminder(): Promise<void> {
   } catch {
     // The recap is still on the Progress tab.
   }
+}
+
+/** Our own Android plugin (android/.../RestCountdownPlugin.java). */
+const RestCountdown = registerPlugin<{
+  show(o: { endsAt: number; label: string }): Promise<void>;
+  hide(): Promise<void>;
+}>("RestCountdown");
+
+/**
+ * Rest time counting down on the lock screen and in the notification shade.
+ * Android runs the clock itself, so it keeps going while the app sleeps.
+ * Silent; the "Rest over" alert is still scheduleRestAlert's job.
+ */
+export function showRestCountdown(endsAt: number, label: string): void {
+  if (!isNative()) return;
+  RestCountdown.show({ endsAt, label }).catch(() => {});
+}
+
+export function hideRestCountdown(): void {
+  if (!isNative()) return;
+  RestCountdown.hide().catch(() => {});
 }
 
 export async function cancelRestAlert(): Promise<void> {

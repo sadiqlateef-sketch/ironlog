@@ -2,7 +2,8 @@
 @import "tw-animate-css";
 
 /* Dark-first, high-contrast theme. Gym lighting is harsh and screens get
-   sweaty, so numbers must pop. Add class="light" to <html> for light mode. */
+   sweaty, so numbers must pop. Light mode puts class="light" on <html>
+   (src/lib/appearance.ts). */
 @custom-variant light (&:is(.light *));
 
 :root {
@@ -56,41 +57,64 @@
   --glow-1: rgb(42 70 216 / 0.42);
   --glow-2: rgb(106 47 214 / 0.34);
   --glow-3: rgb(15 122 138 / 0.26);
+  --glass-highlight: rgb(255 255 255 / 0.07);
+  --glass-shadow: rgb(0 0 0 / 0.35);
 }
 
+/* Light mode (Settings > Appearance). Same layout and accents, on a pale
+   blue-grey backdrop with white frosted cards. Every text colour is checked
+   (WCAG AA, 4.5:1) against the page, the strongest glow and a card. */
 .light {
   color-scheme: light;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.13 0 0);
-  --card: oklch(0.97 0 0);
-  --card-foreground: oklch(0.13 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.13 0 0);
-  --primary: oklch(0.45 0.15 135);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.93 0 0);
-  --secondary-foreground: oklch(0.13 0 0);
-  --muted: oklch(0.93 0 0);
-  --muted-foreground: oklch(0.4 0 0);
-  --accent: oklch(0.9 0 0);
-  --accent-foreground: oklch(0.13 0 0);
-  --border: oklch(0 0 0 / 14%);
-  --input: oklch(0 0 0 / 18%);
-  --ring: oklch(0.45 0.15 135);
-  --card-solid: oklch(0.97 0 0);
-  --primary-text: oklch(0.45 0.15 135);
-  --success: oklch(0.5 0.15 145);
-  --ai: oklch(0.5 0.2 290);
-  --glow-1: transparent;
-  --glow-2: transparent;
-  --glow-3: transparent;
-  --chart-1: oklch(0.55 0.15 135);
-  --chart-grid: oklch(0 0 0 / 8%);
-  --chart-axis: oklch(0 0 0 / 20%);
-  --record: oklch(0.55 0.13 80);
-  --body-base: oklch(0.88 0 0);
-  --body-muscle: oklch(0.78 0 0);
-  --heat: oklch(0.6 0.2 30);
+  --background: #f3f5fb;
+  --foreground: #0e1124;
+  --card: rgb(255 255 255 / 0.72);
+  --card-solid: #ffffff;
+  --card-foreground: #0e1124;
+  --popover: rgb(255 255 255 / 0.92);
+  --popover-foreground: #0e1124;
+  --primary: #2f55d4;                     /* white text on it: 6.2:1 */
+  --primary-foreground: #ffffff;
+  --primary-text: #2446c0;
+  --secondary: rgb(14 17 36 / 0.06);
+  --secondary-foreground: #0e1124;
+  --muted: rgb(14 17 36 / 0.06);
+  --muted-foreground: #4b5371;
+  --accent: rgb(14 17 36 / 0.08);
+  --accent-foreground: #0e1124;
+  --destructive: #b42328;
+  --border: rgb(14 17 36 / 0.12);
+  --input: rgb(14 17 36 / 0.2);
+  --ring: #2f55d4;
+  --success: #186a30;
+  --ai: #6a43d1;
+  --set-warmup: #8a5800;
+  --set-drop: #0a6c78;
+  --set-failure: #b42318;
+  --record: #7a5200;
+  --chart-1: #2f55d4;
+  --chart-grid: rgb(14 17 36 / 0.08);
+  --chart-axis: rgb(14 17 36 / 0.2);
+  --body-base: #d9deec;
+  --body-muscle: #b4bdd8;
+  --heat: #e2502f;
+  --glow-1: rgb(61 99 238 / 0.09);
+  --glow-2: rgb(124 77 230 / 0.09);
+  --glow-3: rgb(15 140 160 / 0.08);
+  --glass-highlight: rgb(255 255 255 / 0.6);
+  --glass-shadow: rgb(14 17 36 / 0.08);
+}
+
+/* Solid colour chips that pick dark text for the dark theme's bright fills
+   (the ticked-set button, the record trophy): white reads better on the
+   light theme's deeper fills. */
+.light .text-\[\#08200d\],
+.light .text-\[\#2a2000\] {
+  color: #ffffff;
+}
+/* The new-record pop-up keeps its warm tint, just light. */
+.light .bg-\[\#1d1a14\]\/95 {
+  background-color: rgb(255 249 232 / 0.97);
 }
 
 @theme inline {
@@ -146,6 +170,15 @@
   }
 }
 
+/* Numbers (weights, reps, timers, stats): the app's sans in bold with
+   even-width digits, so columns line up and big numbers read cleanly.
+   Code and link fields keep Geist Mono. */
+@utility num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
 /* Frosted glass panel: cards, sheets, the tab bar and the rest timer. */
 @utility glass {
   background-color: var(--card);
@@ -153,8 +186,8 @@
   backdrop-filter: blur(22px) saturate(150%);
   border: 1px solid var(--border);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    0 10px 30px rgb(0 0 0 / 0.35);
+    inset 0 1px 0 var(--glass-highlight),
+    0 10px 30px var(--glass-shadow);
 }
 
 /* Denser glass for chrome that floats over scrolling content (tab bar, rest
@@ -165,8 +198,8 @@
   backdrop-filter: blur(26px) saturate(150%);
   border: 1px solid var(--border);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    0 10px 30px rgb(0 0 0 / 0.45);
+    inset 0 1px 0 var(--glass-highlight),
+    0 10px 30px var(--glass-shadow);
 }
 
 /* Confetti for the new-record pop-up in the logger */
@@ -176,3 +209,26 @@
 }
 .record-confetti { animation: record-confetti 1.4s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .record-confetti { display: none; } }
+
+/* Switching screens: a quick fade-and-rise so the change reads as movement,
+   not a blink. Ends on transform:none so fixed children aren't affected. */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.page-in { animation: page-in 200ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+
+/* Loading placeholders: grey blocks the shape of what's coming, with a soft sweep. */
+@keyframes skeleton-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--muted) 30%, var(--accent) 50%, var(--muted) 70%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in, .skeleton { animation: none; }
+}

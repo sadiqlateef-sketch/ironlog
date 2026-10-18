@@ -4,8 +4,11 @@
 // equipment, gym and calendar, the Claude connector, alerts, and sign out.
 
 import { useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Dumbbell, FileDown, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bell, ChevronRight, Dumbbell, FileDown, FileUp, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { AppearanceSettings } from "@/components/appearance-settings";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
+import { BackupButton } from "@/components/import/backup-button";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
 import { AboutYouForm } from "@/components/progress/body";
@@ -44,8 +47,15 @@ function Section({ id, title, description, children }: { id?: string; title: str
   );
 }
 
+const EFFORT = [
+  { v: "rir", l: "Reps left" },
+  { v: "rpe", l: "RPE" },
+  { v: "off", l: "Don't ask" },
+] as const;
+
 export function SettingsScreen() {
   const { profile, unit, setUnit, updateProfile, signOut } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [note, setNote] = useState<string | null>(null);
   const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | null>(null);
@@ -62,6 +72,7 @@ export function SettingsScreen() {
   const goal = profile?.training_goal ?? null;
   const equipment = profile?.training_equipment ?? [];
   const days = profile?.training_days_per_week ?? null;
+  const effort = profile?.effort_scale ?? "rir";
 
   return (
     <div className="flex flex-col gap-4">
@@ -101,6 +112,10 @@ export function SettingsScreen() {
         <p className="text-muted-foreground text-xs">{profile?.email}</p>
       </Section>
 
+      <Section id="appearance" title="Appearance" description="Saved on this phone. Dark is easiest to read under bright gym lights.">
+        <AppearanceSettings />
+      </Section>
+
       <Section id="about" title="About you" description="Used for BMI and the body fat estimate. Only you can see it.">
         {profile && <AboutYouForm key={profile.updated_at} onDone={() => setNote("Saved.")} />}
       </Section>
@@ -138,12 +153,31 @@ export function SettingsScreen() {
                 type="button"
                 aria-pressed={days === d}
                 onClick={() => save({ training_days_per_week: d })}
-                className={cn("h-10 rounded-lg font-mono font-bold", days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}
+                className={cn("h-10 rounded-lg num font-bold", days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}
               >
                 {d}
               </button>
             ))}
           </div>
+        </div>
+        <div className="flex flex-col gap-2 text-sm">
+          After each set, ask how hard it was
+          <div className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1" role="group" aria-label="Ask how hard each set was">
+            {EFFORT.map((x) => (
+              <button
+                key={x.v}
+                type="button"
+                aria-pressed={effort === x.v}
+                onClick={() => save({ effort_scale: x.v })}
+                className={cn("h-10 rounded-lg font-semibold", effort === x.v ? "bg-foreground text-background" : "text-muted-foreground")}
+              >
+                {x.l}
+              </button>
+            ))}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Reps left means &quot;how many more could you have done?&quot; It helps decide when to go heavier.
+          </p>
         </div>
       </Section>
 
@@ -160,6 +194,8 @@ export function SettingsScreen() {
       </Section>
 
       <Section title="Your data">
+        <Row icon={FileUp} label="Import from JEFIT or another app" detail="Bring your whole workout history in" onClick={() => router.push("/import/?tab=file")} />
+        <BackupButton />
         <Row
           icon={FileDown}
           label="Export workouts (CSV)"

@@ -66,7 +66,7 @@ export function GoalBar({ status, goal, u }: { status: GoalStatus; goal: number;
       >
         <span className={cn("block h-full rounded-full", tone)} style={{ width: `${Math.max(3, status.pct)}%` }} />
       </span>
-      <span className="flex items-baseline justify-between text-sm tabular-nums">
+      <span className="flex items-baseline justify-between text-sm num">
         <span>
           <span className="font-bold">{num(status.current)}</span>
           <span className="text-muted-foreground"> / {num(goal)} {u}</span>

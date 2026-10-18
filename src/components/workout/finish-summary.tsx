@@ -45,9 +45,9 @@ export function summarize(w: Pick<FinishedWorkout, "blocks" | "recordIds">) {
     sets += done.length;
     const working = done
       .filter((s) => s.type !== "warmup")
-      .map((s) => ({ weight: parseNumber(s.weight) ?? 0, reps: parseNumber(s.reps) ?? 0, rpe: (s as { rpe?: number | string | null }).rpe ?? null }));
+      .map((s) => ({ weight: parseNumber(s.weight) ?? 0, reps: parseNumber(s.reps) ?? 0 }));
     for (const s of working) volume += s.weight * s.reps;
-    effort.push(...done.map((s) => ({ set_type: s.type, reps: parseNumber(s.reps) ?? 0, rpe: rpeOf((s as { rpe?: number | string | null }).rpe) })));
+    effort.push(...done.map((s) => ({ set_type: s.type, reps: parseNumber(s.reps) ?? 0, rpe: s.rpe != null && s.rpe > 0 ? s.rpe : null })));
     const top = working.reduce<{ weight: number; reps: number } | null>((m, s) => (!m || bestE1rm([s]) > bestE1rm([m]) ? s : m), null);
     const prev = lines.find((l) => l.id === b.exercise.id);
     if (prev) {
@@ -59,11 +59,6 @@ export function summarize(w: Pick<FinishedWorkout, "blocks" | "recordIds">) {
   }
   return { volume, sets, exercises: lines.length, lines, effort };
 }
-
-const rpeOf = (v: number | string | null | undefined) => {
-  const n = typeof v === "string" ? parseNumber(v) : v;
-  return n != null && n > 0 ? n : null;
-};
 
 /**
  * The screen after Finish: time, volume, sets, new records, how hard it was
@@ -140,7 +135,7 @@ export function FinishSummary({ workout, onDone, children }: { workout: Finished
         <Activity className="text-set-failure size-6" aria-hidden />
         <div>
           <p className="text-sm">
-            Strain <span className="text-lg font-bold tabular-nums">{strain.score}</span> · <span className="font-semibold">{band.label}</span>
+            Strain <span className="text-lg font-bold num">{strain.score}</span> · <span className="font-semibold">{band.label}</span>
           </p>
           <p className="text-muted-foreground text-xs">
             {band.note}
@@ -166,7 +161,7 @@ export function FinishSummary({ workout, onDone, children }: { workout: Finished
               <li key={l.id} className="flex items-center gap-2 border-t py-2 text-sm first:border-t-0">
                 {l.record ? <Trophy className="text-record size-4 shrink-0" aria-label="New record" /> : <span className="size-4 shrink-0" />}
                 <span className="min-w-0 flex-1 truncate">{l.name}</span>
-                <span className="font-bold tabular-nums">{detail(l)}</span>
+                <span className="font-bold num">{detail(l)}</span>
               </li>
             ))}
           </ul>
@@ -194,7 +189,7 @@ function Big({ label, value }: { label: string; value: string }) {
   return (
     <div className="glass rounded-2xl px-3 py-2">
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="text-2xl font-bold tabular-nums">{value}</dd>
+      <dd className="text-2xl font-bold num">{value}</dd>
     </div>
   );
 }

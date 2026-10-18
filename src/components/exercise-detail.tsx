@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { describeTimedSet } from "@/lib/cardio";
 import type { MuscleGroup } from "@/types/database";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 export type Tab = "overview" | "history" | "chart" | "guide";
 
@@ -179,7 +180,7 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
 
 function emptyPrefs(exerciseId: string): ExercisePrefs {
   const now = new Date().toISOString();
-  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, goal_date: null, goal_start_kg: null, favorite: false, notes: null, created_at: now, updated_at: now };
+  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, goal_date: null, goal_start_kg: null, favorite: false, notes: null, rest_seconds: null, unilateral: null, created_at: now, updated_at: now };
 }
 
 function GoalButton({
@@ -199,7 +200,7 @@ function GoalButton({
       <Target className="text-success" />
       {goalKg ? (
         <>
-          Goal <span className="font-bold tabular-nums">{show(goalKg)}</span> {u}
+          Goal <span className="num font-bold">{show(goalKg)}</span> {u}
         </>
       ) : (
         "Set a goal"
@@ -210,7 +211,7 @@ function GoalButton({
 
 function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: (kg: number) => number; u: string }) {
   const { unit } = useAuth();
-  if (!history) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!history) return <SkeletonList rows={3} />;
   if (!history.length) return <p className="text-muted-foreground text-sm">You haven&apos;t logged this yet. Your sets will show up here.</p>;
   return (
     <ul className="flex flex-col gap-3">
@@ -225,10 +226,10 @@ function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: 
               <p className="text-muted-foreground shrink-0 text-xs">
                 {d.restSeconds != null && (
                   <>
-                    Rest <span className="font-mono">{formatClock(d.restSeconds)}</span> ·{" "}
+                    Rest <span className="num">{formatClock(d.restSeconds)}</span> ·{" "}
                   </>
                 )}
-                1RM <span className="text-foreground font-mono font-bold">{show(d.e1rm)}</span>
+                1RM <span className="text-foreground num font-bold">{show(d.e1rm)}</span>
               </p>
             </div>
             <ol className="flex flex-col gap-1">
@@ -236,11 +237,11 @@ function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: 
                 const label = s.set_type === "warmup" ? "W" : String(++working);
                 const best = i === d.best;
                 return (
-                  <li key={i} className="flex items-center gap-3 font-mono">
+                  <li key={i} className="flex items-center gap-3 num">
                     <span className={cn("w-5 text-center text-sm font-bold", s.set_type === "warmup" ? "text-set-warmup" : "text-muted-foreground")}>
                       {label}
                     </span>
-                    <span className={cn("text-lg font-extrabold", best && "text-primary-text")}>
+                    <span className={cn("text-lg font-bold", best && "text-primary-text")}>
                       {describeTimedSet({ ...s, duration_seconds: s.duration_seconds ?? null, distance_m: s.distance_m ?? null }, unit, (kg) => `${show(kg)} ${u}`) ?? `${show(s.weight)} ${u} × ${s.reps}`}
                     </span>
                     {best && <span className="text-primary-text font-sans text-xs font-semibold">Best set</span>}
@@ -268,7 +269,7 @@ function ChartTab({
 }) {
   const [range, setRange] = useState<(typeof CHART_RANGES)[number]["label"]>("3M");
   const [metric, setMetric] = useState<"e1rm" | "volume">("e1rm");
-  if (!history) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!history) return <SkeletonList rows={3} />;
 
   const days = CHART_RANGES.find((r) => r.label === range)!.days;
   const { points, min, max } = chartPoints(history, metric, days);
@@ -337,7 +338,7 @@ function ChartTab({
         ).map(([label, v]) => (
           <div key={label} className="glass rounded-2xl p-3">
             <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{label}</p>
-            <p className="font-mono text-2xl font-extrabold">
+            <p className="num text-2xl font-bold">
               {v == null ? "–" : show(v.value).toLocaleString()} <span className="text-muted-foreground text-sm font-normal">{u}</span>
             </p>
             {v && <p className="text-muted-foreground text-xs">{shortDate(v.date)}</p>}
@@ -372,7 +373,7 @@ function GuideTab({ exercise }: { exercise: Exercise }) {
             <li key={s.muscle} className="flex flex-col gap-1">
               <div className="flex justify-between text-sm">
                 <span className={cn(i === 0 && "font-semibold")}>{MUSCLE_LABELS[s.muscle]}</span>
-                <span className="text-primary-text font-mono font-bold">{s.pct}%</span>
+                <span className="text-primary-text num font-bold">{s.pct}%</span>
               </div>
               <div className="bg-secondary h-1.5 rounded-full">
                 <div className="bg-primary h-full rounded-full" style={{ width: `${s.pct}%`, opacity: i === 0 ? 1 : 0.6 }} />
@@ -387,7 +388,7 @@ function GuideTab({ exercise }: { exercise: Exercise }) {
           <ol className="flex flex-col gap-2">
             {steps.map((s, i) => (
               <li key={i} className="flex gap-3 text-sm leading-relaxed">
-                <span className="bg-secondary text-primary-text flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold">
+                <span className="bg-secondary text-primary-text flex size-6 shrink-0 items-center justify-center rounded-full num text-xs font-bold">
                   {i + 1}
                 </span>
                 <span>{s}</span>
@@ -404,7 +405,7 @@ function NotesField({ initial, onSave }: { initial: string; onSave: (notes: stri
   const [text, setText] = useState(initial);
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">My notes</span>
+      <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">My notes · shown every time you log it</span>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

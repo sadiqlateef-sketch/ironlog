@@ -8,6 +8,7 @@ import { ExerciseList } from "@/components/exercise-list";
 import { NewExerciseDialog } from "@/components/new-exercise-dialog";
 import { Button } from "@/components/ui/button";
 import { listExercises, listFavoriteExerciseIds, type Exercise } from "@/lib/workout-api";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 export default function ExercisesPage() {
   return (
@@ -42,7 +43,7 @@ function Library() {
       {exercises ? (
         <ExerciseList exercises={exercises} onSelect={setSelected} favorites={favorites} muscleGrid />
       ) : (
-        !error && <p className="text-muted-foreground text-sm">Loading…</p>
+        !error && <SkeletonList rows={6} />
       )}
       <ExerciseDetail
         exercise={selected}

@@ -126,7 +126,7 @@ export function OverviewTab({
         <section className="glass flex flex-col gap-1 rounded-2xl p-3" aria-label="Strength level">
           <div className="flex items-baseline gap-2">
             <h3 className="flex-1 text-sm font-semibold">{LIFT_LABELS[lift]} for your bodyweight</h3>
-            <span className="text-lg font-bold tabular-nums">{level.ratio.toFixed(2)}×</span>
+            <span className="text-lg font-bold num">{level.ratio.toFixed(2)}×</span>
           </div>
           <p className="text-muted-foreground text-xs">
             {level.level ? (
@@ -162,7 +162,7 @@ export function OverviewTab({
             {records.volume && <Record label="Best workout volume" value={`${Math.round(conv(records.volume.value)).toLocaleString("en-US")} ${u}`} detail={shortDate(records.volume.date)} />}
           </dl>
           {records.repMaxes.length > 0 && (
-            <table className="mt-3 w-full text-sm tabular-nums">
+            <table className="mt-3 w-full text-sm num">
               <caption className="text-muted-foreground mb-1 text-left text-xs">Heaviest weight for at least this many reps</caption>
               <tbody>
                 {records.repMaxes.map((r) => (
@@ -191,7 +191,7 @@ function Record({ label, value, detail }: { label: string; value: string; detail
   return (
     <div className="glass min-w-0 rounded-2xl p-3">
       <dt className="text-muted-foreground truncate text-xs">{label}</dt>
-      <dd className="text-xl font-bold tabular-nums">{value}</dd>
+      <dd className="text-xl font-bold num">{value}</dd>
       <dd className="text-muted-foreground truncate text-xs">{detail}</dd>
     </div>
   );

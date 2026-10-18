@@ -155,7 +155,7 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
   return (
     <div className="bg-secondary min-w-0 rounded-xl px-2 py-2">
       <dt className="text-muted-foreground truncate text-xs">{label}</dt>
-      <dd className="text-xl font-bold tabular-nums">{value}</dd>
+      <dd className="text-xl font-bold num">{value}</dd>
       {sub && <dd className="text-muted-foreground truncate text-xs">{sub}</dd>}
     </div>
   );
@@ -275,7 +275,7 @@ export function StrainCard({ reloadKey }: { reloadKey: number }) {
           <div className="bg-background/50 grid grid-cols-[auto_1fr] items-center gap-4 rounded-2xl border p-4" data-testid="strain-readout">
             <div className="text-center">
               <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{latestKey === today ? "Today" : shortDate(latestWorkouts[0].session.start_time)}</p>
-              <p className="text-5xl font-bold tabular-nums">{latest.score}</p>
+              <p className="text-5xl font-bold num">{latest.score}</p>
               <p className="text-sm font-semibold">{band!.label}</p>
             </div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
@@ -313,7 +313,7 @@ function Vital({ icon, label, value, unit }: { icon?: ReactNode; label: string; 
         {icon}
         {label}
       </dt>
-      <dd className="text-lg leading-tight font-bold tabular-nums">
+      <dd className="text-lg leading-tight font-bold num">
         {value}
         {unit && <span className="text-muted-foreground ml-1 text-xs font-normal">{unit}</span>}
       </dd>
@@ -334,7 +334,7 @@ function ZoneBar({ zones, maxHr }: { zones: number[]; maxHr: number }) {
           z > 0 ? <div key={i} style={{ flexGrow: z, background: "var(--set-failure)", opacity: ZONE_SHADE[i] }} /> : null,
         )}
       </div>
-      <ul className="text-muted-foreground mt-1.5 grid grid-cols-5 text-center text-[11px] tabular-nums">
+      <ul className="text-muted-foreground mt-1.5 grid grid-cols-5 text-center text-[11px] num">
         {zones.map((z, i) => (
           <li key={i}>
             <span className="text-foreground font-semibold">Z{i + 1}</span> {Math.round(z)}m
@@ -425,7 +425,7 @@ export function ConsistencyCard({ data }: { data: StatsData }) {
                   }}
                 />
               </span>
-              <span className="text-right tabular-nums">
+              <span className="text-right num">
                 <span className="font-bold">{m.workouts}</span>
                 {m.planned != null && <span className="text-muted-foreground"> / {m.planned}</span>}
               </span>

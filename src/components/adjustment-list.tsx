@@ -55,7 +55,7 @@ export function AdjustmentList({ items, onChange }: { items: AdjustmentWithConte
               </span>
             </div>
             {(changesWeight || a.suggested_reps != null) && (
-              <p className="font-mono text-sm">
+              <p className="num text-sm">
                 {changesWeight && (
                   <>
                     {formatWeight(a.current_weight_kg!, unit)} → <span className="font-bold">{formatWeight(a.suggested_weight_kg!, unit)}</span>

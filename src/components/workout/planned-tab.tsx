@@ -47,6 +47,7 @@ import {
 } from "@/lib/workout-api";
 import { cn } from "@/lib/utils";
 import type { MuscleGroup } from "@/types/database";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 type Day = RoutineWithExercises;
 
@@ -98,7 +99,7 @@ export function PlannedTab({
   }, []);
   useEffect(load, [load]);
 
-  if (program === undefined) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (program === undefined) return <SkeletonList rows={3} />;
 
   const week = progress?.next_week ?? program?.weeks ?? 1;
   const days = (program?.routines ?? []).filter((r) => r.program_week === week).sort((a, b) => a.program_day! - b.program_day!);
@@ -445,7 +446,7 @@ function DayDetails({
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{x.exercises?.name ?? "Exercise"}</p>
-                        <p className="text-muted-foreground font-mono text-sm">{setsLabel(x)}</p>
+                        <p className="text-muted-foreground num text-sm">{setsLabel(x)}</p>
                       </div>
                       <Button variant="ghost" size="icon" aria-label={`Muscles worked by ${x.exercises?.name}`} onClick={() => show(x.exercise_id, "guide")}>
                         <PersonStanding />

@@ -3,6 +3,7 @@
 import { createContext, use, useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
+import { listenForGoogleSignIn } from "@/lib/google-sign-in";
 import { cachedRead } from "@/lib/offline/cache";
 import { kvClear, kvSet } from "@/lib/offline/kv";
 import { discardPending, flush, getSyncStatus } from "@/lib/offline/queue";
@@ -17,12 +18,12 @@ interface AuthState {
   unit: UnitSystem;
   setUnit: (unit: UnitSystem) => Promise<void>;
   /** Save profile settings (bar, plates, rest time...) and update them here. */
-  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at">>) => Promise<void>;
+  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at" | "effort_scale">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 /** Profile columns added by recent migrations, skipped when the database is behind the app. */
-const NEWER_COLUMNS = ["training_goal", "training_equipment", "training_days_per_week", "onboarded_at"];
+const NEWER_COLUMNS = ["training_goal", "training_equipment", "training_days_per_week", "onboarded_at", "effort_scale"];
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -34,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase();
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-    return () => data.subscription.unsubscribe();
+    const stopGoogle = listenForGoogleSignIn();
+    return () => (data.subscription.unsubscribe(), stopGoogle());
   }, []);
 
   const userId = session?.user.id;

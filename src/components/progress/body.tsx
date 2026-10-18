@@ -117,7 +117,7 @@ function RecoveryCard() {
         </div>
         {data && (
           <p className="text-right">
-            <span className="block font-mono text-2xl leading-none font-extrabold">{overall}%</span>
+            <span className="block num text-2xl leading-none font-bold">{overall}%</span>
             <span className="text-muted-foreground text-xs">overall</span>
           </p>
         )}
@@ -235,7 +235,7 @@ function CompositionCard({ rows, now }: { rows: BodyMeasurement[]; now: number }
       )}
       {wtr != null && (
         <p className="text-sm">
-          Waist-to-height <span className="font-mono font-semibold">{wtr.toFixed(2)}</span>
+          Waist-to-height <span className="num font-semibold">{wtr.toFixed(2)}</span>
           <span className="text-muted-foreground"> · {wtr < 0.5 ? "under the 0.5 guideline" : "at or over the 0.5 guideline"}</span>
         </p>
       )}
@@ -251,7 +251,7 @@ function Tile({ label, value, note }: { label: string; value: string; note: stri
   return (
     <div className="bg-secondary flex flex-col rounded-xl px-3 py-2">
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="font-mono text-xl font-extrabold">{value}</dd>
+      <dd className="num text-xl font-bold">{value}</dd>
       <dd className="text-muted-foreground text-xs">{note}</dd>
     </div>
   );
@@ -381,7 +381,7 @@ function BodyStatsCard({ rows, onChange }: { rows: BodyMeasurement[]; onChange: 
                 <div className="min-w-0 flex-1">
                   <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{info.label}</p>
                   {last ? (
-                    <p className="font-mono text-xl font-extrabold">
+                    <p className="num text-xl font-bold">
                       {one(info.show(last.value, unit))}{" "}
                       <span className="text-muted-foreground font-sans text-sm font-normal">{info.unit(unit)}</span>
                       {last.change != null && Math.abs(last.change) >= 0.05 && (
@@ -554,7 +554,7 @@ function HistorySheet({
                         {one(Math.abs(v - prev))}
                       </span>
                     )}
-                    <span className="w-20 text-right font-mono font-semibold">
+                    <span className="w-20 text-right num font-semibold">
                       {one(v)} <span className="text-muted-foreground font-sans text-xs">{info.unit(unit)}</span>
                     </span>
                     <Button
