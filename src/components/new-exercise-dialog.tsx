@@ -28,6 +28,8 @@ export function NewExerciseDialog({
   const [muscle, setMuscle] = useState<MuscleGroup>("chest");
   const [equipment, setEquipment] = useState<EquipmentType>("barbell");
   const [compound, setCompound] = useState(true);
+  const [timed, setTimed] = useState(false);
+  const [oneSide, setOneSide] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,6 +45,9 @@ export function NewExerciseDialog({
         secondary_muscles: [],
         equipment,
         mechanic: compound ? "compound" : "isolation",
+        // Sent only when picked, so this works on a database that doesn't have them yet.
+        ...(timed && { tracking: "time" as const }),
+        ...(oneSide && !timed && { unilateral: true }),
         userId: session.user.id,
       });
       setName("");
@@ -88,6 +93,28 @@ export function NewExerciseDialog({
             <input type="checkbox" className="accent-primary size-4" checked={compound} onChange={(e) => setCompound(e.target.checked)} />
             Compound lift (works several joints)
           </label>
+          <div className="bg-secondary grid grid-cols-2 gap-1 rounded-xl p-1" role="group" aria-label="What you log">
+            {[
+              { on: !timed, l: "Weight × reps", v: false },
+              { on: timed, l: "Timed hold", v: true },
+            ].map((x) => (
+              <button
+                key={x.l}
+                type="button"
+                aria-pressed={x.on}
+                onClick={() => setTimed(x.v)}
+                className={`h-10 rounded-lg text-sm font-semibold ${x.on ? "bg-foreground text-background" : "text-muted-foreground"}`}
+              >
+                {x.l}
+              </button>
+            ))}
+          </div>
+          {!timed && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="accent-primary size-4" checked={oneSide} onChange={(e) => setOneSide(e.target.checked)} />
+              One side at a time (log left and right reps)
+            </label>
+          )}
           {error && <p className="text-destructive text-sm">{error}</p>}
           <Button type="submit" disabled={busy || !name.trim()}>
             Save exercise

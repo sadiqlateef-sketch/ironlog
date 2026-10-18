@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRestTimer } from "@/components/providers/rest-timer-provider";
-import { toKg, weightInput, type UnitSystem } from "@/lib/units";
+import { kgToLb, toKg, weightInput, type UnitSystem } from "@/lib/units";
 import {
   getBestE1rms,
   getLastPerformance,
   getRoutineTargets,
+  listExercisePrefs,
   listExercises,
+  saveExercisePrefs,
   startSession,
   type Exercise,
+  type ExercisePrefs,
   type LastPerformance,
   type Routine,
   type WorkoutSession,
@@ -23,6 +26,7 @@ import {
   getActiveSession,
   insertSets,
   listActiveSets,
+  renumberSets,
   reorderExercises,
   updateSessionNotes,
   updateSet,
@@ -35,6 +39,8 @@ import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { cueSetSaved } from "@/lib/cues";
 import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
+import { PLATE_LOADED } from "@/lib/labels";
+import { matchPrevious, sideReps, suggestWeight, weightStep, type Suggestion } from "@/lib/set-logic";
 import type { SetType } from "@/types/database";
 
 /** A set that just beat your best estimated 1RM for that exercise. */
@@ -52,11 +58,15 @@ export interface UiSet {
   type: SetType;
   parentSetId: string | null;
   weight: string;
+  /** One side at a time: reps is the right side and repsLeft the left. */
   reps: string;
+  repsLeft: string;
   /** Timed and cardio exercises: "1:30" and distance in mi/km. */
   time: string;
   distance: string;
   done: boolean;
+  /** How hard it was, as RPE (asked as reps left or RPE). */
+  rpe: number | null;
 }
 
 /** One exercise card in the logger. */
@@ -75,7 +85,21 @@ export interface Block {
   /** Target rep range from the routine, for the progression chart. */
   repMin: number | null;
   repMax: number | null;
+  /** Your note for this exercise (seat height, grip...), shown every time. */
+  note: string | null;
+  /** Log left and right reps separately. */
+  unilateral: boolean;
+  /** Go up from last time? In your unit. Null = same as last time. */
+  suggestion: Suggestion | null;
 }
+
+/** Where the "how hard was that?" buttons show: the set you just finished. */
+export interface EffortAsk {
+  order: number;
+  id: string;
+}
+
+const LOWER_BODY = ["quads", "hamstrings", "glutes", "adductors", "abductors", "lower_back"];
 
 const REST_KEY = "ironlog.rest.";
 
@@ -104,6 +128,11 @@ function targetNoteFor(t: { target_rpe: number | null; target_percent_1rm: numbe
   return parts.length ? parts.join(" · ") : null;
 }
 
+/** A stored kg value as a plain number in your unit, to the nearest 0.5. */
+function inUnit(kg: number, unit: UnitSystem): number {
+  return Math.round((unit === "imperial" ? kgToLb(kg) : kg) * 2) / 2;
+}
+
 /** A stored kg weight as the logger shows it (see weightInput: 0.5 lb / 0.25 kg steps). */
 export const toDisplay = (kg: number, unit: UnitSystem): string => weightInput(kg, unit);
 
@@ -114,10 +143,12 @@ function toUiSet(s: WorkoutSet, unit: UnitSystem): UiSet {
     type: s.set_type,
     parentSetId: s.parent_set_id,
     weight: toDisplay(s.weight, unit),
-    reps: s.is_completed || s.reps ? String(s.reps) : "",
+    reps: s.reps_right != null ? String(s.reps_right) : s.is_completed || s.reps ? String(s.reps) : "",
+    repsLeft: s.reps_left != null ? String(s.reps_left) : "",
     time: s.duration_seconds ? formatDuration(s.duration_seconds) : "",
     distance: s.distance_m ? toDistanceDisplay(s.distance_m, unit) : "",
     done: s.is_completed,
+    rpe: s.rpe == null ? null : Number(s.rpe),
   };
 }
 
@@ -132,6 +163,10 @@ export function useWorkout() {
   const bestRef = useRef(new Map<string, number>());
   const recordsRef = useRef(new Set<string>());
   const [record, setRecord] = useState<RecordHit | null>(null);
+  // Your per-exercise settings (note, rest, one side at a time), by exercise id.
+  const prefsRef = useRef(new Map<string, ExercisePrefs>());
+  const [effortAsk, setEffortAsk] = useState<EffortAsk | null>(null);
+  const effortScale = profile?.effort_scale ?? "rir";
 
   // The ref is updated straight away so a change made right after another
   // (add an exercise, then move it) sees the first one.
@@ -143,23 +178,49 @@ export function useWorkout() {
 
   const fail = useCallback((e: unknown) => setError((e as Error).message ?? String(e)), []);
 
+  /** Your own rest time for this exercise, if you've set one. */
+  const myRest = (ex: Exercise) => prefsRef.current.get(ex.id)?.rest_seconds ?? savedRest(ex.id);
+
   const defaultRest = useCallback(
-    (ex: Exercise) => savedRest(ex.id) ?? (ex.mechanic === "compound" ? (profile?.default_rest_seconds ?? 120) : 90),
+    (ex: Exercise) => myRest(ex) ?? (ex.mechanic === "compound" ? (profile?.default_rest_seconds ?? 120) : 90),
     [profile],
+  );
+
+  /** Note, one-side logging and today's suggested weight for an exercise card. */
+  const extras = useCallback(
+    (ex: Exercise, previous: LastPerformance, repMax: number | null): Pick<Block, "note" | "unilateral" | "suggestion"> => {
+      const p = prefsRef.current.get(ex.id);
+      const reps = (ex.tracking ?? "weight_reps") === "weight_reps";
+      const bigLower = ex.mechanic === "compound" && LOWER_BODY.includes(ex.primary_muscle) && PLATE_LOADED.includes(ex.equipment);
+      return {
+        note: p?.notes?.trim() || null,
+        unilateral: reps && (p?.unilateral ?? ex.unilateral ?? false),
+        suggestion: reps
+          ? suggestWeight(
+              previous.map((x) => ({ set_type: x.set_type, weight: inUnit(Number(x.weight), unit), reps: x.reps, rpe: x.rpe == null ? null : Number(x.rpe) })),
+              { repMax, step: weightStep(unit, bigLower) },
+            )
+          : null,
+      };
+    },
+    [unit],
   );
 
   // ---- Load the active workout (if any) ----
   const fetchWorkout = useCallback(async (): Promise<{ session: WorkoutSession | null; blocks: Block[] }> => {
     const active = await getActiveSession();
     if (!active) return { session: null, blocks: [] };
-    const [sets, exercises, targets] = await Promise.all([
+    const [sets, exercises, targets, prefs] = await Promise.all([
       listActiveSets(active.id),
       listExercises(),
       active.routine_id ? getRoutineTargets(active.routine_id) : Promise.resolve([]),
+      listExercisePrefs().catch(() => [] as ExercisePrefs[]),
     ]);
+    prefsRef.current = new Map(prefs.map((p) => [p.exercise_id, p]));
     const byId = new Map(exercises.map((e) => [e.id, e]));
     const grouped = new Map<number, WorkoutSet[]>();
-    for (const s of sets) grouped.set(s.exercise_order, [...(grouped.get(s.exercise_order) ?? []), s]);
+    for (const s of [...sets].sort((a, b) => a.set_number - b.set_number))
+      grouped.set(s.exercise_order, [...(grouped.get(s.exercise_order) ?? []), s]);
 
     const planned = matchTargets(
       targets,
@@ -172,22 +233,25 @@ export function useWorkout() {
         if (!exercise) return null;
         const t = planned.get(order);
         const target = t == null ? undefined : targets[t];
+        const previous = await getLastPerformance(exercise.id);
+        const repMax = target?.target_reps_max ?? target?.target_reps ?? null;
         return {
           order,
           exercise,
           supersetGroup: rows[0].superset_group,
-          restSeconds: savedRest(exercise.id) ?? target?.rest_seconds ?? defaultRest(exercise),
+          restSeconds: myRest(exercise) ?? target?.rest_seconds ?? defaultRest(exercise),
           repTarget: target
             ? target.target_reps_max
               ? `${target.target_reps}-${target.target_reps_max}`
               : String(target.target_reps)
             : null,
           targetNote: target ? targetNoteFor(target) : null,
-          previous: await getLastPerformance(exercise.id),
+          previous,
           sets: rows.map((r) => toUiSet(r, unit)),
           routineExerciseId: target?.id ?? null,
           repMin: target?.target_reps ?? null,
-          repMax: target?.target_reps_max ?? target?.target_reps ?? null,
+          repMax,
+          ...extras(exercise, previous, repMax),
         };
       }),
     );
@@ -199,7 +263,7 @@ export function useWorkout() {
       session: active,
       blocks: loaded.filter((b): b is Block => b !== null).sort((a, b) => a.order - b.order),
     };
-  }, [unit, defaultRest]);
+  }, [unit, defaultRest, extras]);
 
   const load = useCallback(
     () =>
@@ -398,6 +462,7 @@ export function useWorkout() {
             routineExerciseId: null,
             repMin: null,
             repMax: null,
+            ...extras(exercise, previous, null),
           },
         ]);
         return order;
@@ -406,7 +471,7 @@ export function useWorkout() {
         return null;
       }
     },
-    [session, unit, defaultRest, fail, setBlocks],
+    [session, unit, defaultRest, extras, fail, setBlocks],
   );
 
   const removeExercise = useCallback(
@@ -471,7 +536,16 @@ export function useWorkout() {
         setBlocks((prev) =>
           prev.map((b) =>
             b.order === order
-              ? { ...b, exercise, previous, restSeconds: defaultRest(exercise), routineExerciseId: null, repMin: null, repMax: null }
+              ? {
+                  ...b,
+                  exercise,
+                  previous,
+                  restSeconds: defaultRest(exercise),
+                  routineExerciseId: null,
+                  repMin: null,
+                  repMax: null,
+                  ...extras(exercise, previous, null),
+                }
               : b,
           ),
         );
@@ -479,7 +553,7 @@ export function useWorkout() {
         fail(e);
       }
     },
-    [defaultRest, fail, setBlocks],
+    [defaultRest, extras, fail, setBlocks],
   );
 
   /** Change this exercise's rest time; remembered for next time too. */
@@ -487,10 +561,53 @@ export function useWorkout() {
     (order: number, seconds: number) => {
       const block = blocksRef.current.find((b) => b.order === order);
       if (!block) return;
-      saveRest(block.exercise.id, seconds);
+      const id = block.exercise.id;
+      saveRest(id, seconds);
       setBlocks((prev) => prev.map((b) => (b.order === order ? { ...b, restSeconds: seconds } : b)));
+      // Saved to your account too, so the watch and your next workout use it.
+      saveExercisePrefs(id, { rest_seconds: seconds })
+        .then((p) => prefsRef.current.set(id, p))
+        .catch(() => {});
     },
     [setBlocks],
+  );
+
+  /** Save your own setting for an exercise and show it on every card of that exercise. */
+  const savePref = useCallback(
+    async (exerciseId: string, patch: Parameters<typeof saveExercisePrefs>[1], show: (b: Block) => Partial<Block>) => {
+      setBlocks((prev) => prev.map((b) => (b.exercise.id === exerciseId ? { ...b, ...show(b) } : b)));
+      try {
+        prefsRef.current.set(exerciseId, await saveExercisePrefs(exerciseId, patch));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail, setBlocks],
+  );
+
+  /** Your note for this exercise, shown every time you do it. */
+  const setNote = useCallback(
+    (order: number, text: string) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      if (!block) return;
+      const note = text.trim() || null;
+      return savePref(block.exercise.id, { notes: note }, () => ({ note }));
+    },
+    [savePref],
+  );
+
+  /** Log left and right separately for this exercise from now on (or stop). */
+  const setUnilateral = useCallback(
+    (order: number, on: boolean) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      if (!block) return;
+      return savePref(block.exercise.id, { unilateral: on }, (b) => ({
+        unilateral: on,
+        // Going back to one number: keep the right side's reps as the set's reps.
+        sets: on ? b.sets : b.sets.map((s) => ({ ...s, repsLeft: "" })),
+      }));
+    },
+    [savePref],
   );
 
   const saveNotes = useCallback(
@@ -527,6 +644,66 @@ export function useWorkout() {
     [unit, fail, setBlocks],
   );
 
+  /**
+   * Put warm-up sets (weights in your unit) before the working sets. Warm-ups
+   * not done yet are replaced, so tapping it twice doesn't double them up.
+   */
+  const addWarmups = useCallback(
+    async (order: number, warmups: { weight: number; reps: number }[]) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      if (!session || !block || !warmups.length) return;
+      const replace = block.sets.filter((s) => s.type === "warmup" && !s.done);
+      const keep = block.sets.filter((s) => !replace.includes(s));
+      // Warm-ups you already did stay first; the new ones go after them.
+      const doneWarm = keep.filter((s) => s.type === "warmup");
+      const rest = keep.filter((s) => s.type !== "warmup");
+      const at = doneWarm.length;
+      try {
+        await deleteSets(replace.map((s) => s.id));
+        const moves = rest.map((s, i) => ({ id: s.id, setNumber: at + warmups.length + i + 1 }));
+        await renumberSets(moves.filter((m, i) => rest[i].setNumber !== m.setNumber));
+        const rows = await insertSets(
+          warmups.map((w, i) => ({
+            session_id: session.id,
+            exercise_id: block.exercise.id,
+            exercise_order: order,
+            set_number: at + i + 1,
+            set_type: "warmup" as const,
+            superset_group: block.supersetGroup,
+            weight: toKg(w.weight, unit),
+            reps: w.reps,
+          })),
+        );
+        const added = rows.map((r) => ({ ...toUiSet(r, unit), weight: String(warmups[r.set_number - at - 1].weight), reps: String(r.reps) }));
+        setBlocks((prev) =>
+          prev.map((b) =>
+            b.order === order
+              ? { ...b, sets: [...doneWarm, ...added, ...rest.map((s, i) => ({ ...s, setNumber: moves[i].setNumber }))] }
+              : b,
+          ),
+        );
+      } catch (e) {
+        fail(e);
+        load();
+      }
+    },
+    [session, unit, fail, load, setBlocks],
+  );
+
+  /** How hard a set was, as RPE. Null clears it. */
+  const setEffort = useCallback(
+    async (order: number, id: string, rpe: number | null) => {
+      setEffortAsk((a) => (a?.id === id ? null : a));
+      setBlocks((prev) => prev.map((b) => (b.sets.some((s) => s.id === id) ? { ...b, sets: b.sets.map((s) => (s.id === id ? { ...s, rpe } : s)) } : b)));
+      try {
+        await updateSet(id, { rpe });
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail, setBlocks],
+  );
+
   // ---- Sets ----
   const patchSet = useCallback(
     // Found by set id, not slot: a set finishing saving after its exercise was moved still lands.
@@ -555,7 +732,14 @@ export function useWorkout() {
           },
         ]);
         // Copy the last set's numbers so a repeat set is one tap.
-        const ui = { ...toUiSet(row, unit), weight: last?.weight ?? "", reps: last?.reps ?? "", time: last?.time ?? "", distance: last?.distance ?? "" };
+        const ui = {
+          ...toUiSet(row, unit),
+          weight: last?.weight ?? "",
+          reps: last?.reps ?? "",
+          repsLeft: last?.repsLeft ?? "",
+          time: last?.time ?? "",
+          distance: last?.distance ?? "",
+        };
         setBlocks((prev) => prev.map((b) => (b.order === order ? { ...b, sets: [...b.sets, ui] } : b)));
       } catch (e) {
         fail(e);
@@ -696,13 +880,16 @@ export function useWorkout() {
   /** Save weight/reps after the user leaves the field. */
   const commitSet = useCallback(
     async (order: number, id: string) => {
-      const set = blocksRef.current.find((b) => b.order === order)?.sets.find((s) => s.id === id);
-      if (!set) return;
-      const tracking = blocksRef.current.find((b) => b.order === order)?.exercise.tracking ?? "weight_reps";
+      const block = blocksRef.current.find((b) => b.order === order);
+      const set = block?.sets.find((s) => s.id === id);
+      if (!block || !set) return;
+      const tracking = block.exercise.tracking ?? "weight_reps";
+      const sides = block.unilateral && (set.repsLeft || set.reps) ? sideReps(intOrNull(set.repsLeft), intOrNull(set.reps)) : null;
       try {
         await updateSet(id, {
           weight: tracking === "distance_time" ? 0 : toKg(parseNumber(set.weight) ?? 0, unit),
           reps: Math.round(parseNumber(set.reps) ?? 0),
+          ...sides,
           ...(tracking !== "weight_reps" && {
             duration_seconds: parseDuration(set.time),
             distance_m: tracking === "distance_time" ? toMetres(parseNumber(set.distance) ?? 0, unit) || null : null,
@@ -773,6 +960,7 @@ export function useWorkout() {
       const set = block.sets[idx];
 
       if (set.done) {
+        setEffortAsk((a) => (a?.id === id ? null : a));
         patchSet(order, id, { done: false });
         try {
           await updateSet(id, { is_completed: false });
@@ -782,7 +970,7 @@ export function useWorkout() {
         return true;
       }
 
-      const prev = block.previous[idx];
+      const prev = matchPrevious(block.sets.map((s) => s.type), block.previous)[idx];
       const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
       const startRest = () => {
         if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
@@ -806,6 +994,7 @@ export function useWorkout() {
         patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
         cueSetSaved();
         startRest();
+        if (tracking === "time" && set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
         try {
           await updateSet(id, {
             weight: toKg(parseNumber(weight) ?? 0, unit),
@@ -820,20 +1009,34 @@ export function useWorkout() {
         return true;
       }
 
-      const weight = set.weight || (prev ? toDisplay(prev.weight, unit) : "");
-      const reps = set.reps || (prev ? String(prev.reps) : block.repTarget?.split("-")[0] ?? "");
-      const repsNum = parseNumber(reps);
+      // Working sets fill in today's suggested weight when there is one.
+      const suggested = block.suggestion && (set.type === "normal" || set.type === "failure") ? String(block.suggestion.weight) : null;
+      const weight = set.weight || suggested || (prev ? toDisplay(prev.weight, unit) : "");
+      const fallback = (side: number | null | undefined) =>
+        prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "");
+      let reps = set.reps || fallback(prev?.reps_right);
+      let repsLeft = "";
+      let sides: ReturnType<typeof sideReps> = null;
+      if (block.unilateral) {
+        // A side left blank did the same as the other side (or last time's).
+        repsLeft = set.repsLeft || set.reps || fallback(prev?.reps_left);
+        reps = set.reps || set.repsLeft || reps;
+        sides = sideReps(intOrNull(repsLeft), intOrNull(reps));
+      }
+      const repsNum = sides ? sides.reps : parseNumber(reps);
       if (repsNum == null || repsNum === 0) return false;
 
-      patchSet(order, id, { weight, reps, done: true });
+      patchSet(order, id, { weight, reps, repsLeft, done: true });
       cueSetSaved();
       startRest();
+      if (set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
       const kg = toKg(parseNumber(weight) ?? 0, unit);
       if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
       try {
         await updateSet(id, {
           weight: kg,
           reps: Math.round(repsNum),
+          ...sides,
           is_completed: true,
         });
       } catch (e) {
@@ -841,7 +1044,18 @@ export function useWorkout() {
       }
       return true;
     },
-    [patchSet, unit, restTimer, fail, session, checkRecord],
+    [patchSet, unit, restTimer, fail, session, checkRecord, effortScale],
+  );
+
+  /** A timed hold finished on the hold timer: log it on the next set to do. */
+  const logHold = useCallback(
+    (order: number, seconds: number) => {
+      const set = blocksRef.current.find((b) => b.order === order)?.sets.find((s) => !s.done);
+      if (!set || seconds <= 0) return Promise.resolve(false);
+      patchSet(order, set.id, { time: formatDuration(seconds) });
+      return toggleDone(order, set.id);
+    },
+    [patchSet, toggleDone],
   );
 
   return {
@@ -875,5 +1089,18 @@ export function useWorkout() {
     addDropSet,
     restoreSet,
     toggleDone,
+    logHold,
+    addWarmups,
+    setEffort,
+    effortAsk,
+    dismissEffort: () => setEffortAsk(null),
+    effortScale,
+    setNote,
+    setUnilateral,
   };
+}
+
+function intOrNull(s: string): number | null {
+  const n = parseNumber(s);
+  return n == null ? null : Math.round(n);
 }

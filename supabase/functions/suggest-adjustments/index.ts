@@ -41,7 +41,7 @@ Deno.serve(
         .order("position"),
       db
         .from("workout_sets")
-        .select("exercise_id, exercise_order, set_type, weight, reps, is_completed")
+        .select("exercise_id, exercise_order, set_type, weight, reps, rpe, is_completed")
         .eq("session_id", session.id)
         .eq("is_completed", true)
         .neq("set_type", "warmup")
@@ -77,7 +77,7 @@ Deno.serve(
     (targets ?? []).forEach((t, i) => {
       const logged: LoggedSet[] = (sets ?? [])
         .filter((s) => s.exercise_order === slotOf.get(i))
-        .map((s) => ({ weight: Number(s.weight), reps: s.reps }));
+        .map((s) => ({ weight: Number(s.weight), reps: s.reps, rpe: s.rpe == null ? null : Number(s.rpe) }));
       if (logged.length === 0) return; // skipped exercise: nothing to judge
       const ex = t.exercises as unknown as { name: string; primary_muscle: string } | null;
       const r = ruleFor(

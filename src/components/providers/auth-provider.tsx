@@ -17,12 +17,12 @@ interface AuthState {
   unit: UnitSystem;
   setUnit: (unit: UnitSystem) => Promise<void>;
   /** Save profile settings (bar, plates, rest time...) and update them here. */
-  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at">>) => Promise<void>;
+  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at" | "effort_scale">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 /** Profile columns added by recent migrations, skipped when the database is behind the app. */
-const NEWER_COLUMNS = ["training_goal", "training_equipment", "training_days_per_week", "onboarded_at"];
+const NEWER_COLUMNS = ["training_goal", "training_equipment", "training_days_per_week", "onboarded_at", "effort_scale"];
 
 const AuthContext = createContext<AuthState | null>(null);
 

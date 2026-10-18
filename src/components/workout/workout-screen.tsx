@@ -10,8 +10,10 @@ import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { EquipmentSheet } from "@/components/equipment-sheet";
+import { useAuth } from "@/components/providers/auth-provider";
 import { useSlot } from "@/hooks/use-slot";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
+import { HoldTimer } from "@/components/workout/hold-timer";
 import { CurrentSetControls, FocusView, setTitle } from "@/components/workout/current-set";
 import { KeypadProvider } from "@/components/workout/keypad";
 import { GestureHint, LoggerOptions } from "@/components/workout/logger-options";
@@ -22,6 +24,7 @@ import { ReorderSheet } from "@/components/workout/reorder-sheet";
 import { ProgressionSheet } from "@/components/workout/progression-sheet";
 import { RestSheet } from "@/components/workout/rest-sheet";
 import { SwapSheet } from "@/components/workout/swap-sheet";
+import { WarmupSheet } from "@/components/workout/warmup-sheet";
 import { VoiceLogButton } from "@/components/workout/voice-log";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,6 +52,11 @@ import {
   workingOn,
 } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
+import { PLATE_LOADED } from "@/lib/labels";
+import { ownedPlates } from "@/lib/plates";
+import { kgToLb } from "@/lib/units";
+import { parseDuration } from "@/lib/cardio";
+import { weightStep } from "@/lib/set-logic";
 import { keepScreenOn, openExactAlarmSettings, requestNotifications, restAlertStatus, tap } from "@/lib/native";
 
 export function WorkoutScreen() {
@@ -145,6 +153,10 @@ function ActiveWorkout({
   const [view, setViewState] = useState<View>(savedView);
   const [focusPick, setFocus] = useState<number | null>(null);
   const [restFor, setRestFor] = useState<number | null>(null);
+  const [noteFor, setNoteFor] = useState<number | null>(null);
+  const [warmupFor, setWarmupFor] = useState<number | null>(null);
+  const [holdFor, setHoldFor] = useState<number | null>(null);
+  const { profile, unit } = useAuth();
   const [swapFor, setSwapFor] = useState<number | null>(null);
   const [intervalOpen, setIntervalOpen] = useState(false);
   const [equipment, setEquipment] = useState(false);
@@ -335,6 +347,15 @@ function ActiveWorkout({
           upNext={afterName}
           onChange={(patch) => nextSet && w.patchSet(focus.order, nextSet.id, patch)}
           onCommit={() => nextSet && w.commitSet(focus.order, nextSet.id)}
+          effort={
+            w.effortAsk && w.effortAsk.order === focus.order
+              ? {
+                  scale: w.effortScale,
+                  onPick: (rpe) => w.effortAsk && w.setEffort(w.effortAsk.order, w.effortAsk.id, rpe),
+                  onSkip: w.dismissEffort,
+                }
+              : null
+          }
         />
       )}
 
@@ -469,6 +490,14 @@ function ActiveWorkout({
               setFocus(block.order);
               return w.toggleDone(block.order, id);
             }}
+            effortScale={w.effortScale}
+            effortAskId={w.effortAsk?.order === block.order ? w.effortAsk.id : null}
+            onEffort={(id, rpe) => w.setEffort(block.order, id, rpe)}
+            onSkipEffort={w.dismissEffort}
+            onNote={() => setNoteFor(block.order)}
+            onToggleUnilateral={() => w.setUnilateral(block.order, !block.unilateral)}
+            onWarmups={() => setWarmupFor(block.order)}
+            onHold={() => setHoldFor(block.order)}
           />
         </div>
         );
@@ -601,6 +630,62 @@ function ActiveWorkout({
             exerciseName={b?.exercise.name ?? ""}
             seconds={b?.restSeconds ?? 0}
             onChange={(sec) => b && w.setRest(b.order, sec)}
+          />
+        );
+      })()}
+      {(() => {
+        const b = blocks.find((x) => x.order === noteFor);
+        return (
+          <NotesSheet
+            open={!!b}
+            onOpenChange={(o) => !o && setNoteFor(null)}
+            notes={b?.note ?? null}
+            onSave={(t) => b && w.setNote(b.order, t)}
+            title="Exercise note"
+            description={`Shown on ${b?.exercise.name ?? "this exercise"} every time you log it.`}
+            placeholder="e.g. Seat on 4, pins on 12. Narrow grip."
+          />
+        );
+      })()}
+      {(() => {
+        const b = blocks.find((x) => x.order === warmupFor);
+        const { bar, plates: owned } = ownedPlates(profile, unit);
+        // Today's working weight: what's typed on the first working set, else the suggestion, else last time.
+        const firstWork = b?.sets.find((s) => s.type === "normal" || s.type === "failure");
+        const prevWork = b?.previous.find((p) => p.set_type === "normal");
+        const working =
+          Number(firstWork?.weight) ||
+          b?.suggestion?.weight ||
+          (prevWork ? Math.round((unit === "imperial" ? kgToLb(prevWork.weight) : prevWork.weight) * 2) / 2 : null);
+        return (
+          <WarmupSheet
+            open={!!b}
+            onOpenChange={(o) => !o && setWarmupFor(null)}
+            exerciseName={b?.exercise.name ?? ""}
+            working={working || null}
+            unitLabel={unit === "imperial" ? "lb" : "kg"}
+            plateLoaded={!!b && PLATE_LOADED.includes(b.exercise.equipment)}
+            bar={bar}
+            plates={owned}
+            step={weightStep(unit, false)}
+            onAdd={(sets) => b && w.addWarmups(b.order, sets)}
+          />
+        );
+      })()}
+      {(() => {
+        const b = blocks.find((x) => x.order === holdFor);
+        return (
+          <HoldTimer
+            open={!!b}
+            onOpenChange={(o) => !o && setHoldFor(null)}
+            exerciseName={b?.exercise.name ?? ""}
+            targetSeconds={b?.repTarget ? parseDuration(b.repTarget.split("-")[0]) : null}
+            onLog={(sec) => {
+              if (!b) return;
+              tap();
+              setFocus(b.order);
+              w.logHold(b.order, sec);
+            }}
           />
         );
       })()}

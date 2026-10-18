@@ -160,7 +160,7 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
 
 function emptyPrefs(exerciseId: string): ExercisePrefs {
   const now = new Date().toISOString();
-  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, favorite: false, notes: null, created_at: now, updated_at: now };
+  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, favorite: false, notes: null, rest_seconds: null, unilateral: null, created_at: now, updated_at: now };
 }
 
 function GoalButton({
@@ -421,7 +421,7 @@ function NotesField({ initial, onSave }: { initial: string; onSave: (notes: stri
   const [text, setText] = useState(initial);
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">My notes</span>
+      <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">My notes · shown every time you log it</span>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
