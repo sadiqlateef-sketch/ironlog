@@ -33,15 +33,21 @@ function locked<T>(fn: () => Promise<T>): Promise<T> {
   return p;
 }
 
+/** Fired on window whenever the workout in progress starts, changes or ends (the workout bar listens). */
+export const ACTIVE_WORKOUT_EVENT = "ironlog:active-workout";
+const changed = () => {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(ACTIVE_WORKOUT_EVENT));
+};
+
 function writeMirror(m: Mirror | null): Promise<void> {
-  return locked(() => kvSet(KEY, m));
+  return locked(() => kvSet(KEY, m)).then(changed);
 }
 
 function changeMirror(fn: (m: Mirror) => Mirror | null): Promise<void> {
   return locked(async () => {
     const m = await readMirror();
     if (m) await kvSet(KEY, fn(m));
-  });
+  }).then(changed);
 }
 
 function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
@@ -64,6 +70,12 @@ async function commit(...ops: Op[]): Promise<void> {
 const now = () => new Date().toISOString();
 
 // ---------- Reading ----------
+
+/** The workout in progress as this phone last saw it. Instant: no network. */
+export async function peekActiveWorkout(): Promise<{ session: WorkoutSession; sets: number; done: number } | null> {
+  const m = await readMirror();
+  return m ? { session: m.session, sets: m.sets.length, done: m.sets.filter((s) => s.completed_at).length } : null;
+}
 
 /** The unfinished workout, from the server when it's reachable and caught up. */
 export async function getActiveSession(): Promise<WorkoutSession | null> {

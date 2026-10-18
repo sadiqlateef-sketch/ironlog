@@ -45,6 +45,7 @@ import {
 } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
 import { keepScreenOn, openExactAlarmSettings, requestNotifications, restAlertStatus, tap } from "@/lib/native";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 export function WorkoutScreen() {
   const w = useWorkout();
@@ -60,7 +61,7 @@ export function WorkoutScreen() {
   }, [active]);
 
   if (w.session === undefined) {
-    return <p className="text-muted-foreground text-sm">Loading…</p>;
+    return <SkeletonList rows={4} rowClassName="h-24" />;
   }
 
   if (w.session === null) {

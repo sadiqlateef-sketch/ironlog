@@ -541,6 +541,30 @@ answers filled in, and once Claude has built it, **Start Day 1** makes it your
 active program and opens the first workout. Accounts that already had
 workouts or programs skip the questions.
 
+After that (and once on each phone, including after updating), a four-screen
+tour shows where things are. Replay it from **More > Take the tour**.
+
+## Getting around
+
+Four tabs at the bottom: **Home** (the Today card: resume, the program's next
+day or a start button, plus how recovered you are), **Workout**, **Progress**
+and **More** (programs, exercise library, plate calculator, logging and photo
+import, watch pairing, settings). New screens for More go in
+`src/lib/nav.ts`.
+
+- **Workout bar.** Mid-workout, every other screen shows a bar above the tabs
+  with the workout's time and the rest countdown. Tap it to go back.
+- **Search** (Home's magnifier, or the box on More) finds exercises by name,
+  nickname, muscle or equipment, your workouts from the last year, programs
+  and their days, and the app's own screens.
+- **Appearance** (Settings) has dark (default), light or match-the-phone, and
+  four text sizes. Saved on the phone (`src/lib/appearance.ts`) and applied
+  before the first paint, so nothing flashes.
+- **Android back button and back swipe** close an open sheet first, then go
+  back a screen. On Home it leaves the app, except mid-workout, when it only
+  sends the app to the background so the workout and timer keep running
+  (`src/lib/back-button.ts`).
+
 ## Logging without signal
 
 The workout logger keeps working with no signal. Every change is saved on the
