@@ -4,8 +4,10 @@
 // equipment, gym and calendar, the Claude connector, alerts, and sign out.
 
 import { useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Dumbbell, FileDown, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bell, ChevronRight, Dumbbell, FileDown, FileUp, LogOut, MapPin, MessageCircle } from "lucide-react";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
+import { BackupButton } from "@/components/import/backup-button";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
 import { AboutYouForm } from "@/components/progress/body";
@@ -46,6 +48,7 @@ function Section({ id, title, description, children }: { id?: string; title: str
 
 export function SettingsScreen() {
   const { profile, unit, setUnit, updateProfile, signOut } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [note, setNote] = useState<string | null>(null);
   const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | null>(null);
@@ -160,6 +163,8 @@ export function SettingsScreen() {
       </Section>
 
       <Section title="Your data">
+        <Row icon={FileUp} label="Import from JEFIT or another app" detail="Bring your whole workout history in" onClick={() => router.push("/import/?tab=file")} />
+        <BackupButton />
         <Row
           icon={FileDown}
           label="Export workouts (CSV)"

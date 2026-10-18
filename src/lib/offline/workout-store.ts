@@ -132,6 +132,7 @@ export async function startPlannedSession(
     notes: null,
     at_gym: null,
     calendar_event_id: null,
+    import_key: null,
     created_at: t,
     updated_at: t,
   };

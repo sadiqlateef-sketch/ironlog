@@ -268,6 +268,7 @@ export type Database = {
           notes: string | null;
           at_gym: boolean | null;
           calendar_event_id: string | null;
+          import_key: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -282,6 +283,7 @@ export type Database = {
           notes?: string | null;
           at_gym?: boolean | null;
           calendar_event_id?: string | null;
+          import_key?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sessions"]["Insert"]>;
         Relationships: [
