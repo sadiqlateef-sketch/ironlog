@@ -136,6 +136,39 @@ export function similarExercises<T extends SwapCandidate>(current: SwapCandidate
     .slice(0, limit);
 }
 
+/**
+ * Smart swap: the best replacements you can actually do here. Same main
+ * muscle, ranked by how many helper muscles match (both ways), same movement
+ * type, same equipment, then staples. `allowed` filters to your kit and
+ * `exclude` skips what's already in the workout.
+ */
+export function smartSwaps<T extends SwapCandidate>(
+  current: SwapCandidate,
+  all: T[],
+  opts: { allowed?: (e: T) => boolean; exclude?: Set<string>; limit?: number } = {},
+): T[] {
+  const mine = new Set(current.secondary_muscles);
+  const score = (e: T) => {
+    const shared = e.secondary_muscles.filter((m) => mine.has(m)).length;
+    const extra = e.secondary_muscles.length - shared;
+    const missing = mine.size - shared;
+    return (
+      (e.mechanic === current.mechanic ? 10 : 0) +
+      shared * 3 -
+      (extra + missing) +
+      (e.equipment === current.equipment ? 2 : 0) +
+      (e.aliases?.length ? 5 : 0) +
+      (EVERYDAY_EQUIPMENT.includes(e.equipment) ? 2 : 0)
+    );
+  };
+  return all
+    .filter((e) => e.id !== current.id && e.primary_muscle === current.primary_muscle && !opts.exclude?.has(e.id) && (opts.allowed?.(e) ?? true))
+    .map((e) => ({ e, s: score(e) }))
+    .sort((a, b) => b.s - a.s || a.e.name.localeCompare(b.e.name))
+    .slice(0, opts.limit ?? 12)
+    .map((x) => x.e);
+}
+
 /** Best Epley estimate across sets (weights in any one unit). 0 when nothing logged. */
 export function bestE1rm(sets: { weight: number; reps: number }[]): number {
   let best = 0;

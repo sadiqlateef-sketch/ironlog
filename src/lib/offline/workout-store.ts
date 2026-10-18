@@ -125,7 +125,7 @@ export interface PlannedExercise {
 
 /** Start a workout with these exercises' sets laid out, ready to fill in. Works offline. */
 export async function startPlannedSession(
-  info: { name: string; routineId?: string | null },
+  info: { name: string; routineId?: string | null; kitId?: string | null; addToCalendar?: boolean | null },
   items: PlannedExercise[],
 ): Promise<WorkoutSession> {
   const uid = await userId();
@@ -144,6 +144,8 @@ export async function startPlannedSession(
     notes: null,
     at_gym: null,
     calendar_event_id: null,
+    kit_id: info.kitId ?? null,
+    add_to_calendar: info.addToCalendar ?? null,
     import_key: null,
     created_at: t,
     updated_at: t,
@@ -162,7 +164,18 @@ export async function startPlannedSession(
     {
       kind: "insert",
       table: "workout_sessions",
-      rows: [{ id: session.id, routine_id: session.routine_id, name: session.name, source: session.source, start_time: t }],
+      rows: [
+        {
+          id: session.id,
+          routine_id: session.routine_id,
+          name: session.name,
+          source: session.source,
+          start_time: t,
+          // Only sent when set, so ordinary workouts don't depend on the newer columns.
+          ...(info.kitId ? { kit_id: info.kitId } : {}),
+          ...(info.addToCalendar != null ? { add_to_calendar: info.addToCalendar } : {}),
+        },
+      ],
     },
   ];
   if (sets.length) ops.push({ kind: "insert", table: "workout_sets", rows: sets.map(insertable) });
@@ -182,6 +195,12 @@ export async function finishSession(session: WorkoutSession): Promise<{ synced: 
 export async function discardSession(sessionId: string): Promise<void> {
   await changeMirror((m) => (m.session.id === sessionId ? null : m));
   await commit({ kind: "delete", table: "workout_sessions", ids: [sessionId] });
+}
+
+/** The "Add to calendar?" answer for a finished home workout. */
+export async function setSessionCalendar(sessionId: string, on: boolean): Promise<boolean> {
+  await enqueue({ kind: "update", table: "workout_sessions", ids: [sessionId], patch: { add_to_calendar: on } });
+  return flush();
 }
 
 export async function updateSessionNotes(sessionId: string, notes: string): Promise<void> {

@@ -18,12 +18,12 @@ interface AuthState {
   unit: UnitSystem;
   setUnit: (unit: UnitSystem) => Promise<void>;
   /** Save profile settings (bar, plates, rest time...) and update them here. */
-  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at" | "effort_scale">>) => Promise<void>;
+  updateProfile: (patch: Partial<Pick<Profile, "bar_weight_kg" | "available_plates_kg" | "default_rest_seconds" | "display_name" | "physical_stats" | "gym_name" | "gym_lat" | "gym_lng" | "gym_radius_m" | "unit_system" | "training_goal" | "training_equipment" | "training_days_per_week" | "onboarded_at" | "equipment_kits" | "active_kit_id" | "work_shifts" | "effort_scale">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 /** Profile columns added by recent migrations, skipped when the database is behind the app. */
-const NEWER_COLUMNS = ["training_goal", "training_equipment", "training_days_per_week", "onboarded_at", "effort_scale"];
+const NEWER_COLUMNS = ["training_goal", "training_equipment", "training_days_per_week", "onboarded_at", "equipment_kits", "active_kit_id", "work_shifts", "effort_scale"];
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -73,7 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const missing = error?.message.match(/Could not find the '(\w+)' column/)?.[1];
       if (missing && missing in patch) {
         const rest = Object.fromEntries(Object.entries(patch).filter(([k]) => !NEWER_COLUMNS.includes(k))) as typeof patch;
-        if (!Object.keys(rest).length) return;
+        if (!Object.keys(rest).length) {
+          throw new Error('This needs the latest database update. Run "Deploy database and functions" on GitHub, then try again.');
+        }
         ({ data, error } = await getSupabase().from("users").update(rest).eq("id", userId).select().single());
       }
       if (error || !data) throw new Error(error?.message ?? "Couldn't save");

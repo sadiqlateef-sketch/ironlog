@@ -21,6 +21,7 @@ import {
 import { ExerciseDetail, type Tab } from "@/components/exercise-detail";
 import { MuscleFigure, sideOf } from "@/components/muscle-map";
 import { UnmarkDay } from "@/components/unmark-day";
+import { ShiftPlan } from "@/components/workout/shift-plan";
 import { WorkoutEditor } from "@/components/workout-editor";
 import { ActionSheet, type SheetAction } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export function PlannedTab({
   const [progress, setProgress] = useState<ProgramProgress | null>(null);
   const [routines, setRoutines] = useState<Day[]>([]);
   const [lastDone, setLastDone] = useState<Map<string, string>>(new Map());
+  const [trainedToday, setTrainedToday] = useState(false);
   const [open, setOpen] = useState<Day | null>(null);
   const [editing, setEditing] = useState<Day | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export function PlannedTab({
         setProgress(prog);
         setRoutines(mine);
         setLastDone(last);
+        setTrainedToday(log.some((s) => new Date(s.start_time).toDateString() === new Date().toDateString()));
         // Keep an open day sheet showing fresh data.
         setOpen((o) => (o ? ([...(active?.routines ?? []), ...mine].find((r) => r.id === o.id) ?? null) : o));
       })
@@ -141,6 +144,18 @@ export function PlannedTab({
             </Button>
           </div>
         </section>
+      )}
+
+      {days.length > 0 && (
+        <ShiftPlan
+          days={days}
+          done={done}
+          nextId={next?.id ?? null}
+          trainedToday={trainedToday}
+          busy={busy}
+          onStart={(d) => onStart(d)}
+          onApply={(ids) => reorderDays(ids.map((id) => days.find((d) => d.id === id)!).filter(Boolean))}
+        />
       )}
 
       {days.length > 0 && (

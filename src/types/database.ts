@@ -69,6 +69,9 @@ export type Database = {
           training_equipment: string[];
           training_days_per_week: number | null;
           onboarded_at: string | null;
+          equipment_kits: Json;
+          active_kit_id: string | null;
+          work_shifts: Json;
           effort_scale: EffortScale;
         } & Timestamps;
         Insert: {
@@ -88,6 +91,9 @@ export type Database = {
           training_equipment?: string[];
           training_days_per_week?: number | null;
           onboarded_at?: string | null;
+          equipment_kits?: Json;
+          active_kit_id?: string | null;
+          work_shifts?: Json;
           effort_scale?: EffortScale;
         };
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
@@ -291,6 +297,8 @@ export type Database = {
           notes: string | null;
           at_gym: boolean | null;
           calendar_event_id: string | null;
+          kit_id: string | null;
+          add_to_calendar: boolean | null;
           import_key: string | null;
         } & Timestamps;
         Insert: {
@@ -306,6 +314,8 @@ export type Database = {
           notes?: string | null;
           at_gym?: boolean | null;
           calendar_event_id?: string | null;
+          kit_id?: string | null;
+          add_to_calendar?: boolean | null;
           import_key?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sessions"]["Insert"]>;

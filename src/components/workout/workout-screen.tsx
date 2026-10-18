@@ -9,8 +9,12 @@ import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { PlateCalculator } from "@/components/plate-calculator";
-import { EquipmentSheet } from "@/components/equipment-sheet";
+import { EquipmentSheet, Switch } from "@/components/equipment-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useKits } from "@/hooks/use-kits";
+import { kitAllows, kitFor } from "@/lib/kit";
+import { HOME_CALENDAR_KEY } from "@/lib/home-prefs";
+import { syncGymCalendar } from "@/lib/gym";
 import { useSlot } from "@/hooks/use-slot";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
 import { HoldTimer } from "@/components/workout/hold-timer";
@@ -29,6 +33,7 @@ import { VoiceLogButton } from "@/components/workout/voice-log";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FindTab } from "@/components/workout/find-tab";
+import { HomeTab } from "@/components/workout/home-tab";
 import { InstantTab } from "@/components/workout/instant-tab";
 import { PlannedTab } from "@/components/workout/planned-tab";
 import { RecordCelebration } from "@/components/workout/record";
@@ -37,6 +42,7 @@ import { useWorkout, type Block, type UiSet } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
   requestAdjustments,
+  setSessionCalendar,
   type AdjustmentWithContext,
   type Exercise,
   type Routine,
@@ -67,6 +73,23 @@ export function WorkoutScreen() {
   const [info, setInfo] = useState<Exercise | null>(null);
   const [summary, setSummary] = useState<NonNullable<Awaited<ReturnType<Workout["finish"]>>> | null>(null);
 
+  /** Close the "Workout saved" card; a home workout's calendar answer is saved then. */
+  function closeSummary() {
+    const s = summary;
+    setSummary(null);
+    router.push("/");
+    if (s?.addToCalendar == null) return;
+    try {
+      localStorage.setItem(HOME_CALENDAR_KEY, s.addToCalendar ? "1" : "0");
+    } catch {}
+    const save = s.addToCalendar === s.startedWithCalendar ? Promise.resolve(true) : setSessionCalendar(s.sessionId, s.addToCalendar);
+    save
+      .then((ok) => {
+        if (ok && s.addToCalendar) void syncGymCalendar();
+      })
+      .catch(() => {});
+  }
+
   // Phone app: keep the screen awake while a workout is open.
   const active = !!w.session;
   useEffect(() => {
@@ -82,14 +105,14 @@ export function WorkoutScreen() {
     return (
       <>
         <StartWorkout onStart={w.start} onStartWith={w.startWith} error={w.error} />
-        <Dialog open={!!summary} onOpenChange={(o) => !o && (setSummary(null), router.push("/"))}>
+        <Dialog open={!!summary} onOpenChange={(o) => !o && closeSummary()}>
           <DialogContent>
             <DialogHeader className="sr-only">
               <DialogTitle>Workout saved</DialogTitle>
               <DialogDescription>Your workout summary.</DialogDescription>
             </DialogHeader>
             {summary && (
-              <FinishSummary workout={summary} onDone={() => (setSummary(null), router.push("/"))}>
+              <FinishSummary workout={summary} onDone={closeSummary}>
                 {summary.atGym && (
                   <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
                     <MapPin className="size-4 shrink-0" aria-hidden />
@@ -103,6 +126,14 @@ export function WorkoutScreen() {
                   </p>
                 )}
                 {summary.routineId && summary.synced && <NextTime sessionId={summary.sessionId} />}
+                {summary.addToCalendar != null && (
+                  <Switch
+                    on={summary.addToCalendar}
+                    onClick={() => setSummary({ ...summary, addToCalendar: !summary.addToCalendar })}
+                    label="Add to calendar?"
+                    detail="Puts this workout on your Google Calendar, if it's connected. Remembered for next time."
+                  />
+                )}
               </FinishSummary>
             )}
           </DialogContent>
@@ -139,6 +170,9 @@ function ActiveWorkout({
   onInfo: (e: Exercise | null) => void;
 }) {
   const session = w.session!;
+  const { profile, unit } = useAuth();
+  const { markMissing } = useKits();
+  const kit = kitFor(session.kit_id, profile);
   const [picking, setPicking] = useState(false);
   /** Where the picker's exercise goes, counting supersets as one; null = at the end. */
   const [insertAt, setInsertAt] = useState<number | null>(null);
@@ -153,7 +187,6 @@ function ActiveWorkout({
   const [noteFor, setNoteFor] = useState<number | null>(null);
   const [warmupFor, setWarmupFor] = useState<number | null>(null);
   const [holdFor, setHoldFor] = useState<number | null>(null);
-  const { profile, unit } = useAuth();
   const [swapFor, setSwapFor] = useState<number | null>(null);
   const [intervalOpen, setIntervalOpen] = useState(false);
   const [equipment, setEquipment] = useState(false);
@@ -614,8 +647,9 @@ function ActiveWorkout({
         onOpenChange={(open) => setPlates((p) => ({ ...p, open }))}
         initialWeight={plates.weight}
         onEditWeights={() => setEquipment(true)}
+        kit={kit}
       />
-      <EquipmentSheet open={equipment} onOpenChange={setEquipment} />
+      <EquipmentSheet open={equipment} onOpenChange={setEquipment} kitId={kit.id} />
       <IntervalTimer open={intervalOpen} onOpenChange={setIntervalOpen} />
       <NotesSheet open={notes} onOpenChange={setNotes} notes={session.notes} onSave={w.saveNotes} />
       {(() => {
@@ -690,6 +724,10 @@ function ActiveWorkout({
         exercise={blocks.find((b) => b.order === swapFor)?.exercise ?? null}
         onOpenChange={(o) => !o && setSwapFor(null)}
         onSwap={(e) => swapFor != null && w.swapExercise(swapFor, e)}
+        kitName={kit.name}
+        allowed={(e) => kitAllows(e, kit)}
+        inWorkout={new Set(blocks.map((b) => b.exercise.id))}
+        onMissing={(e) => markMissing(kit.id, e.id).catch(() => {})}
       />
       {(() => {
         const b = blocks.find((x) => x.order === progressionFor) ?? null;
@@ -733,18 +771,19 @@ function ActiveWorkout({
 }
 
 /** A DOM node rendered by the app shell, found after mount. */
-type StartTab = "find" | "planned" | "instant";
+type StartTab = "find" | "planned" | "instant" | "home";
 const TAB_KEY = "ironlog.workout.tab";
 const START_TABS: { key: StartTab; label: string }[] = [
   { key: "find", label: "Find" },
   { key: "planned", label: "Planned" },
   { key: "instant", label: "Instant" },
+  { key: "home", label: "Home" },
 ];
 
 function savedTab(): StartTab {
   try {
     const t = localStorage.getItem(TAB_KEY);
-    return t === "find" || t === "instant" ? t : "planned";
+    return t === "find" || t === "instant" || t === "home" ? t : "planned";
   } catch {
     return "planned";
   }
@@ -790,7 +829,7 @@ function StartWorkout({
           </Button>
         </div>
       </div>
-      <div className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Workout">
+      <div className="bg-secondary grid grid-cols-4 gap-1 rounded-xl p-1" role="tablist" aria-label="Workout">
         {START_TABS.map((t) => (
           <button
             key={t.key}
@@ -809,6 +848,7 @@ function StartWorkout({
         <PlannedTab key={plannedKey} busy={busy} onStart={(r) => wrap(() => onStart(r))} onFindPlan={() => choose("find")} />
       )}
       {tab === "instant" && <InstantTab busy={busy} onStart={(create) => wrap(() => onStartWith(create))} />}
+      {tab === "home" && <HomeTab busy={busy} onStart={(create) => wrap(() => onStartWith(create))} />}
       {tab === "find" && (
         <FindTab
           busy={busy}

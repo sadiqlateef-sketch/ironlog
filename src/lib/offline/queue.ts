@@ -94,7 +94,23 @@ export async function enqueue(...ops: Op[]): Promise<void> {
   await save();
 }
 
+/** Session columns added lately. If the live database doesn't have them yet, send the change without them. */
+const NEWER_COLUMNS = ["kit_id", "add_to_calendar"];
+
 async function send(op: Op): Promise<void> {
+  try {
+    return await sendOnce(op);
+  } catch (e) {
+    const col = (e as Error).message?.match(/Could not find the '(\w+)' column/)?.[1];
+    if (!col || !NEWER_COLUMNS.includes(col) || (op.kind !== "insert" && op.kind !== "update")) throw e;
+    const strip = (r: Row) => Object.fromEntries(Object.entries(r).filter(([k]) => !NEWER_COLUMNS.includes(k)));
+    if (op.kind === "insert") return sendOnce({ ...op, rows: op.rows.map(strip) });
+    const patch = strip(op.patch);
+    if (Object.keys(patch).length) return sendOnce({ ...op, patch });
+  }
+}
+
+async function sendOnce(op: Op): Promise<void> {
   const db = getSupabase();
   const check = (res: { error: { message: string } | null }) => {
     if (res.error) throw new Error(res.error.message);

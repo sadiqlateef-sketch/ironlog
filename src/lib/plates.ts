@@ -1,6 +1,8 @@
 // Plate calculator: which plates go on EACH side of the bar to hit a target.
 // Works in whatever unit you pass in (all numbers must be the same unit).
 
+import type { Kit } from "./kit.ts";
+
 export interface PlateResult {
   /** Plates for one side, heaviest first. */
   perSide: number[];
@@ -12,10 +14,15 @@ export interface PlateResult {
 
 const EPS = 1e-6;
 
-export function calculatePlates(target: number, barWeight: number, plates: number[]): PlateResult {
+/**
+ * `pairs` (optional, same order as `plates`): how many of each plate you can
+ * put on each side, for a home set with a few of each. Leave it out for a gym.
+ */
+export function calculatePlates(target: number, barWeight: number, plates: number[], pairs?: number[]): PlateResult {
   if (!(target > barWeight)) {
     return { perSide: [], achieved: barWeight, remainder: Math.max(0, round(target - barWeight)) };
   }
+  if (pairs) return limited(target, barWeight, plates, pairs);
 
   const sorted = [...plates].filter((p) => p > 0).sort((a, b) => b - a);
   let perSideRemaining = (target - barWeight) / 2;
@@ -32,6 +39,46 @@ export function calculatePlates(target: number, barWeight: number, plates: numbe
 
   const achieved = round(barWeight + 2 * perSide.reduce((a, b) => a + b, 0));
   return { perSide, achieved, remainder: round(target - achieved) };
+}
+
+/** With only a few of each plate, greedy can miss: try every mix and keep the closest (fewest plates on a tie). */
+function limited(target: number, barWeight: number, plates: number[], pairs: number[]): PlateResult {
+  const sizes = plates
+    .map((p, i) => ({ p, n: Math.max(0, Math.floor(pairs[i] ?? 0)) }))
+    .filter((x) => x.p > 0 && x.n > 0)
+    .sort((a, b) => b.p - a.p);
+  const goal = (target - barWeight) / 2;
+  let best: number[] = [];
+  let bestSum = 0;
+  const pick: number[] = [];
+  const walk = (i: number, sum: number) => {
+    if (sum > goal + EPS) return;
+    if (sum > bestSum + EPS || (Math.abs(sum - bestSum) < EPS && pick.length < best.length)) {
+      bestSum = sum;
+      best = [...pick];
+    }
+    if (i >= sizes.length || bestSum > goal - EPS) return;
+    const { p, n } = sizes[i];
+    for (let k = Math.min(n, Math.floor((goal - sum + EPS) / p)); k >= 0; k--) {
+      for (let j = 0; j < k; j++) pick.push(p);
+      walk(i + 1, sum + k * p);
+      pick.length -= k;
+    }
+  };
+  walk(0, 0);
+  const achieved = round(barWeight + 2 * bestSum);
+  return { perSide: best, achieved, remainder: round(target - achieved) };
+}
+
+/** The bar, plates and (for a home set) how many pairs of each, from a kit, in your unit. */
+export function kitPlates(kit: Kit, unit: "metric" | "imperial"): { bar: number; plates: number[]; pairs?: number[] } {
+  const conv = (kg: number) => nominal(unit === "imperial" ? kg * KG_TO_LB : kg);
+  const bar = kit.bar_kg != null ? conv(kit.bar_kg) : STANDARD_PLATES[unit].bar;
+  if (!kit.plates.length) return { bar, plates: [...STANDARD_PLATES[unit].plates] };
+  const sorted = [...kit.plates].sort((a, b) => b.kg - a.kg);
+  const plates = sorted.map((p) => conv(p.kg));
+  if (sorted.every((p) => p.count == null)) return { bar, plates: [...new Set(plates)] };
+  return { bar, plates, pairs: sorted.map((p) => (p.count == null ? 99 : Math.floor(p.count / 2))) };
 }
 
 function round(n: number): number {
