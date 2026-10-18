@@ -323,6 +323,9 @@ export function useWorkout() {
         records: recordsRef.current.size,
         /** False when it's saved on the phone and still waiting for signal. */
         synced,
+        /** A home workout's "Add to calendar?" answer (null for other workouts). */
+        addToCalendar: session.add_to_calendar ?? null,
+        startedWithCalendar: session.add_to_calendar ?? null,
       };
       recordsRef.current = new Set();
       setSession(null);

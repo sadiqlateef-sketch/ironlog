@@ -19,6 +19,7 @@ import {
   getRoutine,
   listPendingAdjustments,
   listPrograms,
+  listExercises,
   listRoutinesWithExercises,
   startProgram,
   startSession,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/workout-api";
 import { cn } from "@/lib/utils";
 import { EQUIPMENT, EQUIPMENT_LABEL, GOALS, planDefaults } from "@/lib/plan-options";
+import { activeKit, describeKit, kitAllows, kitsOf } from "@/lib/kit";
 
 export default function PlansPage() {
   return (
@@ -184,17 +186,25 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 }
 
 function Generator({ initial, onCreated }: { initial: PlanInput; onCreated: (programId: string) => void }) {
+  const { profile, unit } = useAuth();
+  const kits = kitsOf(profile);
+  const [kitId, setKitId] = useState(() => activeKit(profile, kits).id);
   const [form, setForm] = useState<PlanInput>(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof PlanInput>(k: K, v: PlanInput[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const kit = kits.find((k) => k.id === kitId) ?? kits[0];
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const { program_id } = await generatePlan(form);
+      // Only exercises this kit can do, and loads it can make.
+      const used = { ...kit, equipment: form.equipment.filter((x) => (EQUIPMENT as readonly string[]).includes(x)) as typeof kit.equipment };
+      const library = await listExercises().catch(() => []);
+      const exclude = [...new Set(library.filter((x) => !kitAllows(x, used)).map((x) => x.slug))];
+      const { program_id } = await generatePlan({ ...form, exclude_slugs: exclude, equipment_note: describeKit(used, unit).slice(0, 400) });
       onCreated(program_id);
     } catch (err) {
       setError((err as Error).message);
@@ -284,6 +294,25 @@ function Generator({ initial, onCreated }: { initial: PlanInput; onCreated: (pro
             ))}
           </div>
         </fieldset>
+        {kits.length > 1 && (
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium">Where you&apos;ll train</legend>
+            <div className="flex flex-wrap gap-2">
+              {kits.map((k) => (
+                <Chip
+                  key={k.id}
+                  on={k.id === kitId}
+                  onClick={() => {
+                    setKitId(k.id);
+                    set("equipment", [...k.equipment]);
+                  }}
+                >
+                  {k.name}
+                </Chip>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <fieldset>
           <legend className="mb-2 text-sm font-medium">Equipment</legend>
           <div className="flex flex-wrap gap-2">

@@ -6,7 +6,8 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { calculatePlates, ownedPlates, plateColor } from "@/lib/plates";
+import { kitFor, type Kit } from "@/lib/kit";
+import { calculatePlates, kitPlates, plateColor } from "@/lib/plates";
 import { parseNumber } from "@/lib/workout-logic";
 
 /** Bottom sheet that shows exactly which plates to load on each side. */
@@ -15,6 +16,7 @@ export function PlateCalculator({
   onOpenChange,
   initialWeight,
   onEditWeights,
+  kit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -22,16 +24,18 @@ export function PlateCalculator({
   initialWeight?: number | null;
   /** Opens the "your bar and plates" sheet. */
   onEditWeights?: () => void;
+  /** Whose plates to use (the workout's kit); defaults to the kit in use. */
+  kit?: Kit;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Plate calculator</DialogTitle>
-          <DialogDescription>Plates per side, heaviest closest to the middle.</DialogDescription>
+          <DialogDescription>Plates per side, heaviest closest to the middle.{kit ? ` Using ${kit.name}.` : ""}</DialogDescription>
         </DialogHeader>
         {/* Mounted fresh on every open, so it starts from the current set's weight. */}
-        <PlateForm initialWeight={initialWeight} />
+        <PlateForm initialWeight={initialWeight} kit={kit} />
         {onEditWeights && (
           <Button
             variant="secondary"
@@ -48,16 +52,16 @@ export function PlateCalculator({
   );
 }
 
-function PlateForm({ initialWeight }: { initialWeight?: number | null }) {
+function PlateForm({ initialWeight, kit }: { initialWeight?: number | null; kit?: Kit }) {
   const { profile, unit } = useAuth();
-  const std = ownedPlates(profile, unit);
+  const std = kitPlates(kit ?? kitFor(null, profile), unit);
   const u = unit === "imperial" ? "lb" : "kg";
   const [target, setTarget] = useState(initialWeight ? String(initialWeight) : "");
   const [bar, setBar] = useState(String(std.bar));
 
   const t = parseNumber(target);
   const b = parseNumber(bar) ?? std.bar;
-  const result = t != null ? calculatePlates(t, b, std.plates) : null;
+  const result = t != null ? calculatePlates(t, b, std.plates, std.pairs) : null;
 
   return (
     <>

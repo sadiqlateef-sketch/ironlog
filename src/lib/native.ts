@@ -19,6 +19,8 @@ const REST_CHANNEL = "rest-timer";
 const RECOVERY_NOTIFICATION_ID = 1002;
 const REMINDER_CHANNEL = "reminders";
 const RECOVERY_PREF = "ironlog:recovery-reminder";
+const HOME_NOTIFICATION_ID = 1003;
+const HOME_PREF = "ironlog:home-reminder";
 
 /** Light tap when a set is ticked off. */
 export function tap(): void {
@@ -53,7 +55,7 @@ export async function initNative(): Promise<void> {
   await LocalNotifications.createChannel({
     id: REMINDER_CHANNEL,
     name: "Reminders",
-    description: "Recovery-day tips the morning after a workout",
+    description: "Recovery-day tips and your nightly home workout",
     importance: 3,
     visibility: 1,
   }).catch(() => {});
@@ -144,6 +146,47 @@ export async function scheduleRecoveryReminder(at: Date, title: string, body: st
   } catch {
     // A missed tip is fine.
   }
+}
+
+/** The nightly "Use What You Got" reminder: off, or the time it goes off ("19:30"). */
+export function homeReminderTime(): string | null {
+  try {
+    const v = localStorage.getItem(HOME_PREF);
+    return v && /^\d{2}:\d{2}$/.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Turn the nightly home-workout reminder on at `time` ("19:30"), or off with null. Returns the time it's set for. */
+export async function setHomeReminder(time: string | null): Promise<string | null> {
+  if (!isNative()) return null;
+  await LocalNotifications.cancel({ notifications: [{ id: HOME_NOTIFICATION_ID }] }).catch(() => {});
+  if (time && !(await requestNotifications())) time = null;
+  if (time) {
+    const [hour, minute] = time.split(":").map(Number);
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: HOME_NOTIFICATION_ID,
+            title: "Use What You Got",
+            body: "Tonight's 15–25 minute home workout is ready. Built from your home kit.",
+            channelId: REMINDER_CHANNEL,
+            schedule: { on: { hour, minute }, allowWhileIdle: true },
+            autoCancel: true,
+          },
+        ],
+      });
+    } catch {
+      time = null;
+    }
+  }
+  try {
+    if (time) localStorage.setItem(HOME_PREF, time);
+    else localStorage.removeItem(HOME_PREF);
+  } catch {}
+  return time;
 }
 
 /** Starting another workout makes tomorrow's "recovery day" wrong, so drop it. */

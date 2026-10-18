@@ -112,7 +112,7 @@ export async function getExerciseHistory(exerciseId: string) {
 // ---------- Sessions ----------
 
 // The workout in progress lives in the offline store (works without signal).
-export { getActiveSession, startPlannedSession, type PlannedExercise } from "@/lib/offline/workout-store";
+export { getActiveSession, setSessionCalendar, startPlannedSession, type PlannedExercise } from "@/lib/offline/workout-store";
 
 export async function listRecentSessions(limit = 5): Promise<WorkoutSession[]> {
   return unwrap(
@@ -248,6 +248,9 @@ export interface PlanInput {
   experience: "beginner" | "intermediate" | "advanced";
   equipment: string[];
   notes: string;
+  /** From your equipment kit: what it can't do, and its weights in words. */
+  exclude_slugs?: string[];
+  equipment_note?: string;
 }
 
 export type RoutineWithExercises = Routine & {

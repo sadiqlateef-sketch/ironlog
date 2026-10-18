@@ -6,6 +6,8 @@ import { ExercisePicker } from "@/components/exercise-picker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SortableList } from "@/components/ui/sortable-list";
+import { useKits } from "@/hooks/use-kits";
+import { kitAllows } from "@/lib/kit";
 import { MUSCLE_LABELS } from "@/lib/labels";
 import {
   buildInstantWorkout,
@@ -60,12 +62,15 @@ export function InstantTab({ busy, onStart }: { busy: boolean; onStart: (create:
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  const signature = `${opts.minutes}|${opts.equipment}|${opts.target}|${seed}`;
+  const { active } = useKits();
+  const signature = `${opts.minutes}|${opts.equipment}|${opts.target}|${seed}|${active.id}`;
   const built = useMemo(() => {
     if (!library) return null;
-    const w = buildInstantWorkout(library, opts, seed);
+    // "Full gym" means the gym you're using: only what its kit has.
+    const pool = opts.equipment === "gym" ? library.filter((e) => kitAllows(e, active)) : library;
+    const w = buildInstantWorkout(pool, opts, seed);
     return { title: w.title, items: w.items.map((x) => ({ ...x, key: x.exercise.id })) };
-  }, [library, opts, seed]);
+  }, [library, opts, seed, active]);
   const items = edited?.for === signature ? edited.items : (built?.items ?? []);
   const minutes = Math.round(items.reduce((t, x) => t + itemMinutes(x), 0));
 

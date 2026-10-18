@@ -337,6 +337,39 @@ only the Edge Function can read (RLS on, no policies).
    Ironlog**, tick the calendar boxes, and continue. You land back in Ironlog;
    pick the calendar (one named "Workout" is chosen for you if you have it).
 
+## Equipment, swaps, work shifts and home workouts
+
+**Your equipment (Settings > Equipment).** One kit per place you train: your
+gym and your home set. Each kit has the equipment types, whether there's a
+bench, squat rack and pull-up bar, the bar weight, your plates (a gym "has
+plenty"; at home you count them) and your dumbbells (a full rack, or exactly
+the ones you own). The plate calculator, the program builder, Instant
+workouts and swaps only use what the kit has. "Save and use here now" picks
+the kit that's in use.
+
+**Smart swaps.** In a workout, Swap shows the best match first: same main
+muscle, the closest helper muscles, equipment this place has, and nothing
+that's already in the workout. "Not here" swaps it and remembers this place
+doesn't have that exercise (undo it in the kit).
+
+**Work shifts (Settings > Work shifts).** Tap days to mark Day, Evening or
+Night shifts for the next four weeks. The Planned tab then shows "Your week
+around work": heavy days go on days off, lighter ones around evening shifts
+or before a night shift, and the day after a night shift is rest. "Use this
+order" makes Up next follow it.
+
+**Use What You Got (Workout > Home).** A 15, 20 or 25 minute workout (or
+"Surprise me") built only from your home kit, in supersets so short sessions
+still cover a lot. It's the same workout all evening and a new one each
+night; shuffle for another, or swap any exercise. It logs like any workout.
+At the end, "Add to calendar?" puts it on your Google Calendar (the answer is
+remembered). An evening reminder can be turned on in the Home tab or
+Settings > Reminders (Android app).
+
+After this update: run **Deploy database and functions** once (adds the
+migration `20261018000000_kits_shifts_home.sql` and the updated
+`gym-calendar` and `generate-plan` functions), then rebuild the APK.
+
 ## Progress screen (Phase 3)
 
 - **Muscle recovery heatmap.** Front and back body views, coloured from dark
