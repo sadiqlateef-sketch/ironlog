@@ -7,8 +7,8 @@ import { formatClock } from "@/lib/workout-logic";
 
 /** Sticky bar above the bottom nav while resting. */
 export function RestTimerBar() {
-  const { timer, remaining, adjust, stop } = useRestTimer();
-  if (!timer) return null;
+  const { timer, remaining, adjust, stop, inline } = useRestTimer();
+  if (!timer || inline) return null;
 
   const done = remaining <= 0;
   const progress = Math.min(1, remaining / timer.duration);
@@ -30,7 +30,7 @@ export function RestTimerBar() {
           <p className={`text-xs ${done ? "" : "text-muted-foreground"} truncate`}>
             {done ? "Rest over. Next set!" : `Resting · ${timer.label}`}
           </p>
-          <p className="font-mono text-3xl font-extrabold leading-tight tracking-tight">{formatClock(remaining)}</p>
+          <p className="num text-[34px] leading-tight font-bold">{formatClock(remaining)}</p>
         </div>
         {!done && (
           <>

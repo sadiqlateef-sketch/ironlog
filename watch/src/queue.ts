@@ -2,8 +2,10 @@
 // the watch first, then sent to the server in order. With no signal (a basement
 // gym), changes wait and go out once the watch is back online.
 //
-// Each operation is safe to send twice: new sets carry their own id, and heart
+// Each operation is safe to send twice: new workouts and sets carry their own id, and heart
 // rate rows are unique per session + second, so a retry never duplicates data.
+
+import type { NewSet } from "./logic";
 
 export interface HrRow {
   session_id: string;
@@ -11,20 +13,18 @@ export interface HrRow {
   bpm: number;
 }
 
-export interface NewSetRow {
+export type NewSetRow = NewSet;
+
+/** A workout started on the watch, possibly with no signal: the session and its sets in one go. */
+export interface StartRow {
   id: string;
-  client_id: string;
-  session_id: string;
-  exercise_id: string;
-  exercise_order: number;
-  set_number: number;
-  set_type: "warmup" | "normal" | "drop" | "failure";
-  superset_group: number | null;
-  weight: number;
-  reps: number;
+  name: string;
+  routine_id: string | null;
+  start_time: string;
 }
 
 export type Op =
+  | { kind: "start"; session: StartRow; rows: NewSetRow[] }
   | { kind: "addSet"; row: NewSetRow }
   | { kind: "complete"; setId: string; weight: number; reps: number; at: string }
   | { kind: "uncomplete"; setId: string }
@@ -82,13 +82,19 @@ export class OpQueue {
 
   /** Save a change, then try to send everything. Never throws. */
   async push(op: Op): Promise<number> {
+    await this.add(op);
+    return this.flush();
+  }
+
+  /** Save a change and start sending in the background. Resolves as soon as it's saved on the watch. */
+  async add(op: Op): Promise<void> {
     const ops = await this.all();
     // Heart rate arrives often: merge with a waiting batch rather than growing the queue.
     const last = ops[ops.length - 1];
     if (op.kind === "hr" && last?.kind === "hr") last.rows.push(...op.rows);
     else ops.push(op);
     await this.save();
-    return this.flush();
+    this.flush();
   }
 
   /** Send waiting changes in order, stopping at the first one that must be retried. Returns how many are left. */

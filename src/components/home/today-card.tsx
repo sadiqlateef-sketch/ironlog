@@ -81,7 +81,7 @@ function InProgress({ workout }: { workout: NonNullable<ActiveWorkout> }) {
       <div className="min-w-0">
         <p className="truncate text-lg font-bold">{workoutTitle(workout.session.name ?? "Workout")}</p>
         <p className="text-muted-foreground text-sm">
-          In progress · <span className="text-foreground font-mono font-semibold">{formatElapsed(now - +new Date(workout.session.start_time))}</span>
+          In progress · <span className="text-foreground num font-semibold">{formatElapsed(now - +new Date(workout.session.start_time))}</span>
           {workout.sets > 0 && ` · ${workout.done} of ${workout.sets} sets`}
         </p>
       </div>

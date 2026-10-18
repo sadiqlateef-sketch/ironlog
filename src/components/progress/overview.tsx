@@ -132,14 +132,14 @@ export function WeekCards({ data }: { data: StatsData }) {
     <section className="grid grid-cols-2 gap-3" aria-label="This week">
       <div className="glass flex flex-col gap-1 rounded-2xl p-4">
         <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Volume this week</p>
-        <p className="font-mono text-2xl font-extrabold">
+        <p className="num text-2xl font-bold">
           {compact(w.volume)} <span className="text-muted-foreground text-sm font-normal">{u}</span>
         </p>
         <Change pct={w.volumePct} />
       </div>
       <div className="glass flex flex-col gap-1 rounded-2xl p-4">
         <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Time this week</p>
-        <p className="font-mono text-2xl font-extrabold">
+        <p className="num text-2xl font-bold">
           {w.minutes >= 60 ? `${Math.floor(w.minutes / 60)}h ${w.minutes % 60}m` : `${w.minutes}m`}
         </p>
         <Change pct={w.minutesPct} />
@@ -205,7 +205,7 @@ export function CalendarCard({ data, onChanged }: { data: StatsData; onChanged?:
               onClick={() => setOpen(d)}
               aria-label={`${d.toLocaleDateString(undefined, { month: "long", day: "numeric" })}${ss ? `: ${ss.length} workout${ss.length > 1 ? "s" : ""}` : ""}`}
               className={cn(
-                "mx-auto grid size-9 place-items-center rounded-full font-mono text-sm",
+                "mx-auto grid size-9 place-items-center rounded-full num text-sm",
                 ss ? "bg-primary text-primary-foreground font-bold" : "text-foreground/85 hover:bg-accent",
                 k > today && "text-muted-foreground",
                 isToday && "ring-primary-text ring-2",
@@ -220,15 +220,15 @@ export function CalendarCard({ data, onChanged }: { data: StatsData; onChanged?:
       <dl className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-secondary rounded-xl px-2 py-2">
           <dt className="text-muted-foreground text-xs">This month</dt>
-          <dd className="font-mono text-xl font-extrabold">{inMonth}</dd>
+          <dd className="num text-xl font-bold">{inMonth}</dd>
         </div>
         <div className="bg-secondary rounded-xl px-2 py-2">
           <dt className="text-muted-foreground text-xs">All sessions</dt>
-          <dd className="font-mono text-xl font-extrabold">{data.total}</dd>
+          <dd className="num text-xl font-bold">{data.total}</dd>
         </div>
         <div className="bg-secondary rounded-xl px-2 py-2">
           <dt className="text-muted-foreground text-xs">Week streak</dt>
-          <dd className="flex items-center justify-center gap-1 font-mono text-xl font-extrabold">
+          <dd className="flex items-center justify-center gap-1 num text-xl font-bold">
             <Flame className={cn("size-5", streak ? "text-set-warmup fill-set-warmup/30" : "text-muted-foreground")} />
             {streak}
           </dd>
@@ -261,7 +261,7 @@ export function ProgressIndexCard({ data }: { data: StatsData }) {
       ) : (
         <div className="flex items-center gap-4">
           <div>
-            <p className="font-mono text-4xl font-extrabold" data-testid="progress-index">
+            <p className="num text-4xl font-bold" data-testid="progress-index">
               {now.toFixed(1)}
             </p>
             <p className={cn("text-sm font-semibold", now >= 100 ? "text-success" : "text-set-failure")}>
@@ -312,7 +312,7 @@ export function MuscleBreakdownCard({ data }: { data: StatsData }) {
               <li key={r.group} className="flex items-center gap-2">
                 <span className="size-3 shrink-0 rounded-full" style={{ background: GROUP_COLORS[r.group] }} aria-hidden />
                 <span className="flex-1">{r.group}</span>
-                <span className="font-mono font-bold">{r.pct}%</span>
+                <span className="num font-bold">{r.pct}%</span>
               </li>
             ))}
           </ul>
@@ -349,14 +349,14 @@ export function TopLiftsCard({ data }: { data: StatsData }) {
                   onClick={() => ex && setOpen(ex)}
                   className="hover:bg-accent flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left"
                 >
-                  <span className="text-muted-foreground w-4 font-mono text-sm font-bold">{i + 1}</span>
+                  <span className="text-muted-foreground w-4 num text-sm font-bold">{i + 1}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{ex?.name ?? "Exercise"}</span>
                     <span className="text-muted-foreground text-xs">
                       {roundHalf(t.weight)} {u} × {t.reps}
                     </span>
                   </span>
-                  <span className="text-primary-text font-mono text-xl font-extrabold">
+                  <span className="text-primary-text num text-xl font-bold">
                     {Math.round(t.e1rm)} <span className="text-muted-foreground text-xs font-normal">{u}</span>
                   </span>
                 </button>
@@ -448,8 +448,8 @@ export function CompareCard({ data }: { data: StatsData }) {
           {rows.map(([label, a, b, f]) => (
             <tr key={label} className="border-t">
               <td className="py-2">{label}</td>
-              <td className={cn("py-2 text-right font-mono font-bold", a > b ? "text-success" : a < b && "text-set-failure")}>{f(a)}</td>
-              <td className="text-muted-foreground py-2 text-right font-mono">{f(b)}</td>
+              <td className={cn("py-2 text-right num font-bold", a > b ? "text-success" : a < b && "text-set-failure")}>{f(a)}</td>
+              <td className="text-muted-foreground py-2 text-right num">{f(b)}</td>
             </tr>
           ))}
         </tbody>

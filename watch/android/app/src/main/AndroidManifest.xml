@@ -6,6 +6,13 @@
     <uses-permission android:name="android.permission.BODY_SENSORS" android:maxSdkVersion="35" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
 
+    <!-- Voice logging opens the watch's speech screen; Android 11+ needs to be told we look for it. -->
+    <queries>
+      <intent>
+        <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+      </intent>
+    </queries>
+
     <!-- This is a watch app. -->
     <uses-feature android:name="android.hardware.type.watch" />
 

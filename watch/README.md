@@ -46,6 +46,18 @@ Watches don't have a file manager, so you install over Wi-Fi with `adb`
 The first time you start a workout, the watch asks to read your heart rate.
 Allow it.
 
+## Use it without your phone
+
+Home shows your program's **Up next** day (or your routines). Tap it to start.
+The watch keeps a copy of your plan and of the workout in progress, so this
+works with no signal too: everything you log waits on the watch and syncs
+once it's back online. Open the app somewhere with signal now and then so the
+saved plan stays current.
+
+In a workout, **🎤 Say a set** opens the watch's speech screen. Say "185 for
+8" (or "rows 70 for 10" to log on another exercise) and it's logged, with
+**Undo** right below.
+
 ## Develop
 
 ```bash
@@ -61,6 +73,8 @@ npm run lint
 | `App.tsx` | Picks the screen: link, home, workout |
 | `src/screens/` | Pair, Home, Workout (log a set, rest, summary) |
 | `src/queue.ts` | Offline queue: saves each change on the watch, sends it when online |
+| `src/voice.ts` + `android/.../VoiceModule.kt` | "Say a set": the watch's speech screen, on-device where it can |
+| `src/voiceSet.ts` | Reads "185 for 8" (a copy of the phone's `src/lib/voice-set.ts`; a test keeps them the same) |
 | `src/logic.ts` | Weight steps, pre-fill, rest rules, heart-rate zones (pure, tested) |
 | `src/api.ts` | Database reads and writes (Supabase) |
 | `src/pairing.ts` | Watch side of linking (server: `supabase/functions/watch-pair`) |

@@ -162,7 +162,7 @@ function Item({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-muted-foreground truncate text-xs">{label}</dt>
-      <dd className="font-mono text-lg font-extrabold">{value}</dd>
+      <dd className="num text-lg font-bold">{value}</dd>
     </div>
   );
 }

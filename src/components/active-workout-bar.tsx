@@ -60,7 +60,7 @@ export function ActiveWorkoutBar({ workout }: { workout: NonNullable<ActiveWorko
             <span className={cn("block truncate text-xs", !restDone && "text-muted-foreground")}>
               {restDone ? "Rest over. Next set!" : resting ? `Resting · ${name}` : `${name}${workout.sets ? ` · ${workout.done} of ${workout.sets} sets` : ""}`}
             </span>
-            <span className="block font-mono text-xl leading-tight font-extrabold tracking-tight" role={resting ? "timer" : undefined}>
+            <span className="block num text-xl leading-tight font-extrabold tracking-tight" role={resting ? "timer" : undefined}>
               {resting ? formatClock(remaining) : elapsed}
             </span>
           </span>

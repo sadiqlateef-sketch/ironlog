@@ -118,7 +118,7 @@ function Dashboard() {
                     )}
                   </p>
                 </div>
-                <p className="shrink-0 font-mono text-sm font-semibold">{formatWeight(s.volume, unit)}</p>
+                <p className="shrink-0 num text-sm font-semibold">{formatWeight(s.volume, unit)}</p>
                 <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
               </button>
             </Card>

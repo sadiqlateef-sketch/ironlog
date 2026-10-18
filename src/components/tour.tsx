@@ -145,8 +145,8 @@ function LogArt() {
       ].map(([w, r, done], k) => (
         <div key={k} className={cn("flex items-center gap-2 rounded-xl p-1.5", done && "bg-success/10")}>
           <span className="text-muted-foreground w-4 text-xs">{k + 1}</span>
-          <span className="bg-secondary flex-1 rounded-lg py-1.5 text-center font-mono font-bold">{w}</span>
-          <span className="bg-secondary flex-1 rounded-lg py-1.5 text-center font-mono font-bold">{r}</span>
+          <span className="bg-secondary flex-1 rounded-lg py-1.5 text-center num font-bold">{w}</span>
+          <span className="bg-secondary flex-1 rounded-lg py-1.5 text-center num font-bold">{r}</span>
           <span className={cn("grid size-8 place-items-center rounded-lg text-xs font-bold", done ? "bg-success text-[#08200d]" : "bg-secondary")}>✓</span>
         </div>
       ))}
@@ -189,7 +189,7 @@ function BarArt() {
         <span className="bg-success relative size-2.5 rounded-full" />
         <span className="relative flex-1">
           <span className="text-muted-foreground block text-xs">Resting · Push Day</span>
-          <span className="block font-mono text-xl font-extrabold">1:24</span>
+          <span className="block num text-xl font-extrabold">1:24</span>
         </span>
         <Timer className="text-muted-foreground relative size-5" />
         <SkipForward className="relative size-5" />

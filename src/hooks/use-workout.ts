@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRestTimer } from "@/components/providers/rest-timer-provider";
-import { kgToLb, toKg, type UnitSystem } from "@/lib/units";
+import { toKg, weightInput, type UnitSystem } from "@/lib/units";
 import {
   getBestE1rms,
   getLastPerformance,
@@ -32,6 +32,7 @@ import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
+import { cueSetSaved } from "@/lib/cues";
 import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import type { SetType } from "@/types/database";
@@ -103,11 +104,8 @@ function targetNoteFor(t: { target_rpe: number | null; target_percent_1rm: numbe
   return parts.length ? parts.join(" · ") : null;
 }
 
-export function toDisplay(kg: number, unit: UnitSystem): string {
-  if (!kg) return "";
-  const v = unit === "imperial" ? kgToLb(kg) : kg;
-  return String(Math.round(v * 100) / 100);
-}
+/** A stored kg weight as the logger shows it (see weightInput: 0.5 lb / 0.25 kg steps). */
+export const toDisplay = (kg: number, unit: UnitSystem): string => weightInput(kg, unit);
 
 function toUiSet(s: WorkoutSet, unit: UnitSystem): UiSet {
   return {
@@ -568,7 +566,10 @@ export function useWorkout() {
 
   const removeSet = useCallback(
     async (order: number, id: string) => {
-      setBlocks((prev) => prev.map((b) => (b.order === order ? { ...b, sets: b.sets.filter((s) => s.id !== id) } : b)));
+      // Its drop sets go with it (the database removes them too).
+      setBlocks((prev) =>
+        prev.map((b) => (b.order === order ? { ...b, sets: b.sets.filter((s) => s.id !== id && s.parentSetId !== id) } : b)),
+      );
       try {
         await deleteSets([id]);
       } catch (e) {
@@ -576,6 +577,120 @@ export function useWorkout() {
       }
     },
     [fail, setBlocks],
+  );
+
+  /**
+   * Put a new set straight after another one (long-press: duplicate, add drop set).
+   * Set numbers are unique per exercise, so the later sets move up one first,
+   * highest first, so no two ever share a number on the way.
+   */
+  const insertSetAfter = useCallback(
+    async (order: number, afterId: string, fields: Pick<UiSet, "type" | "parentSetId" | "weight" | "reps" | "time" | "distance">) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      const idx = block?.sets.findIndex((s) => s.id === afterId) ?? -1;
+      if (!session || !block || idx < 0) return;
+      const number = block.sets[idx].setNumber + 1;
+      const later = block.sets.filter((s) => s.setNumber >= number).sort((a, b) => b.setNumber - a.setNumber);
+      const tracking = block.exercise.tracking ?? "weight_reps";
+      try {
+        for (const s of later) await updateSet(s.id, { set_number: s.setNumber + 1 });
+        const [row] = await insertSets([
+          {
+            session_id: session.id,
+            exercise_id: block.exercise.id,
+            exercise_order: order,
+            set_number: number,
+            set_type: fields.type,
+            parent_set_id: fields.parentSetId,
+            superset_group: block.supersetGroup,
+            weight: tracking === "distance_time" ? 0 : toKg(parseNumber(fields.weight) ?? 0, unit),
+            reps: Math.round(parseNumber(fields.reps) ?? 0),
+            ...(tracking !== "weight_reps" && {
+              duration_seconds: parseDuration(fields.time),
+              distance_m: tracking === "distance_time" ? toMetres(parseNumber(fields.distance) ?? 0, unit) || null : null,
+            }),
+          },
+        ]);
+        const ui = { ...toUiSet(row, unit), ...fields, done: false };
+        const bumped = new Set(later.map((s) => s.id));
+        setBlocks((prev) =>
+          prev.map((b) => {
+            if (b.order !== order) return b;
+            const sets = b.sets.map((s) => (bumped.has(s.id) ? { ...s, setNumber: s.setNumber + 1 } : s));
+            const at = sets.findIndex((s) => s.id === afterId);
+            return { ...b, sets: [...sets.slice(0, at + 1), ui, ...sets.slice(at + 1)] };
+          }),
+        );
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [session, unit, fail, setBlocks],
+  );
+
+  /** Long-press "Duplicate": the same numbers again, right below, not ticked yet. */
+  const duplicateSet = useCallback(
+    (order: number, id: string) => {
+      const set = blocksRef.current.find((b) => b.order === order)?.sets.find((s) => s.id === id);
+      if (!set) return Promise.resolve();
+      const { type, parentSetId, weight, reps, time, distance } = set;
+      return insertSetAfter(order, id, { type, parentSetId, weight, reps, time, distance });
+    },
+    [insertSetAfter],
+  );
+
+  /** Long-press "Add drop set": a lighter set hanging off this one. */
+  const addDropSet = useCallback(
+    (order: number, id: string, weight: string) => {
+      const set = blocksRef.current.find((b) => b.order === order)?.sets.find((s) => s.id === id);
+      if (!set) return Promise.resolve();
+      return insertSetAfter(order, id, { type: "drop", parentSetId: id, weight, reps: "", time: "", distance: "" });
+    },
+    [insertSetAfter],
+  );
+
+  /** Undo a delete: the same set back in its old place. */
+  const restoreSet = useCallback(
+    async (order: number, set: UiSet, index: number) => {
+      const block = blocksRef.current.find((b) => b.order === order);
+      if (!session || !block) return;
+      const tracking = block.exercise.tracking ?? "weight_reps";
+      // Its number may have been reused by a set added since.
+      const taken = block.sets.some((s) => s.setNumber === set.setNumber);
+      const number = taken ? Math.max(0, ...block.sets.map((s) => s.setNumber)) + 1 : set.setNumber;
+      const reps = Math.round(parseNumber(set.reps) ?? 0);
+      try {
+        const [row] = await insertSets([
+          {
+            session_id: session.id,
+            exercise_id: block.exercise.id,
+            exercise_order: order,
+            set_number: number,
+            set_type: set.type,
+            parent_set_id: set.parentSetId && block.sets.some((s) => s.id === set.parentSetId) ? set.parentSetId : null,
+            superset_group: block.supersetGroup,
+            weight: tracking === "distance_time" ? 0 : toKg(parseNumber(set.weight) ?? 0, unit),
+            reps,
+            is_completed: set.done,
+            ...(tracking !== "weight_reps" && {
+              duration_seconds: parseDuration(set.time),
+              distance_m: tracking === "distance_time" ? toMetres(parseNumber(set.distance) ?? 0, unit) || null : null,
+            }),
+          },
+        ]);
+        const ui = { ...set, id: row.id, setNumber: number, parentSetId: row.parent_set_id };
+        setBlocks((prev) =>
+          prev.map((b) => {
+            if (b.order !== order) return b;
+            const at = Math.min(index, b.sets.length);
+            return { ...b, sets: [...b.sets.slice(0, at), ui, ...b.sets.slice(at)] };
+          }),
+        );
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [session, unit, fail, setBlocks],
   );
 
   /** Save weight/reps after the user leaves the field. */
@@ -600,13 +715,12 @@ export function useWorkout() {
     [unit, fail],
   );
 
-  const cycleType = useCallback(
-    async (order: number, id: string) => {
+  /** Change a set's type (warm-up, drop...). A drop set hangs off the set right before it. */
+  const setSetType = useCallback(
+    async (order: number, id: string, type: SetType) => {
       const block = blocksRef.current.find((b) => b.order === order);
       const idx = block?.sets.findIndex((s) => s.id === id) ?? -1;
       if (!block || idx < 0) return;
-      const type = nextSetType(block.sets[idx].type);
-      // A drop set hangs off the set right before it.
       const parentSetId = type === "drop" && idx > 0 ? block.sets[idx - 1].id : null;
       patchSet(order, id, { type, parentSetId });
       try {
@@ -616,6 +730,14 @@ export function useWorkout() {
       }
     },
     [patchSet, fail],
+  );
+
+  const cycleType = useCallback(
+    (order: number, id: string) => {
+      const set = blocksRef.current.find((b) => b.order === order)?.sets.find((s) => s.id === id);
+      if (set) return setSetType(order, id, nextSetType(set.type));
+    },
+    [setSetType],
   );
 
   /** Celebrates a set that beats every earlier workout's best for that lift. */
@@ -682,6 +804,7 @@ export function useWorkout() {
         if (!seconds && !metres) return false;
         const weight = tracking === "time" ? set.weight || (prev?.weight ? toDisplay(prev.weight, unit) : "") : "";
         patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
+        cueSetSaved();
         startRest();
         try {
           await updateSet(id, {
@@ -703,6 +826,7 @@ export function useWorkout() {
       if (repsNum == null || repsNum === 0) return false;
 
       patchSet(order, id, { weight, reps, done: true });
+      cueSetSaved();
       startRest();
       const kg = toKg(parseNumber(weight) ?? 0, unit);
       if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
@@ -746,6 +870,10 @@ export function useWorkout() {
     patchSet,
     commitSet,
     cycleType,
+    setSetType,
+    duplicateSet,
+    addDropSet,
+    restoreSet,
     toggleDone,
   };
 }

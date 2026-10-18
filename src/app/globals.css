@@ -170,6 +170,15 @@
   }
 }
 
+/* Numbers (weights, reps, timers, stats): the app's sans in bold with
+   even-width digits, so columns line up and big numbers read cleanly.
+   Code and link fields keep Geist Mono. */
+@utility num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
 /* Frosted glass panel: cards, sheets, the tab bar and the rest timer. */
 @utility glass {
   background-color: var(--card);
