@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { describeTimedSet } from "@/lib/cardio";
 import type { MuscleGroup } from "@/types/database";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 export type Tab = "history" | "chart" | "guide";
 
@@ -227,7 +228,7 @@ function GoalButton({
 
 function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: (kg: number) => number; u: string }) {
   const { unit } = useAuth();
-  if (!history) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!history) return <SkeletonList rows={3} />;
   if (!history.length) return <p className="text-muted-foreground text-sm">You haven&apos;t logged this yet. Your sets will show up here.</p>;
   return (
     <ul className="flex flex-col gap-3">
@@ -285,7 +286,7 @@ function ChartTab({
 }) {
   const [range, setRange] = useState<(typeof CHART_RANGES)[number]["label"]>("3M");
   const [metric, setMetric] = useState<"e1rm" | "volume">("e1rm");
-  if (!history) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!history) return <SkeletonList rows={3} />;
 
   const days = CHART_RANGES.find((r) => r.label === range)!.days;
   const { points, min, max } = chartPoints(history, metric, days);

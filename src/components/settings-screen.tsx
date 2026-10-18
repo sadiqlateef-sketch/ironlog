@@ -6,6 +6,7 @@
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, ChevronRight, Dumbbell, FileDown, FileUp, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { AppearanceSettings } from "@/components/appearance-settings";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
 import { BackupButton } from "@/components/import/backup-button";
 import { EquipmentSheet } from "@/components/equipment-sheet";
@@ -109,6 +110,10 @@ export function SettingsScreen() {
           </div>
         </div>
         <p className="text-muted-foreground text-xs">{profile?.email}</p>
+      </Section>
+
+      <Section id="appearance" title="Appearance" description="Saved on this phone. Dark is easiest to read under bright gym lights.">
+        <AppearanceSettings />
       </Section>
 
       <Section id="about" title="About you" description="Used for BMI and the body fat estimate. Only you can see it.">

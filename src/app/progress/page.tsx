@@ -32,6 +32,11 @@ import {
   type WorkoutSession,
 } from "@/lib/workout-api";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { ChartNoAxesColumn } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 const RANGES = [
   { key: "4w", label: "4 weeks", days: 28 },
@@ -85,6 +90,19 @@ function Progress() {
 
       {tab === "overview" && (
         <>
+          {data?.total === 0 && (
+            <EmptyState
+              icon={ChartNoAxesColumn}
+              title="Your progress starts with one workout"
+              action={
+                <Button asChild>
+                  <Link href="/workout/">Start a workout</Link>
+                </Button>
+              }
+            >
+              After your first workout, this fills in with your weekly volume, records, strength trend and which muscles you&apos;ve trained.
+            </EmptyState>
+          )}
           {data ? (
             <>
               <WeekCards data={data} />
@@ -96,7 +114,7 @@ function Progress() {
               <CompareCard data={data} />
             </>
           ) : (
-            !error && <p className="text-muted-foreground text-sm">Loading…</p>
+            !error && <SkeletonList rows={4} rowClassName="h-32" />
           )}
           <PeriodizationCard />
           <h2 className="text-muted-foreground mt-2 text-xs font-semibold tracking-wide uppercase">Charts</h2>
