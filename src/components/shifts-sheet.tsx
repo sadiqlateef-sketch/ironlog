@@ -93,7 +93,7 @@ function ShiftsForm({ onDone }: { onDone: () => void }) {
                 d === today && "ring-primary ring-2",
               )}
             >
-              <span className="font-mono">{Number(d.slice(8))}</span>
+              <span className="num">{Number(d.slice(8))}</span>
               {t && <span className="text-[10px] leading-none font-bold">{SHORT[t]}</span>}
             </button>
           );

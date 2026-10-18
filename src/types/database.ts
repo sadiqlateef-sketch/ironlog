@@ -276,6 +276,7 @@ export type Database = {
           calendar_event_id: string | null;
           kit_id: string | null;
           add_to_calendar: boolean | null;
+          import_key: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -292,6 +293,7 @@ export type Database = {
           calendar_event_id?: string | null;
           kit_id?: string | null;
           add_to_calendar?: boolean | null;
+          import_key?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sessions"]["Insert"]>;
         Relationships: [

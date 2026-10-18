@@ -61,7 +61,7 @@ export function RecordCelebration({ hit, onDone }: { hit: RecordHit; onDone: () 
           <span className="text-record block text-lg leading-tight font-extrabold">New record!</span>
           <span className="block truncate font-semibold">{hit.exercise}</span>
           <span className="text-muted-foreground block text-sm">
-            <span className="text-foreground font-mono font-bold">
+            <span className="text-foreground num font-bold">
               {hit.weight} {unit === "imperial" ? "lb" : "kg"} × {hit.reps}
             </span>{" "}
             · your strongest set yet

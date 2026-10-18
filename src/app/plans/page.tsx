@@ -561,7 +561,7 @@ function DayRow({
                 {x.superset_group != null && <span className="text-set-drop mr-1 text-xs font-bold">SS{x.superset_group}</span>}
                 {x.exercises?.name}
               </span>
-              <span className="text-muted-foreground shrink-0 font-mono">
+              <span className="text-muted-foreground shrink-0 num">
                 {x.target_sets}×{x.target_reps}
                 {x.target_reps_max ? `-${x.target_reps_max}` : ""}
                 {x.target_weight_kg ? ` @ ${formatWeight(x.target_weight_kg, unit)}` : x.target_rpe ? ` @ RPE ${x.target_rpe}` : ""}

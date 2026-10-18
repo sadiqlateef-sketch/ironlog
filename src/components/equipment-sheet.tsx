@@ -193,7 +193,7 @@ function KitForm({ kit, onBack }: { kit: Kit; onBack: () => void }) {
                       type="button"
                       aria-pressed={on}
                       onClick={() => setPlate(p, on ? undefined : null)}
-                      className={cn("h-12 rounded-xl border font-mono text-base font-bold", on ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-muted-foreground")}
+                      className={cn("h-12 rounded-xl border num text-base font-bold", on ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-muted-foreground")}
                     >
                       {p}
                     </button>
@@ -333,11 +333,11 @@ export function Switch({ on, onClick, label, detail }: { on: boolean; onClick: (
 function Stepper({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   return (
     <li className="flex items-center gap-2">
-      <span className="flex-1 font-mono font-semibold">{label}</span>
+      <span className="flex-1 num font-semibold">{label}</span>
       <Button variant="secondary" size="icon" aria-label={`One fewer ${label}`} onClick={() => onChange(Math.max(0, value - 1))} disabled={value === 0}>
         <Minus />
       </Button>
-      <span className="w-8 text-center font-mono text-lg font-bold" aria-label={`${value} of ${label}`}>
+      <span className="w-8 text-center num text-lg font-bold" aria-label={`${value} of ${label}`}>
         {value}
       </span>
       <Button variant="secondary" size="icon" aria-label={`One more ${label}`} onClick={() => onChange(Math.min(20, value + 1))}>

@@ -254,6 +254,18 @@ recognizer in the Android app (it asks for microphone permission the first
 time) and the browser's speech recognition on the web, where the browser has
 one; otherwise the mic button is hidden and your keyboard's mic still works.
 
+### Say a set mid-workout
+
+In the logger, tap the mic next to **Log Set** and say the set: "bench 185 for
+8", "8 reps at 60 kilos", "one eighty five for eight", "same for 6",
+"bodyweight for 12". It ticks off the next set of the exercise you named (or
+the one you're on), starts the rest timer, and shows **Undo** for a few
+seconds. The words are read on the phone (`src/lib/voice-set.ts`), not by
+Claude, so it needs no signal and doesn't count toward any limit. The speech
+itself goes through the phone's recognizer, which works offline when the
+phone has its offline speech language installed (most Android phones do for
+English; check Settings > Google > Voice > Offline speech recognition).
+
 ## Log workouts from a Claude chat
 
 Tell Claude about a workout in any chat (claude.ai, the Claude phone app,
@@ -412,6 +424,19 @@ migration `20261018000000_kits_shifts_home.sql` and the updated
   and "next time" suggestions follow an exercise wherever you move it.
 - **Finish** drops unchecked sets and saves the workout. Unit (lb / kg) is on
   the home screen.
+- **Swipe a set** right to finish it (or undo it), left to delete it (with an
+  Undo button for 5 seconds). **Hold a set** to duplicate it, mark it as a
+  warm-up, or add a drop set straight after it (about 20% lighter).
+- Tapping a weight or reps box opens Ironlog's **number pad**: big keys, − / +
+  buttons (weight steps switch between 5 and 2.5 lb, or 2.5 and 1.25 kg), and a
+  **Reps** / **Log set** key to move on. Weights show to the nearest 0.5 lb.
+- In the All view, finished exercises **collapse to one line**; tap to open.
+- The sliders button at the top opens **Logger display**: **Focus mode** (just the
+  set you're on and a big rest timer), **One-handed mode** (weight and reps with
+  − / + next to Log Set), the number pad, sounds and vibration. Saved per phone.
+- While resting, the countdown also shows on the **lock screen and notification
+  shade** (Android app, when notifications are allowed), and ticks in the last
+  3 seconds.
 
 ## What's in here
 

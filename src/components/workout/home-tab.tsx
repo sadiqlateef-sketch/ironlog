@@ -168,7 +168,7 @@ export function HomeTab({ busy, onStart }: { busy: boolean; onStart: (create: ()
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{x.exercise.name}</p>
                         <p className="text-muted-foreground text-sm">
-                          <span className="font-mono">
+                          <span className="num">
                             {x.sets} × {x.repMin}–{x.repMax}
                             {x.exercise.tracking === "time" ? " s" : ""}
                           </span>

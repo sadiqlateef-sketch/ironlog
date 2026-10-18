@@ -81,7 +81,7 @@ export function ProgressionSheet({
             <div className="bg-secondary flex flex-col gap-3 rounded-2xl p-4">
               <div>
                 <p className="text-muted-foreground text-sm font-medium">New weight</p>
-                <p className="font-mono text-3xl font-extrabold tracking-tight">
+                <p className="num text-3xl font-bold tracking-tight">
                   {newWeight != null ? formatWeight(newWeight, unit) : "Same weight"}
                   {newReps && <span className="text-muted-foreground ml-2 text-lg font-semibold">× {newReps}</span>}
                 </p>
@@ -126,7 +126,7 @@ export function ProgressionSheet({
                             style={{ width: `${(s.reps / scale) * 100}%` }}
                           />
                         </div>
-                        <span className="w-28 text-right font-mono text-sm font-semibold">
+                        <span className="w-28 text-right num text-sm font-semibold">
                           {formatWeight(s.weight, unit).replace(/ (lb|kg)$/, "")} × {s.reps}
                         </span>
                       </div>

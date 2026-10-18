@@ -94,7 +94,7 @@ function PlateForm({ initialWeight, kit }: { initialWeight?: number | null; kit?
             {result.perSide.length === 0 ? (
               <p className="text-muted-foreground text-sm">Just the bar.</p>
             ) : (
-              <p className="font-mono text-xl font-bold">
+              <p className="num text-xl font-bold">
                 {result.perSide.join(" + ")} <span className="text-muted-foreground text-sm font-normal">{u} per side</span>
               </p>
             )}

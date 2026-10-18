@@ -11,7 +11,7 @@ export const RATIONALES: Record<RationaleKind, { title: string; body: string; ac
   },
   microphone: {
     title: "Say your workout",
-    body: "Ironlog listens only while the mic button is on, and your phone turns the speech into text for Claude to read. Nothing is recorded or kept. Android will ask you to allow the microphone next.",
+    body: "Ironlog listens only while the mic button is on, and your phone turns your words into text. Nothing is recorded or kept. Android will ask you to allow the microphone next.",
     action: "Continue",
   },
 };

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpDown, ArrowUpToLine, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, NotebookPen, Plus, Sparkles } from "lucide-react";
+import { ArrowUpDown, ArrowUpToLine, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Plus, SlidersHorizontal, Sparkles, Undo2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -17,12 +17,17 @@ import { HOME_CALENDAR_KEY } from "@/lib/home-prefs";
 import { syncGymCalendar } from "@/lib/gym";
 import { useSlot } from "@/hooks/use-slot";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
+import { CurrentSetControls, FocusView, setTitle } from "@/components/workout/current-set";
+import { KeypadProvider } from "@/components/workout/keypad";
+import { GestureHint, LoggerOptions } from "@/components/workout/logger-options";
+import { setLoggerPref, useLoggerPrefs } from "@/lib/logger-prefs";
 import { IntervalTimer } from "@/components/workout/interval-timer";
 import { NotesSheet } from "@/components/workout/notes-sheet";
 import { ReorderSheet } from "@/components/workout/reorder-sheet";
 import { ProgressionSheet } from "@/components/workout/progression-sheet";
 import { RestSheet } from "@/components/workout/rest-sheet";
 import { SwapSheet } from "@/components/workout/swap-sheet";
+import { VoiceLogButton } from "@/components/workout/voice-log";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FindTab } from "@/components/workout/find-tab";
@@ -30,7 +35,7 @@ import { HomeTab } from "@/components/workout/home-tab";
 import { InstantTab } from "@/components/workout/instant-tab";
 import { PlannedTab } from "@/components/workout/planned-tab";
 import { RecordBadge, RecordCelebration } from "@/components/workout/record";
-import { useWorkout, type Block } from "@/hooks/use-workout";
+import { useWorkout, type Block, type UiSet } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
   requestAdjustments,
@@ -183,6 +188,13 @@ function ActiveWorkout({
   const [progressionFor, setProgressionFor] = useState<number | null>(null);
   const [nudge, setNudge] = useState<string | null>(null);
   const [adjustments, setAdjustments] = useState<AdjustmentWithContext[]>([]);
+  const [options, setOptions] = useState(false);
+  /** Cards you opened or closed yourself; the rest close once every set is done. */
+  const [openCards, setOpenCards] = useState<Map<number, boolean>>(() => new Map());
+  /** Just deleted: offer to put it back. */
+  const [removed, setRemoved] = useState<{ order: number; set: UiSet; index: number; key: number } | null>(null);
+  const removedKey = useRef(0);
+  const prefs = useLoggerPrefs();
   const slot = useSlot("bottom-bar-slot");
 
   // Suggestions the AI made after the last time you did this routine.
@@ -213,6 +225,7 @@ function ActiveWorkout({
   function reorder(next: Block[]): Map<number, number> {
     const slots = w.reorder(next);
     setFocus((f) => (f == null ? f : (slots.get(f) ?? f)));
+    setOpenCards((m) => new Map([...m].map(([k, v]) => [slots.get(k) ?? k, v])));
     return slots;
   }
 
@@ -267,6 +280,25 @@ function ActiveWorkout({
     if (view === "list") document.getElementById(`exercise-${order}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function removeSet(order: number, id: string) {
+    const b = w.blocksNow().find((x) => x.order === order);
+    const index = b?.sets.findIndex((x) => x.id === id) ?? -1;
+    if (!b || index < 0) return;
+    const key = ++removedKey.current;
+    setRemoved({ order, set: b.sets[index], index, key });
+    setTimeout(() => setRemoved((r) => (r?.key === key ? null : r)), 5000);
+    w.removeSet(order, id);
+  }
+
+  function undoRemove() {
+    if (!removed) return;
+    setRemoved(null);
+    w.restoreSet(removed.order, removed.set, removed.index);
+  }
+
+  const collapsedCard = (b: Block) =>
+    view === "list" && (openCards.get(b.order) === false || (openCards.get(b.order) == null && b.order !== focusOrder && b.sets.length > 0 && b.sets.every((x) => x.done)));
+
   async function finish() {
     setConfirmFinish(false);
     const s = await w.finish();
@@ -279,7 +311,6 @@ function ActiveWorkout({
       if (after != null) return jumpTo(after);
       return undone > 0 ? setConfirmFinish(true) : finish();
     }
-    tap();
     const ok = await w.toggleDone(focus.order, nextSet.id);
     if (!ok) {
       setNudge("Enter your reps first");
@@ -297,8 +328,12 @@ function ActiveWorkout({
   const shown = view === "focus" && focus ? [focus] : blocks;
   const states = segmentStates(blocks, focusOrder);
   const units = exerciseUnits(blocks);
+  const focusMode = prefs.focus && !!focus;
+  const afterName = after != null ? (blocks.find((b) => b.order === after)?.exercise.name ?? null) : null;
+  const oneHanded = prefs.oneHanded && !focusMode && !!focus && !!nextSet;
 
   return (
+    <KeypadProvider>
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -312,12 +347,33 @@ function ActiveWorkout({
             )}
           </div>
         </div>
-        <Button onClick={() => (undone > 0 ? setConfirmFinish(true) : finish())}>
-          <Flag /> Finish
-        </Button>
+        <div className="flex shrink-0 gap-1">
+          <Button variant="ghost" size="icon" aria-label="Logger display options" onClick={() => setOptions(true)}>
+            <SlidersHorizontal />
+          </Button>
+          <Button onClick={() => (undone > 0 ? setConfirmFinish(true) : finish())}>
+            <Flag /> Finish
+          </Button>
+        </div>
       </header>
 
-      {blocks.length > 0 && (
+      {focusMode && (
+        <Button variant="secondary" className="self-center" onClick={() => setLoggerPref("focus", false)}>
+          <Minimize2 /> Exit focus mode
+        </Button>
+      )}
+
+      {focusMode && focus && (
+        <FocusView
+          block={focus}
+          set={nextSet}
+          upNext={afterName}
+          onChange={(patch) => nextSet && w.patchSet(focus.order, nextSet.id, patch)}
+          onCommit={() => nextSet && w.commitSet(focus.order, nextSet.id)}
+        />
+      )}
+
+      {!focusMode && blocks.length > 0 && (
         <div className="flex items-center gap-3">
           <ol className="flex flex-1 gap-1.5" aria-label="Exercises">
             {blocks.map((b, i) => (
@@ -377,7 +433,9 @@ function ActiveWorkout({
 
       <RestAlertHint />
 
-      {(() => {
+      {!focusMode && blocks.some((b) => b.sets.length > 0) && <GestureHint />}
+
+      {!focusMode && (() => {
         const suggested = blocks.filter((b) => adjustmentFor(b));
         if (!suggested.length) return null;
         return (
@@ -396,7 +454,7 @@ function ActiveWorkout({
         );
       })()}
 
-      {shown.map((block, i) => {
+      {!focusMode && shown.map((block, i) => {
         const u = unitIndex(blocks, block.order);
         // In the full list, a thin "add here" between exercises (not inside a superset).
         const gap = view === "list" && i > 0 && unitIndex(blocks, shown[i - 1].order) !== u;
@@ -433,12 +491,16 @@ function ActiveWorkout({
             onReorder={() => setReordering(true)}
             onAddAfter={() => (setInsertAt(u + 1), setPicking(true))}
             onAddSet={() => w.addSet(block.order)}
-            onRemoveSet={(id) => w.removeSet(block.order, id)}
+            onRemoveSet={(id) => removeSet(block.order, id)}
             onChangeSet={(id, patch) => w.patchSet(block.order, id, patch)}
             onCommitSet={(id) => w.commitSet(block.order, id)}
             onCycleType={(id) => w.cycleType(block.order, id)}
+            onSetType={(id, type) => w.setSetType(block.order, id, type)}
+            onDuplicateSet={(id) => w.duplicateSet(block.order, id)}
+            onAddDropSet={(id, weight) => w.addDropSet(block.order, id, weight)}
+            collapsed={collapsedCard(block)}
+            onToggleCollapse={view === "list" ? () => setOpenCards((m) => new Map(m).set(block.order, collapsedCard(block))) : undefined}
             onToggleDone={(id) => {
-              tap();
               setFocus(block.order);
               return w.toggleDone(block.order, id);
             }}
@@ -447,9 +509,11 @@ function ActiveWorkout({
         );
       })}
 
-      <Button size="lg" variant="outline" onClick={() => (setInsertAt(null), setPicking(true))}>
-        <Plus /> Add exercise
-      </Button>
+      {!focusMode && (
+        <Button size="lg" variant="outline" onClick={() => (setInsertAt(null), setPicking(true))}>
+          <Plus /> Add exercise
+        </Button>
+      )}
 
       {blocks.length === 0 && (
         <p className="text-muted-foreground text-center text-sm">
@@ -464,8 +528,8 @@ function ActiveWorkout({
       >
         Discard workout
       </button>
-      {/* Room for the Log Set bar */}
-      <div className="h-20" aria-hidden />
+      {/* Room for the Log Set bar (and the one-handed controls above it) */}
+      <div className={oneHanded ? "h-52" : "h-20"} aria-hidden />
 
       {slot &&
         createPortal(
@@ -503,6 +567,29 @@ function ActiveWorkout({
                 {nudge}
               </p>
             )}
+            {removed && !nudge && (
+              <div role="status" className="glass-strong absolute -top-14 left-3 flex items-center gap-2 rounded-full py-1 pr-1 pl-4 text-sm font-semibold">
+                Set deleted
+                <button type="button" onClick={undoRemove} className="bg-primary text-primary-foreground flex h-9 items-center gap-1.5 rounded-full px-3">
+                  <Undo2 className="size-4" aria-hidden /> Undo
+                </button>
+              </div>
+            )}
+            {oneHanded && focus && nextSet && (
+              <div className="glass-strong mb-2 flex flex-col gap-1.5 rounded-2xl p-2" data-testid="one-handed">
+                <p className="truncate px-1 text-sm">
+                  <span className="font-semibold">{focus.exercise.name}</span>
+                  <span className="text-muted-foreground"> · {setTitle(focus, nextSet)}</span>
+                </p>
+                <CurrentSetControls
+                  block={focus}
+                  set={nextSet}
+                  size="compact"
+                  onChange={(patch) => w.patchSet(focus.order, nextSet.id, patch)}
+                  onCommit={() => w.commitSet(focus.order, nextSet.id)}
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -517,6 +604,7 @@ function ActiveWorkout({
                   </span>
                 )}
               </button>
+              <VoiceLogButton w={w} current={focusOrder} onLogged={(order) => setFocus(focusAfterLog(order, w.blocksNow()))} />
               <Button size="lg" className="h-14 flex-1 text-lg" onClick={logSet} data-testid="log-set">
                 {logLabel === "Next exercise" && <ChevronRight />}
                 {logLabel}
@@ -596,7 +684,9 @@ function ActiveWorkout({
           </div>
         </DialogContent>
       </Dialog>
+      <LoggerOptions open={options} onOpenChange={setOptions} />
     </div>
+    </KeypadProvider>
   );
 }
 
@@ -700,14 +790,14 @@ function Elapsed({ since }: { since: string }) {
     return () => clearInterval(id);
   }, []);
   return (
-    <p className="text-muted-foreground font-mono text-sm">{formatClock((now - new Date(since).getTime()) / 1000)}</p>
+    <p className="text-muted-foreground num text-sm">{formatClock((now - new Date(since).getTime()) / 1000)}</p>
   );
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="bg-secondary rounded-lg p-3">
-      <dd className="font-mono text-2xl font-bold">{value}</dd>
+      <dd className="num text-2xl font-bold">{value}</dd>
       <dt className="text-muted-foreground text-xs">{label}</dt>
     </div>
   );

@@ -134,6 +134,7 @@ export async function startPlannedSession(
     calendar_event_id: null,
     kit_id: info.kitId ?? null,
     add_to_calendar: info.addToCalendar ?? null,
+    import_key: null,
     created_at: t,
     updated_at: t,
   };

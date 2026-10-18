@@ -1,11 +1,10 @@
-"use client";
+import { AppShell } from "@/components/app-shell";
+import { ImportHub } from "@/components/import/import-hub";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-/** Photo import now lives on the Log screen. */
-export default function ImportRedirect() {
-  const router = useRouter();
-  useEffect(() => router.replace("/log/?tab=photo"), [router]);
-  return null;
+export default function ImportPage() {
+  return (
+    <AppShell>
+      <ImportHub />
+    </AppShell>
+  );
 }

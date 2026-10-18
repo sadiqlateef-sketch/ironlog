@@ -90,7 +90,7 @@ export function IntervalTimer({ open, onOpenChange }: { open: boolean; onOpenCha
             >
               {state.phase === "done" ? "Done" : state.phase === "work" ? "Work" : "Rest"}
             </p>
-            <p className="font-mono text-7xl font-extrabold tracking-tight">{formatClock(state.left)}</p>
+            <p className="num text-7xl font-bold tracking-tight">{formatClock(state.left)}</p>
             <p className="text-muted-foreground text-sm">
               Round {state.round} of {rounds}
             </p>
@@ -129,7 +129,7 @@ function Stepper({ label, value, onMinus, onPlus }: { label: string; value: stri
       <Button variant="secondary" size="icon" aria-label={`Less ${label.toLowerCase()}`} onClick={onMinus}>
         <Minus />
       </Button>
-      <span className="flex-1 text-center font-mono text-2xl font-extrabold">{value}</span>
+      <span className="flex-1 text-center num text-2xl font-bold">{value}</span>
       <Button variant="secondary" size="icon" aria-label={`More ${label.toLowerCase()}`} onClick={onPlus}>
         <Plus />
       </Button>
