@@ -398,7 +398,7 @@ function Review({
         </p>
       )}
 
-      <div className="bg-background sticky bottom-0 -mx-4 flex flex-col gap-2 px-4 pt-2 pb-4">
+      <div className="flex flex-col gap-2">
         <Button size="lg" onClick={runImport} disabled={!ready || !plan || plan.sessions.length === 0}>
           <Check />
           {plan && plan.sessions.length === 0 ? "Nothing new to import" : `Import ${plan?.sessions.length.toLocaleString() ?? ""} workouts`}

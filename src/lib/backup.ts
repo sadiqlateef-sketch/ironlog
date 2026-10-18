@@ -84,6 +84,11 @@ export function backupSheets(d: BackupData, unit: UnitSystem, now = new Date()):
     return x == null ? null : lb ? Math.round((x / 2.54) * 10) / 10 : x;
   };
   const sessionById = new Map(d.sessions.map((x) => [x.id, x]));
+  // Sets in workout order (the database pages them by workout ID, which isn't by date).
+  const startOf = (x: Row) => s(sessionById.get(x.session_id)?.start_time);
+  const sets = [...d.sets].sort(
+    (a, b) => startOf(a).localeCompare(startOf(b)) || s(a.session_id).localeCompare(s(b.session_id)) || Number(a.exercise_order) - Number(b.exercise_order) || Number(a.set_number) - Number(b.set_number),
+  );
   const routineById = new Map(d.routines.map((x) => [x.id, x]));
   const programById = new Map(d.programs.map((x) => [x.id, x]));
   const exName = (x: Row) => s((x.exercises as Row | null)?.name);
@@ -136,7 +141,7 @@ export function backupSheets(d: BackupData, unit: UnitSystem, now = new Date()):
       widths: [17, 24, 28, 6, 5, 9, 11, 6, 6, 12, 10, 12, 6, 30, 38],
       rows: [
         ["Date", "Workout", "Exercise", "Order", "Set", "Type", `Weight (${W})`, "Reps", "RPE", `Est. 1RM (${W})`, "Seconds", `Distance (${lb ? "mi" : "km"})`, "Done", "Notes", "Workout ID"],
-        ...d.sets.map((x) => {
+        ...sets.map((x) => {
           const sess = sessionById.get(x.session_id);
           const dist = n(x.distance_m);
           return [
