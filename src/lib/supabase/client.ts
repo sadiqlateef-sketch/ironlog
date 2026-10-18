@@ -20,7 +20,9 @@ export function getSupabase(): SupabaseClient<Database> {
   }
 
   client = createClient<Database>(url, key, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    // PKCE: Google sign-in comes back with a one-time code that only this
+    // install can trade for a session (see src/lib/google-sign-in.ts).
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" },
     // With bad signal, fail fast and let the offline queue retry (see src/lib/offline).
     db: { retry: false },
     global: { fetch: fetchWithTimeout },

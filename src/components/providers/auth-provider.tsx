@@ -3,6 +3,7 @@
 import { createContext, use, useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
+import { listenForGoogleSignIn } from "@/lib/google-sign-in";
 import { cachedRead } from "@/lib/offline/cache";
 import { kvClear, kvSet } from "@/lib/offline/kv";
 import { discardPending, flush, getSyncStatus } from "@/lib/offline/queue";
@@ -34,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase();
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-    return () => data.subscription.unsubscribe();
+    const stopGoogle = listenForGoogleSignIn();
+    return () => (data.subscription.unsubscribe(), stopGoogle());
   }, []);
 
   const userId = session?.user.id;
