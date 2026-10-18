@@ -69,7 +69,7 @@ export async function getExercisePrefs(exerciseId: string): Promise<ExercisePref
 
 export async function saveExercisePrefs(
   exerciseId: string,
-  patch: Partial<Pick<ExercisePrefs, "goal_weight_kg" | "favorite" | "notes">>,
+  patch: Partial<Pick<ExercisePrefs, "goal_weight_kg" | "goal_date" | "goal_start_kg" | "favorite" | "notes">>,
 ): Promise<ExercisePrefs> {
   return unwrap(
     await getSupabase()
