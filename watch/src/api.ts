@@ -1,8 +1,8 @@
 // Everything the watch reads from or writes to the database.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "./supabase";
-import { groupSets, type ExerciseGroup, type ExerciseInfo, type UnitSystem, type WatchSet } from "./logic";
-import { classify, OpQueue, uuid, type NewSetRow, type Op, type Outcome } from "./queue";
+import { groupSets, planWorkout, type ExerciseGroup, type ExerciseInfo, type PlanRoutine, type UnitSystem, type WatchSet } from "./logic";
+import { classify, OpQueue, uuid, type Op, type Outcome } from "./queue";
 
 export interface Profile {
   unit: UnitSystem;
@@ -13,6 +13,7 @@ export interface Profile {
 export interface ActiveWorkout {
   id: string;
   name: string | null;
+  routineId?: string | null;
   startTime: string;
   groups: ExerciseGroup[];
   /** From the routine, by exercise order: rest seconds and rep target. */
@@ -45,7 +46,7 @@ export async function loadActive(): Promise<ActiveWorkout | null> {
     .is("end_time", null)
     .maybeSingle();
   if (error) throw error;
-  if (!session) return null;
+  if (!session || session.id === (await AsyncStorage.getItem(FINISHED_KEY))) return null;
 
   const { data: sets, error: setErr } = await supabase
     .from("workout_sets")
@@ -81,6 +82,7 @@ export async function loadActive(): Promise<ActiveWorkout | null> {
   return {
     id: session.id,
     name: session.name,
+    routineId: session.routine_id,
     startTime: session.start_time,
     groups: groupSets((sets ?? []) as unknown as WatchSet[], info),
     targets,
@@ -110,6 +112,8 @@ export interface UpNext {
   weeks: number;
   /** The day's name without the "Week N · " prefix. */
   name: string;
+  /** The routine's own name, which the workout is saved under. */
+  fullName: string;
   program: string;
 }
 
@@ -124,49 +128,148 @@ export async function loadUpNext(): Promise<UpNext | null> {
     week: p.next_week,
     day: p.next_day,
     weeks: p.weeks,
+    fullName: String(p.next_routine_name ?? ""),
     name: String(p.next_routine_name ?? "").replace(/^Week \d+ · /, "").replace(/^Day \d+\s*[-–:·]\s*/, ""),
     program: p.program_name,
   };
 }
 
-/** Start a routine from the watch (needs a connection, like the phone app). */
-export async function startRoutine(routineId: string): Promise<void> {
-  const { data: routine, error } = await supabase.from("routines").select("id, name").eq("id", routineId).single();
-  if (error) throw error;
-  const { data: session, error: sErr } = await supabase
-    .from("workout_sessions")
-    .insert({ name: routine.name, routine_id: routine.id, source: "watch" })
-    .select("id")
-    .single();
-  if (sErr) throw new Error(sErr.message.includes("one_active") ? "Finish your current workout first." : sErr.message);
+// ---------- Working with no signal ----------
+// The watch keeps a copy of your plan (Up next and your routines) and of the
+// workout in progress, so it can start and log a workout in a basement gym.
+// Changes go into the queue and reach the server once there's signal.
 
-  const { data: items } = await supabase
-    .from("routine_exercises")
-    .select("exercise_id, superset_group, target_sets, target_weight_kg, warmup_sets")
-    .eq("routine_id", routineId)
-    .order("position");
-  const rows: NewSetRow[] = [];
-  (items ?? []).forEach((item, i) => {
-    let n = 1;
-    const base = { session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, superset_group: item.superset_group };
-    for (let w = 0; w < item.warmup_sets; w++) {
-      const id = uuid();
-      rows.push({ ...base, id, client_id: id, set_number: n++, set_type: "warmup", weight: 0, reps: 0 });
-    }
-    for (let s = 0; s < item.target_sets; s++) {
-      const id = uuid();
-      rows.push({ ...base, id, client_id: id, set_number: n++, set_type: "normal", weight: item.target_weight_kg ?? 0, reps: 0 });
-    }
-  });
-  if (rows.length) {
-    const { error: setErr } = await supabase.from("workout_sets").insert(rows);
-    if (setErr) throw setErr;
+const PLAN_KEY = "ironlog.plan";
+const ACTIVE_KEY = "ironlog.active";
+/** The last workout finished on the watch, until the server has heard about it. */
+const FINISHED_KEY = "ironlog.finished";
+
+export interface WatchPlan {
+  upNext: (UpNext & { routine: PlanRoutine }) | null;
+  routines: (RoutineSummary & { routine: PlanRoutine })[];
+}
+
+async function readJson<T>(key: string): Promise<T | null> {
+  try {
+    return JSON.parse((await AsyncStorage.getItem(key)) ?? "null") as T | null;
+  } catch {
+    return null;
   }
+}
+
+/** The plan as last saved on the watch (null if it has never been online). */
+export function savedPlan(): Promise<WatchPlan | null> {
+  return readJson<WatchPlan>(PLAN_KEY);
+}
+
+/** Fetch Up next and your routines with everything needed to start them, and save a copy. Throws when offline. */
+export async function refreshPlan(): Promise<WatchPlan> {
+  const [upNext, routines] = await Promise.all([loadUpNext(), listRoutines()]);
+  const ids = [...new Set([...(upNext ? [upNext.routineId] : []), ...routines.map((r) => r.id)])];
+  const byRoutine = new Map<string, PlanRoutine["items"]>();
+  if (ids.length) {
+    const { data, error } = await supabase
+      .from("routine_exercises")
+      .select("routine_id, position, exercise_id, superset_group, target_sets, warmup_sets, target_weight_kg, rest_seconds, target_reps, exercises(name, mechanic)")
+      .in("routine_id", ids)
+      .order("position");
+    if (error) throw error;
+    for (const it of data ?? []) {
+      const ex = it.exercises as unknown as { name: string; mechanic: ExerciseInfo["mechanic"] } | null;
+      const list = byRoutine.get(it.routine_id) ?? [];
+      list.push({
+        exerciseId: it.exercise_id,
+        name: ex?.name ?? "Exercise",
+        mechanic: ex?.mechanic ?? null,
+        supersetGroup: it.superset_group,
+        sets: it.target_sets,
+        warmups: it.warmup_sets ?? 0,
+        weightKg: it.target_weight_kg,
+        rest: it.rest_seconds,
+        reps: it.target_reps,
+      });
+      byRoutine.set(it.routine_id, list);
+    }
+  }
+  const plan: WatchPlan = {
+    upNext: upNext ? { ...upNext, routine: { id: upNext.routineId, name: upNext.fullName || upNext.name, items: byRoutine.get(upNext.routineId) ?? [] } } : null,
+    routines: routines.map((r) => ({ ...r, routine: { id: r.id, name: r.name, items: byRoutine.get(r.id) ?? [] } })),
+  };
+  await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(plan));
+  return plan;
+}
+
+/** The workout in progress as the watch last saw it. */
+export function savedActive(): Promise<ActiveWorkout | null> {
+  return readJson<ActiveWorkout>(ACTIVE_KEY);
+}
+
+export async function saveActive(w: ActiveWorkout | null): Promise<void> {
+  await AsyncStorage.setItem(ACTIVE_KEY, JSON.stringify(w));
+}
+
+/**
+ * The workout in progress. Changes made on the watch that haven't reached the
+ * server yet win, so the watch's own copy is used until the queue is empty;
+ * with no signal it's the saved copy too.
+ */
+export async function currentWorkout(): Promise<{ workout: ActiveWorkout | null; offline: boolean }> {
+  const pending = await queue.flush();
+  const local = await savedActive();
+  if (pending > 0 && local) return { workout: local, offline: true };
+  try {
+    const fresh = await loadActive();
+    await saveActive(fresh);
+    if (pending === 0) await AsyncStorage.removeItem(FINISHED_KEY);
+    return { workout: fresh, offline: false };
+  } catch {
+    return { workout: local, offline: true };
+  }
+}
+
+/** Is a workout already running on the server (started on the phone)? Null = couldn't tell (no signal). */
+async function serverHasActive(): Promise<boolean | null> {
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+  const check = loadActive().then((w) => w !== null, () => null);
+  return Promise.race([check, timeout]);
+}
+
+/**
+ * Start a routine from the watch, no phone needed. Works with no signal: the
+ * workout is built from the saved plan and sent to the server later.
+ */
+export async function startRoutine(routine: PlanRoutine): Promise<ActiveWorkout> {
+  if ((await serverHasActive()) === true) throw new Error("Finish your current workout first.");
+  const id = uuid();
+  const startTime = new Date().toISOString();
+  const { rows, groups, targets } = planWorkout(routine, id, uuid);
+  const workout: ActiveWorkout = { id, name: routine.name, routineId: routine.id, startTime, groups, targets };
+  await saveActive(workout);
+  await queue.add({ kind: "start", session: { id, name: routine.name, routine_id: routine.id, start_time: startTime }, rows });
+  return workout;
+}
+
+/** Finish on the watch: queue it, forget the saved copy, and don't offer the same Up next day again. */
+export async function finishWorkout(w: ActiveWorkout): Promise<void> {
+  await AsyncStorage.setItem(FINISHED_KEY, w.id);
+  await saveActive(null);
+  const plan = await savedPlan();
+  if (plan?.upNext && plan.upNext.routineId === w.routineId) await AsyncStorage.setItem(PLAN_KEY, JSON.stringify({ ...plan, upNext: null }));
+  await queue.add({ kind: "finish", sessionId: w.id, at: new Date().toISOString() });
 }
 
 /** Sends one queued change. Each kind is written so that sending it twice is harmless. */
 async function send(op: Op): Promise<Outcome> {
   switch (op.kind) {
+    case "start": {
+      const { error, status } = await supabase
+        .from("workout_sessions")
+        .upsert({ ...op.session, source: "watch" }, { onConflict: "id", ignoreDuplicates: true });
+      if (error) return classify({ ...error, status });
+      if (!op.rows.length) return "ok";
+      const sets = await supabase.from("workout_sets").upsert(op.rows, { onConflict: "id", ignoreDuplicates: true });
+      return classify(sets.error ? { ...sets.error, status: sets.status } : null);
+    }
     case "addSet": {
       const { error, status } = await supabase.from("workout_sets").upsert(op.row, { onConflict: "id", ignoreDuplicates: true });
       return classify(error ? { ...error, status } : null);

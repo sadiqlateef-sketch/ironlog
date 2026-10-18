@@ -19,7 +19,7 @@ export type ExerciseMechanic = "compound" | "isolation";
 export type UnitSystem = "metric" | "imperial";
 /** What a set of this exercise records (see migration 20261016020000_timed_sets.sql). */
 export type Tracking = "weight_reps" | "time" | "distance_time";
-/** How the logger asks how hard a set was (see migration 20261018001500_smarter_sets.sql). */
+/** How the logger asks how hard a set was (see migration 20261018170000_smarter_sets.sql). */
 export type EffortScale = "rir" | "rpe" | "off";
 export type TrainingGoal = "strength" | "hypertrophy" | "powerbuilding" | "general";
 export type SessionSource = "web" | "phone" | "watch" | "import" | "claude";
@@ -278,6 +278,7 @@ export type Database = {
           notes: string | null;
           at_gym: boolean | null;
           calendar_event_id: string | null;
+          import_key: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -292,6 +293,7 @@ export type Database = {
           notes?: string | null;
           at_gym?: boolean | null;
           calendar_event_id?: string | null;
+          import_key?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sessions"]["Insert"]>;
         Relationships: [
