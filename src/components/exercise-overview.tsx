@@ -107,7 +107,7 @@ export function OverviewTab({
           <>
             <GoalBar status={stShown} goal={conv(goalKg)} u={u} />
             <p className="text-muted-foreground text-xs leading-relaxed">
-              {prefs?.goal_date && `By ${new Date(prefs.goal_date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}. `}
+              {prefs?.goal_date && st!.state !== "reached" && `By ${new Date(prefs.goal_date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}. `}
               {goalLine(stShown, u)}
             </p>
           </>

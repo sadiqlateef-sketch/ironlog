@@ -414,7 +414,7 @@ export function ConsistencyCard({ data }: { data: StatsData }) {
         <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">By month</h3>
         <ul className="flex flex-col gap-2">
           {months.map((m) => (
-            <li key={`${m.year}-${m.month}`} className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 text-sm">
+            <li key={`${m.year}-${m.month}`} className="grid grid-cols-[4.5rem_1fr_4.5rem] items-center gap-3 text-sm">
               <span>{new Date(m.year, m.month, 1).toLocaleDateString(undefined, { month: "short", year: m.year !== new Date(data.now).getFullYear() ? "2-digit" : undefined })}</span>
               <span className="bg-secondary h-2 overflow-hidden rounded-full">
                 <span
