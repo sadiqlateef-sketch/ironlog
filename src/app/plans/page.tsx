@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { EQUIPMENT, EQUIPMENT_LABEL, GOALS, planDefaults } from "@/lib/plan-options";
 import { activeKit, describeKit, kitAllows, kitsOf } from "@/lib/kit";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 export default function PlansPage() {
   return (
@@ -107,6 +108,7 @@ function Plans() {
       )}
 
       {/* Your active program first, then the generator, then the rest. */}
+      {programs === null && !error && <SkeletonList rows={2} rowClassName="h-28" />}
       {programs?.filter((p) => p.is_active).map((p) => (
         <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
       ))}

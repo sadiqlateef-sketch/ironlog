@@ -41,6 +41,8 @@ export async function createExercise(input: {
   secondary_muscles: Exercise["secondary_muscles"];
   equipment: Exercise["equipment"];
   mechanic: Exercise["mechanic"];
+  tracking?: Exercise["tracking"];
+  unilateral?: boolean;
   userId: string;
 }): Promise<Exercise> {
   const slug = input.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -69,7 +71,7 @@ export async function getExercisePrefs(exerciseId: string): Promise<ExercisePref
 
 export async function saveExercisePrefs(
   exerciseId: string,
-  patch: Partial<Pick<ExercisePrefs, "goal_weight_kg" | "favorite" | "notes">>,
+  patch: Partial<Pick<ExercisePrefs, "goal_weight_kg" | "favorite" | "notes" | "rest_seconds" | "unilateral">>,
 ): Promise<ExercisePrefs> {
   return unwrap(
     await getSupabase()
@@ -78,6 +80,11 @@ export async function saveExercisePrefs(
       .select()
       .single(),
   );
+}
+
+/** Your settings for every exercise you've set something on: note, rest time, one side at a time. */
+export async function listExercisePrefs(): Promise<ExercisePrefs[]> {
+  return cachedRead("prefs", async () => unwrap(await getSupabase().from("exercise_prefs").select("*")), []);
 }
 
 export async function listFavoriteExerciseIds(): Promise<string[]> {

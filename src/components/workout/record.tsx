@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Trophy } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import type { RecordHit } from "@/hooks/use-workout";
@@ -31,10 +31,16 @@ const CONFETTI = Array.from({ length: 18 }, (_, i) => ({
 /** Pops up in the logger when a set beats your best for that lift, then fades on its own. */
 export function RecordCelebration({ hit, onDone }: { hit: RecordHit; onDone: () => void }) {
   const { unit } = useAuth();
+  // The logger re-renders every second (workout clock, rest timer) and hands us a
+  // new onDone each time, so the timer must not restart when it changes.
+  const done = useRef(onDone);
   useEffect(() => {
-    const id = setTimeout(onDone, 4000);
+    done.current = onDone;
+  });
+  useEffect(() => {
+    const id = setTimeout(() => done.current(), 4000);
     return () => clearTimeout(id);
-  }, [onDone]);
+  }, []);
 
   return (
     <button

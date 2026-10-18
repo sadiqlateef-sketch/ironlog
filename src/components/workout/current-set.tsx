@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Minus, Plus, SkipForward } from "lucide-react";
+import { Minus, Pin, Plus, SkipForward } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRestTimer } from "@/components/providers/rest-timer-provider";
+import { EffortPicker } from "@/components/workout/effort-picker";
 import { LastTime, NumField } from "@/components/workout/set-row";
 import { Button } from "@/components/ui/button";
 import { toDisplay, type Block, type UiSet } from "@/hooks/use-workout";
@@ -11,18 +12,21 @@ import { distanceUnit, formatDuration, toDistanceDisplay } from "@/lib/cardio";
 import { stepFor, stepValue, type KeypadKind } from "@/lib/keypad";
 import { useLoggerPrefs, weightStep } from "@/lib/logger-prefs";
 import { formatClock, setLabel, workingSetNumbers } from "@/lib/workout-logic";
+import { matchPrevious } from "@/lib/set-logic";
 import { cn } from "@/lib/utils";
+import type { EffortScale } from "@/types/database";
 
 interface FieldSpec {
   kind: KeypadKind;
-  field: "weight" | "reps" | "time" | "distance";
+  field: "weight" | "reps" | "repsLeft" | "time" | "distance";
   label: string;
   placeholder: string;
 }
 
 /** The two numbers you enter for this kind of exercise, with last time's values as the grey hint. */
 function fieldsFor(block: Block, index: number, unit: "metric" | "imperial"): FieldSpec[] {
-  const prev = block.previous[index];
+  const set = block.sets[index];
+  const prev = matchPrevious(block.sets.map((s) => s.type), block.previous)[index];
   const u = unit === "imperial" ? "lb" : "kg";
   const tracking = block.exercise.tracking ?? "weight_reps";
   const time: FieldSpec = {
@@ -34,9 +38,24 @@ function fieldsFor(block: Block, index: number, unit: "metric" | "imperial"): Fi
   if (tracking === "distance_time") {
     return [{ kind: "distance", field: "distance", label: distanceUnit(unit), placeholder: prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "0" }, time];
   }
-  const weight: FieldSpec = { kind: "weight", field: "weight", label: tracking === "time" ? `+${u}` : u, placeholder: prev ? toDisplay(prev.weight, unit) || "0" : "0" };
+  // Working sets fill in today's suggested weight when there is one.
+  const suggested = tracking === "weight_reps" && block.suggestion && set && (set.type === "normal" || set.type === "failure");
+  const weight: FieldSpec = {
+    kind: "weight",
+    field: "weight",
+    label: tracking === "time" ? `+${u}` : u,
+    placeholder: suggested ? String(block.suggestion!.weight) : prev ? toDisplay(prev.weight, unit) || "0" : "0",
+  };
   if (tracking === "time") return [weight, time];
-  return [weight, { kind: "reps", field: "reps", label: "Reps", placeholder: prev ? String(prev.reps) : (block.repTarget?.split("-")[0] ?? "0") }];
+  const reps = (side: number | null | undefined) => (prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "0"));
+  if (block.unilateral) {
+    return [
+      weight,
+      { kind: "reps", field: "repsLeft", label: "Left", placeholder: set?.reps || reps(prev?.reps_left) },
+      { kind: "reps", field: "reps", label: "Right", placeholder: set?.repsLeft || reps(prev?.reps_right) },
+    ];
+  }
+  return [weight, { kind: "reps", field: "reps", label: "Reps", placeholder: reps(null) }];
 }
 
 /**
@@ -108,7 +127,7 @@ export function CurrentSetControls({
                 <NumField
                   fieldKey={`${set.id}:${f.field}:${size}`}
                   kind={f.kind}
-                  label={f.label === "Reps" ? "Reps" : f.label === "Time" ? "Time (min:sec)" : `Weight · ${f.label}`}
+                  label={f.kind === "reps" ? (f.label === "Reps" ? "Reps" : `${f.label} reps`) : f.label === "Time" ? "Time (min:sec)" : `Weight · ${f.label}`}
                   ariaLabel={f.label}
                   value={set[f.field]}
                   placeholder={f.placeholder}
@@ -155,9 +174,12 @@ export function FocusView({
   upNext,
   onChange,
   onCommit,
+  effort,
 }: {
   block: Block;
   set: UiSet | null;
+  /** "How hard was it?" for the set you just finished, when it's waiting for an answer. */
+  effort?: { scale: EffortScale; onPick: (rpe: number) => void; onSkip: () => void } | null;
   upNext: string | null;
   onChange: (patch: Partial<UiSet>) => void;
   onCommit: () => void;
@@ -169,7 +191,7 @@ export function FocusView({
     return () => setInline(false);
   }, [setInline]);
 
-  const prev = set ? block.previous[block.sets.indexOf(set)] : undefined;
+  const prev = set ? matchPrevious(block.sets.map((s) => s.type), block.previous)[block.sets.indexOf(set)] : undefined;
   const tracking = block.exercise.tracking ?? "weight_reps";
   const resting = !!timer && remaining > 0;
 
@@ -188,7 +210,14 @@ export function FocusView({
             </>
           )}
         </p>
+        {block.note && (
+          <p className="text-foreground/90 mt-2 inline-flex items-start gap-1.5 text-sm" data-testid="exercise-note">
+            <Pin className="text-set-warmup mt-0.5 size-4 shrink-0" aria-hidden /> {block.note}
+          </p>
+        )}
       </div>
+
+      {effort && <EffortPicker scale={effort.scale} onPick={effort.onPick} onSkip={effort.onSkip} />}
 
       {timer && (
         <div

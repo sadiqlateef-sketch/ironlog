@@ -22,6 +22,7 @@ import { formatDuration, trainingSummary } from "@/lib/stats";
 import { workingSetNumbers } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
 import { describeTimedSet } from "@/lib/cardio";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 let exerciseCache: Promise<Map<string, Exercise>> | null = null;
 const exerciseMap = () => (exerciseCache ??= listExercises().then((xs) => new Map(xs.map((x) => [x.id, x]))));
@@ -136,7 +137,7 @@ function Details({ id, inDay = false, onChanged, onDeleted }: { id: string; inDa
   }, [id, version]);
 
   if (error) return <p className="text-destructive text-sm">{error}</p>;
-  if (!data) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!data) return <SkeletonList rows={3} />;
 
   const { session, sets, names } = data;
   const minutes = session.end_time ? Math.round((Date.parse(session.end_time) - Date.parse(session.start_time)) / 60000) : null;

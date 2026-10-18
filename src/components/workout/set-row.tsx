@@ -20,6 +20,8 @@ const typeStyles = {
 
 /** Set · Last time · weight · reps · done. The header and "add set" rows use the same columns. */
 export const ROW_GRID = "grid grid-cols-[2.5rem_1fr_4.75rem_4rem_3.5rem] items-center gap-2";
+/** One side at a time: Set · weight · left reps · right reps · done. */
+export const SIDES_GRID = "grid grid-cols-[2.5rem_4.75rem_1fr_1fr_3.5rem] items-center gap-2";
 
 const inputClass =
   "num h-14 w-full min-w-0 rounded-xl bg-secondary text-center text-xl font-bold outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring disabled:opacity-100";
@@ -53,6 +55,9 @@ export function SetRow({
   distancePlaceholder = "0",
   weightUnit,
   distanceLabel,
+  sides = false,
+  leftPlaceholder = "0",
+  effort = null,
   current,
   editing,
   onChange,
@@ -75,6 +80,11 @@ export function SetRow({
   weightUnit: string;
   /** "mi" / "km" */
   distanceLabel: string;
+  /** One side at a time: left and right reps instead of "last time" and reps. */
+  sides?: boolean;
+  leftPlaceholder?: string;
+  /** How hard it was ("2" reps left or RPE "8"), shown on the tick. */
+  effort?: string | null;
   /** The next set to do: highlighted so it is easy to find mid-workout. */
   current: boolean;
   editing: boolean;
@@ -103,7 +113,10 @@ export function SetRow({
   }
 
   const logNext = { label: set.done ? "Done" : "Log set", run: () => (blurActive(), !set.done && done()) };
-  const toSecond = { label: tracking === "weight_reps" ? "Reps" : "Time", run: () => secondRef.current?.focus() };
+  const leftRef = useRef<HTMLInputElement>(null);
+  const toSecond = sides
+    ? { label: "Left reps", run: () => leftRef.current?.focus() }
+    : { label: tracking === "weight_reps" ? "Reps" : "Time", run: () => secondRef.current?.focus() };
 
   return (
     <div className="relative overflow-hidden rounded-xl" data-testid="set-row">
@@ -131,7 +144,7 @@ export function SetRow({
         {...swipe.handlers}
         style={swipe.offset ? { transform: `translateX(${swipe.offset}px)` } : undefined}
         className={cn(
-          ROW_GRID,
+          sides ? SIDES_GRID : ROW_GRID,
           "relative touch-pan-y rounded-xl px-1 py-1 select-none",
           !swipe.dragging && "transition-[transform,background-color] duration-200",
           swipe.offset !== 0 && "bg-[var(--card-solid)]",
@@ -149,9 +162,14 @@ export function SetRow({
           {setLabel(set.type, workingNumber)}
         </button>
 
-        <span className="num text-muted-foreground truncate text-center text-sm font-semibold" title="Last time">
-          <LastTime text={previousText} tight />
-        </span>
+        {!sides && (
+          <span
+            className="num text-muted-foreground truncate text-center text-sm font-semibold"
+            title={set.type === "warmup" ? "Plates per side" : "Last time"}
+          >
+            <LastTime text={previousText} tight />
+          </span>
+        )}
 
         {tracking === "distance_time" ? (
           <NumField
@@ -178,12 +196,26 @@ export function SetRow({
             next={toSecond}
           />
         )}
+        {sides && (
+          <NumField
+            fieldKey={`${set.id}:left`}
+            kind="reps"
+            label="Left reps"
+            ariaLabel="Left reps"
+            inputRef={leftRef}
+            value={set.repsLeft}
+            placeholder={leftPlaceholder}
+            onValue={(repsLeft) => onChange({ repsLeft: repsLeft.replace(/\D/g, "") })}
+            onCommit={onCommit}
+            next={{ label: "Right reps", run: () => secondRef.current?.focus() }}
+          />
+        )}
         {tracking === "weight_reps" ? (
           <NumField
             fieldKey={`${set.id}:reps`}
             kind="reps"
-            label="Reps"
-            ariaLabel="Reps"
+            label={sides ? "Right reps" : "Reps"}
+            ariaLabel={sides ? "Right reps" : "Reps"}
             inputRef={secondRef}
             value={set.reps}
             placeholder={repPlaceholder}
@@ -227,14 +259,22 @@ export function SetRow({
           <button
             type="button"
             onClick={done}
-            aria-label={set.done ? "Mark set not done" : "Complete set"}
+            aria-label={set.done ? `Mark set not done${effort ? ` (effort ${effort})` : ""}` : "Complete set"}
             aria-pressed={set.done}
             className={cn(
-              "grid h-14 w-full place-items-center rounded-xl transition-colors",
+              "relative grid h-14 w-full place-items-center rounded-xl transition-colors",
               set.done ? "bg-success text-[#08200d]" : "bg-secondary text-muted-foreground",
             )}
           >
             <Check className="size-7" strokeWidth={3} />
+            {set.done && effort && (
+              <span
+                className="num bg-background text-foreground absolute top-0.5 right-0.5 min-w-5 rounded-full px-1 text-[11px] leading-5 font-bold"
+                data-testid="effort-badge"
+              >
+                {effort}
+              </span>
+            )}
           </button>
         )}
       </div>

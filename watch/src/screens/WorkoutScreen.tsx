@@ -168,7 +168,8 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
     const rest = restSeconds({
       type: target.set_type,
       mechanic: g.mechanic,
-      routineRest: workout.targets[g.order]?.rest ?? null,
+      // Same order as the phone: your own rest for this exercise, then the routine's.
+      routineRest: workout.myRest?.[g.exerciseId] ?? workout.targets[g.order]?.rest ?? null,
       profileDefault: profile.defaultRest,
       supersetGroup: g.supersetGroup,
       order: g.order,

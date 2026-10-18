@@ -599,6 +599,30 @@ answers filled in, and once Claude has built it, **Start Day 1** makes it your
 active program and opens the first workout. Accounts that already had
 workouts or programs skip the questions.
 
+After that (and once on each phone, including after updating), a four-screen
+tour shows where things are. Replay it from **More > Take the tour**.
+
+## Getting around
+
+Four tabs at the bottom: **Home** (the Today card: resume, the program's next
+day or a start button, plus how recovered you are), **Workout**, **Progress**
+and **More** (programs, exercise library, plate calculator, logging and photo
+import, watch pairing, settings). New screens for More go in
+`src/lib/nav.ts`.
+
+- **Workout bar.** Mid-workout, every other screen shows a bar above the tabs
+  with the workout's time and the rest countdown. Tap it to go back.
+- **Search** (Home's magnifier, or the box on More) finds exercises by name,
+  nickname, muscle or equipment, your workouts from the last year, programs
+  and their days, and the app's own screens.
+- **Appearance** (Settings) has dark (default), light or match-the-phone, and
+  four text sizes. Saved on the phone (`src/lib/appearance.ts`) and applied
+  before the first paint, so nothing flashes.
+- **Android back button and back swipe** close an open sheet first, then go
+  back a screen. On Home it leaves the app, except mid-workout, when it only
+  sends the app to the background so the workout and timer keep running
+  (`src/lib/back-button.ts`).
+
 ## Logging without signal
 
 The workout logger keeps working with no signal. Every change is saved on the
@@ -621,6 +645,32 @@ has a link, so make it show the code (one time):
 2. Set the subject to `Your Ironlog password reset code`.
 3. Replace the message body with the contents of `supabase/templates/recovery.html`
    and save.
+
+## Sign in with Google
+
+The sign-in screen has **Continue with Google**. In the Android app Google
+opens in a browser tab and sends you straight back into Ironlog, signed in.
+If you already have an Ironlog account with the same Gmail address, Google
+sign-in opens that same account (Supabase links them by email), so your
+workouts are all there. A new Google user gets a fresh account and the
+usual first-run setup.
+
+It reuses the Google keys from [Google Calendar](#turning-on-google-calendar-one-time-no-command-line).
+With those already set up, it's two steps:
+
+1. Open https://console.cloud.google.com/auth/clients (project **Ironlog**
+   selected at the top) and click your **Ironlog** client. Under **Authorized
+   redirect URIs** click **Add URI**, paste
+   `https://<your project ref>.supabase.co/auth/v1/callback`, and **Save**.
+   (Keep the `gym-calendar` one that's already there.)
+2. Run **Actions > Deploy database and functions**, then rebuild the APK.
+   The deploy turns on Supabase's Google provider with your
+   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` secrets and adds the app's
+   return link `com.ironlog.app://auth-callback` to the allowed redirect URLs.
+
+Sign-in uses PKCE: the link back into the app carries a one-time code that
+only the phone that started the sign-in can turn into a session. Code:
+`src/lib/google-sign-in.ts`.
 
 ## Security
 

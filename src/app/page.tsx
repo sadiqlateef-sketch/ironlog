@@ -2,18 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calculator, ChevronRight, Dumbbell, Heart, Settings, MessageSquareText, Play, Sparkles, Watch } from "lucide-react";
+import { ChevronRight, Dumbbell, Heart, History, Search, Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { AppShell } from "@/components/app-shell";
-import { PlateCalculator } from "@/components/plate-calculator";
+import { TodayCard } from "@/components/home/today-card";
 import { SessionSheet } from "@/components/session-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
-import { UpNext, useActiveProgram } from "@/components/up-next";
+import { useActiveProgram } from "@/components/up-next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonList } from "@/components/ui/skeleton";
+import { useActiveWorkout } from "@/hooks/use-active-workout";
 import { formatWeight } from "@/lib/units";
-import { WATCH_LINKING } from "@/lib/features";
-import { getActiveSession, listPendingAdjustments, listRecentSessions, type AdjustmentWithContext, type WorkoutSession } from "@/lib/workout-api";
+import { listPendingAdjustments, listRecentSessions, type AdjustmentWithContext, type WorkoutSession } from "@/lib/workout-api";
 
 export default function Home() {
   return (
@@ -23,66 +25,46 @@ export default function Home() {
   );
 }
 
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 5 ? "Late night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
 function Dashboard() {
   const { profile, unit } = useAuth();
-  const [active, setActive] = useState<WorkoutSession | null>(null);
+  const workout = useActiveWorkout();
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
-  const [plates, setPlates] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [adjustments, setAdjustments] = useState<AdjustmentWithContext[]>([]);
-  // Bumped after a workout is edited or deleted, so the list and Up next refresh.
+  // Bumped after a workout is edited or deleted, so the list and Today refresh.
   const [reload, setReload] = useState(0);
   const program = useActiveProgram(reload);
 
   useEffect(() => {
-    getActiveSession().then(setActive).catch(() => {});
     listRecentSessions().then(setRecent).catch(() => setRecent([]));
     listPendingAdjustments().then(setAdjustments).catch(() => {});
   }, [reload]);
+
+  const name = profile?.display_name?.split(" ")[0];
 
   return (
     <div className="flex flex-col gap-5">
       <header className="flex items-center gap-3">
         <div className="bg-primary text-primary-foreground grid size-11 place-items-center rounded-lg">
-          <Dumbbell className="size-6" />
+          <Dumbbell className="size-6" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Ironlog</h1>
-          <p className="text-muted-foreground truncate text-sm">{profile?.email}</p>
+          <h1 className="truncate text-2xl font-bold tracking-tight">{name ? `${greeting()}, ${name}` : greeting()}</h1>
+          <p className="text-muted-foreground truncate text-sm">Ironlog</p>
         </div>
-        <Button asChild variant="ghost" size="icon" aria-label="Settings">
-          <Link href="/settings/">
-            <Settings />
+        <Button asChild variant="ghost" size="icon" aria-label="Search">
+          <Link href="/search/">
+            <Search />
           </Link>
         </Button>
       </header>
 
-      {active ? (
-        <Button asChild size="lg">
-          <Link href="/workout/">
-            <Play /> Resume workout
-          </Link>
-        </Button>
-      ) : program ? (
-        <UpNext progress={program} />
-      ) : (
-        <Card className="border-primary gap-3 p-4" data-testid="no-program">
-          <div>
-            <p className="text-lg font-bold">No program yet</p>
-            <p className="text-muted-foreground text-sm">Claude can build one from your goal, equipment and training days.</p>
-          </div>
-          <Button asChild size="lg">
-            <Link href="/plans/?build=1">
-              <Sparkles /> Build my program
-            </Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href="/workout/">
-              <Play /> Start an empty workout
-            </Link>
-          </Button>
-        </Card>
-      )}
+      <TodayCard workout={workout} program={program} recent={recent} reloadKey={reload} />
 
       {adjustments.length > 0 && (
         <section className="flex flex-col gap-2" data-testid="home-adjustments">
@@ -98,45 +80,23 @@ function Dashboard() {
         </section>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <Button asChild variant="secondary">
-          <Link href="/plans/">
-            <Sparkles /> Programs
-          </Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href="/log/">
-            <MessageSquareText /> Log past workout
-          </Link>
-        </Button>
-      </div>
-
-      {WATCH_LINKING && (
-        <Button asChild variant="secondary">
-          <Link href="/link-watch/">
-            <Watch /> Link watch
-          </Link>
-        </Button>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        <Button variant="secondary" onClick={() => setPlates(true)}>
-          <Calculator /> Plates
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href="/settings/">
-            <Settings /> Settings
-          </Link>
-        </Button>
-      </div>
-
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Recent workouts</h2>
         {recent && recent.length > 0 && <p className="text-muted-foreground -mt-1 text-xs">Tap one to see, fix or delete it.</p>}
         {recent === null ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <SkeletonList rows={3} />
         ) : recent.length === 0 ? (
-          <Card className="text-muted-foreground text-sm">No workouts yet. Your first one starts above.</Card>
+          <EmptyState
+            icon={History}
+            title="Your workouts will show up here"
+            action={
+              <Button asChild variant="secondary">
+                <Link href="/log/">Log one you already did</Link>
+              </Button>
+            }
+          >
+            Start one from the Today card above. Each finished workout lands here with its time, volume and heart rate, and you can fix or delete it later.
+          </EmptyState>
         ) : (
           recent.map((s) => (
             <Card key={s.id} className="p-0">
@@ -167,7 +127,6 @@ function Dashboard() {
       </section>
 
       <SessionSheet sessionId={open} onOpenChange={(o) => !o && setOpen(null)} onChanged={() => setReload((r) => r + 1)} />
-      <PlateCalculator open={plates} onOpenChange={setPlates} />
     </div>
   );
 }
