@@ -21,7 +21,7 @@ const JEFIT = [
 test("JEFIT backup: sets from the logs column, times from the sessions table", () => {
   const h = readHistoryFile(JEFIT);
   assert.equal(h.app, "jefit");
-  assert.equal(h.unit, null, "JEFIT doesn't say lb or kg, so the lifter picks");
+  assert.equal(h.unit, null, "no SETTING table here, so the lifter picks lb or kg");
   assert.equal(h.sessions.length, 2);
   const [a, b] = h.sessions;
   assert.equal(a.date, "2024-03-05");
@@ -83,6 +83,64 @@ test("a plain spreadsheet with sets x reps per row, US dates and kg in the heade
   assert.equal(h.sessions[0].date, "2024-03-05");
   assert.equal(h.sessions[0].exercises[0].sets.length, 3);
   assert.equal(h.sessions[1].date, "2024-05-13", "a day over 12 must be day-first");
+});
+
+test("JEFIT's real layout: unit from SETTING, sessions found by belongsession, cardio kept as time", () => {
+  const file = [
+    "",
+    "### SETTING ##########################################",
+    "row_id,USERID,TIMESTAMP,gender,length,mass,timer",
+    '1,9,"2026-10-14 02:01:12",M," inches"," lbs",60',
+    "######################################################",
+    "",
+    "### WORKOUT SESSIONS #################################",
+    "rowid,_id,USERID,edit_time,day_id,total_time,workout_time,starttime,endtime,TIMESTAMP",
+    '67,1,9,1787589597,0,4317,1059,1448035819,1448040136,"2026-08-30 01:59:14"',
+    "######################################################",
+    "",
+    "### EXERCISE LOGS ####################################",
+    "USERID,TIMESTAMP,belongSys,logs,_id,record,mydate,eid,ename,day_item_id,belongsession,logTime,interval_logs,auto_generated",
+    '9,"2026-05-19 19:11:31",1,"95.0x8,100.0x6",2,148.5,2015-11-20,2,"Barbell Bench Press",1,1,1447995600,,No',
+    '9,"2026-05-19 19:11:31",1,"0x102.0,0x1.3,0x5.0,0x0.0,0x600",3,0,2015-11-20,319,"Step Machine",67,1,1453870800,,No',
+    '9,"2026-05-19 19:11:31",1,"0x0.0,0x0.0,0x0.0,0x0.0,0x0",4,0,2015-11-21,321,"Treadmill Running",195,0,1494302400,,No',
+    '9,"2026-05-19 19:11:31",1,"0x1,0x1,0x1,0x1,0x1800",5,0,2015-11-21,322,Walking,196,0,1494302400,"0,0",No',
+    "######################################################",
+    "",
+    "### EXERCISE SET LOGS ################################",
+    "_id,userid,exercise_log_id,set_index,weight_lbs,reps,set_type",
+    "1,9,2,0,95.0000,8,default",
+  ].join("\n");
+  const h = readHistoryFile(file);
+  assert.equal(h.app, "jefit");
+  assert.equal(h.unit, "lb");
+  assert.equal(h.sessions.length, 2);
+  const [a, b] = h.sessions;
+  assert.equal(a.minutes, 72);
+  assert.deepEqual(a.exercises.map((x) => x.name), ["Barbell Bench Press", "Step Machine"]);
+  assert.deepEqual(a.exercises[1].sets.map((s) => [s.reps, s.seconds]), [[0, 600]]);
+  assert.deepEqual(b.exercises.map((x) => x.name), ["Walking"], "a cardio entry with no time is left out");
+  assert.equal(b.exercises[0].sets[0].seconds, 1800);
+});
+
+test("history matching never folds a different movement into another", async () => {
+  const { matchForImport } = await import("../src/lib/history-import.ts");
+  const ex = (slug: string, name: string, equipment: string, aliases: string[] = []) => ({ slug, name, equipment, aliases, created_by: null });
+  const lib = [
+    ex("bench-press", "Bench Press", "barbell", ["Barbell Bench Press"]),
+    ex("incline-bench-press", "Incline Bench Press", "barbell"),
+    ex("dumbbell-bench-press", "Dumbbell Bench Press", "dumbbell"),
+    ex("conventional-deadlift", "Conventional Deadlift", "barbell", ["Deadlift"]),
+    ex("dumbbell-one-arm-upright-row", "Dumbbell One-Arm Upright Row", "dumbbell"),
+    ex("dumbbell-shrug", "Dumbbell Shrug", "dumbbell"),
+  ];
+  assert.equal(matchForImport("Barbell Bench Press", lib)?.exercise.slug, "bench-press");
+  assert.equal(matchForImport("Barbell Bench Press", lib)?.sure, true);
+  assert.equal(matchForImport("Barbell Incline Bench Press", lib)?.exercise.slug, "incline-bench-press");
+  assert.equal(matchForImport("Dumbbell Incline Bench Press", lib), null, "dumbbell isn't barbell");
+  assert.equal(matchForImport("Barbell Romanian Deadlift", lib), null);
+  assert.equal(matchForImport("Barbell Deadlift", lib)?.exercise.slug, "conventional-deadlift");
+  assert.equal(matchForImport("One Arm Dumbell Row", lib), null, "a row isn't an upright row");
+  assert.equal(matchForImport("Dumbbell Shoulder Shrug", lib)?.exercise.slug, "dumbbell-shrug");
 });
 
 test("files that aren't workout exports get a plain explanation", () => {

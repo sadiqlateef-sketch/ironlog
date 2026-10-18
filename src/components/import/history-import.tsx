@@ -13,10 +13,9 @@ import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createImportedExercise, existingHistory, saveHistory } from "@/lib/history-api";
-import { exerciseNames, guessExerciseDetails, readHistoryFile, toSessionToSave, type FileHistory, type SessionToSave } from "@/lib/history-import";
+import { exerciseNames, guessExerciseDetails, matchForImport, readHistoryFile, toSessionToSave, type FileHistory, type SessionToSave } from "@/lib/history-import";
 import { cn } from "@/lib/utils";
 import { listExercises, type Exercise } from "@/lib/workout-api";
-import { rankMatches } from "../../../supabase/functions/_shared/match.ts";
 import type { EquipmentType, MuscleGroup } from "@/types/database";
 
 type Choice = { kind: "match"; id: string; sure: boolean } | { kind: "new" } | { kind: "skip" };
@@ -166,8 +165,8 @@ function Review({
             next.set(k, { kind: "match", id: remembered.id, sure: true });
             continue;
           }
-          const [best] = rankMatches(name, lib, 1);
-          next.set(k, best && best.score >= 0.75 ? { kind: "match", id: best.exercise.id, sure: best.score >= 0.99 } : { kind: "new" });
+          const best = matchForImport(name, lib);
+          next.set(k, best ? { kind: "match", id: best.exercise.id, sure: best.sure } : { kind: "new" });
         }
         setChoices(next);
       })

@@ -6,6 +6,8 @@
 // The file is read by its column names rather than a fixed layout, because
 // apps change their exports and this has to keep working for the next one.
 
+import { normalizeName, rankMatches, type Matchable } from "../../supabase/functions/_shared/match.ts";
+
 export type SetType = "warmup" | "normal" | "drop" | "failure";
 
 export interface FileSet {
@@ -267,6 +269,14 @@ function setType(raw: string | undefined): SetType {
  */
 export function parseLogs(raw: string): FileSet[] {
   const out: FileSet[] = [];
+  // JEFIT writes a cardio entry as five "0x" fields, the last being the time in
+  // seconds: "0x102.0,0x1.3,0x5.0,0x0.0,0x600". Keep the time; the other fields
+  // aren't labelled in the export, so they're left out rather than guessed.
+  const cardio = raw.trim().match(/^0x[\d.]+,0x[\d.]+,0x[\d.]+,0x[\d.]+,0x(\d+)(?:\.0+)?$/);
+  if (cardio && (/\./.test(raw) || Number(cardio[1]) >= 120)) {
+    const secs = Number(cardio[1]);
+    return secs > 0 ? [{ weight: null, reps: 0, set_type: "normal", rpe: null, seconds: Math.min(86_400, secs) }] : [];
+  }
   for (const part of raw.split(/[,;|]/)) {
     const p = part.trim().toLowerCase().replace(/\s*(lbs?|kgs?)\b/g, "");
     if (!p) continue;
@@ -318,7 +328,7 @@ export function readHistoryFile(text: string): FileHistory {
   // JEFIT keeps start/end times in a separate WORKOUT SESSIONS table.
   const sessionInfo = isJefit ? jefitSessionTable(sections, log) : null;
 
-  const unit = unitFromHeader(log.header);
+  const unit = unitFromHeader(log.header) ?? (isJefit ? jefitUnit(sections) : null);
   const app: FileHistory["app"] = isJefit
     ? "jefit"
     : log.header.includes("exercise_title") || log.header.includes("weight_lbs") || log.header.includes("weight_kg")
@@ -335,7 +345,8 @@ export function readHistoryFile(text: string): FileHistory {
   for (const row of log.rows) {
     const name = (get(row, "exercise") ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
     if (!name) continue;
-    const sessionId = (get(row, "session") ?? "").trim();
+    const rawSession = (get(row, "session") ?? "").trim();
+    const sessionId = rawSession === "0" ? "" : rawSession; // JEFIT uses 0 for "no session"
     const info = sessionId ? sessionInfo?.byId.get(sessionId) : undefined;
     const when = parseMoment(get(row, "start")) ?? parseMoment(get(row, "date"));
     const date = when?.date ?? info?.date;
@@ -415,7 +426,20 @@ export function readHistoryFile(text: string): FileHistory {
     .sort((a, b) => (a.date + (a.time ?? "")).localeCompare(b.date + (b.time ?? "")));
 
   if (sessions.length === 0) throw new Error("That file was read, but no sets with weight, reps or time were in it.");
-  return { app, unit: app === "jefit" ? null : unit, sessions: dedupeWithinFile(sessions), skippedRows };
+  return { app, unit, sessions: dedupeWithinFile(sessions), skippedRows };
+}
+
+/** JEFIT's unit: the SETTING table's mass (" lbs" / " kgs"), or a weight_lbs/weight_kg column in its set logs. */
+function jefitUnit(sections: Section[]): "lb" | "kg" | null {
+  for (const sec of sections) {
+    const fromHeader = unitFromHeader(sec.header);
+    if (fromHeader) return fromHeader;
+    const mass = sec.header.indexOf("mass");
+    const v = mass >= 0 ? (sec.rows[0]?.[mass] ?? "").trim().toLowerCase() : "";
+    if (/^lbs?$/.test(v)) return "lb";
+    if (/^kgs?$/.test(v)) return "kg";
+  }
+  return null;
 }
 
 interface SessionInfo {
@@ -606,4 +630,54 @@ export function toSessionToSave(s: FileSession, exerciseIds: Map<string, string>
     minutes: s.minutes ?? Math.min(120, Math.max(20, setCount * 3)),
     exercises,
   };
+}
+
+// ---------- Matching a whole history ----------
+
+// Words that make it a different exercise: an incline press isn't a flat one,
+// a Romanian deadlift isn't a conventional one. A file's name and a library
+// name must agree on every one of these.
+const DISTINCT = new Set([
+  "incline", "decline", "close", "wide", "narrow", "reverse", "romanian", "stiff", "sumo", "front", "rear", "overhead", "upright",
+  "seated", "standing", "lying", "prone", "one", "single", "alternate", "alternating", "hammer", "preacher", "concentration", "bent",
+  "high", "low", "behind", "neck", "deficit", "split", "bulgarian", "goblet", "hack", "landmine", "straight", "drag", "french", "skull",
+  "kickback", "military", "arnold", "zottman", "spider", "face", "hip", "leg", "calf", "chest", "shoulder", "arm", "tricep", "bicep", "delt",
+  "lat", "ab", "glute", "jump", "box", "pause", "pin", "floor", "push", "pull", "chin", "dip", "lunge", "shrug", "squat", "deadlift",
+  "row", "press", "curl", "raise", "fly", "extension", "pushdown", "pulldown", "crunch", "twist", "plank", "kick", "crossover", "cross",
+]);
+const EQUIPMENT_WORDS: Record<string, string> = {
+  barbell: "barbell", dumbbell: "dumbbell", cable: "cable", machine: "machine", smith: "smith_machine", ez: "ez_bar",
+  kettlebell: "kettlebell", band: "band", hex: "trap_bar",
+};
+const WORD_FORMS: Record<string, string> = { dumbell: "dumbbell", dumbells: "dumbbell", triceps: "tricep", biceps: "bicep", delts: "delt", deltoid: "delt", lats: "lat", abs: "ab", abdominal: "ab", calves: "calf", glutes: "glute", flys: "fly", raises: "raise", crossovers: "crossover" };
+
+/**
+ * The library exercise a file's exercise name is, or null. Stricter than the
+ * photo import's matching because a wrong match here would quietly fold years
+ * of, say, incline bench into flat bench records: equipment and every
+ * distinguishing word must agree. When unsure it says no, and the exercise is
+ * added as your own instead (which you can still change on the check screen).
+ */
+export function matchForImport<T extends Matchable & { equipment: string }>(name: string, library: T[]): { exercise: T; sure: boolean } | null {
+  const words = (s: string) =>
+    new Set(
+      normalizeName(s.replace(/\bshoulder shrug/gi, "shrug").replace(/\bup[\s-]*right\b/gi, "upright").replace(/\bcross[\s-]*overs?\b/gi, "crossover").replace(/\bpush[\s-]*downs?\b/gi, "pushdown").replace(/\bpull[\s-]*downs?\b/gi, "pulldown"))
+        .map((w) => WORD_FORMS[w] ?? w),
+    );
+  const want = words(name);
+  const wantEquip = [...want].map((w) => EQUIPMENT_WORDS[w]).find(Boolean);
+  const core = (set: Set<string>) => [...set].filter((w) => DISTINCT.has(w)).sort().join(" ");
+  for (const { exercise, score } of rankMatches(name, library, 25)) {
+    if (score < 0.6) break;
+    if (wantEquip && exercise.equipment !== wantEquip && !(wantEquip === "machine" && exercise.equipment === "smith_machine")) continue;
+    for (const candidate of [exercise.name, ...exercise.aliases]) {
+      const have = words(candidate);
+      [...have].forEach((w) => EQUIPMENT_WORDS[w] && have.delete(w));
+      const mine = new Set([...want].filter((w) => !EQUIPMENT_WORDS[w]));
+      if (core(have) !== core(mine)) continue;
+      const same = have.size === mine.size && [...have].every((w) => mine.has(w));
+      return { exercise, sure: same };
+    }
+  }
+  return null;
 }
