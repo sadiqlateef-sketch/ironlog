@@ -3,11 +3,11 @@
 // Phone-only extras (Android app via Capacitor). Every function is safe to
 // call on the web: it either does nothing or uses the browser fallback.
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
-import { LocalNotifications } from "@capacitor/local-notifications";
+import { LocalNotifications, Weekday } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { KeepAwake } from "@capacitor-community/keep-awake";
@@ -19,6 +19,9 @@ const REST_CHANNEL = "rest-timer";
 const RECOVERY_NOTIFICATION_ID = 1002;
 const REMINDER_CHANNEL = "reminders";
 const RECOVERY_PREF = "ironlog:recovery-reminder";
+const HOME_NOTIFICATION_ID = 1003;
+const HOME_PREF = "ironlog:home-reminder";
+const RECAP_NOTIFICATION_ID = 1004;
 
 /** Light tap when a set is ticked off. */
 export function tap(): void {
@@ -53,7 +56,7 @@ export async function initNative(): Promise<void> {
   await LocalNotifications.createChannel({
     id: REMINDER_CHANNEL,
     name: "Reminders",
-    description: "Recovery-day tips the morning after a workout",
+    description: "Recovery-day tips and your nightly home workout",
     importance: 3,
     visibility: 1,
   }).catch(() => {});
@@ -146,10 +149,98 @@ export async function scheduleRecoveryReminder(at: Date, title: string, body: st
   }
 }
 
+/** The nightly "Use What You Got" reminder: off, or the time it goes off ("19:30"). */
+export function homeReminderTime(): string | null {
+  try {
+    const v = localStorage.getItem(HOME_PREF);
+    return v && /^\d{2}:\d{2}$/.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Turn the nightly home-workout reminder on at `time` ("19:30"), or off with null. Returns the time it's set for. */
+export async function setHomeReminder(time: string | null): Promise<string | null> {
+  if (!isNative()) return null;
+  await LocalNotifications.cancel({ notifications: [{ id: HOME_NOTIFICATION_ID }] }).catch(() => {});
+  if (time && !(await requestNotifications())) time = null;
+  if (time) {
+    const [hour, minute] = time.split(":").map(Number);
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: HOME_NOTIFICATION_ID,
+            title: "Use What You Got",
+            body: "Tonight's 15–25 minute home workout is ready. Built from your home kit.",
+            channelId: REMINDER_CHANNEL,
+            schedule: { on: { hour, minute }, allowWhileIdle: true },
+            autoCancel: true,
+          },
+        ],
+      });
+    } catch {
+      time = null;
+    }
+  }
+  try {
+    if (time) localStorage.setItem(HOME_PREF, time);
+    else localStorage.removeItem(HOME_PREF);
+  } catch {}
+  return time;
+}
+
 /** Starting another workout makes tomorrow's "recovery day" wrong, so drop it. */
 export async function cancelRecoveryReminder(): Promise<void> {
   if (!isNative()) return;
   await LocalNotifications.cancel({ notifications: [{ id: RECOVERY_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+/**
+ * "Your weekly recap is ready" every Sunday at 6 PM. Only when notifications
+ * are already allowed (the app never asks just for this). Safe to call often:
+ * it replaces the same notification.
+ */
+export async function scheduleRecapReminder(): Promise<void> {
+  if (!isNative()) return;
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: RECAP_NOTIFICATION_ID,
+          title: "Your weekly recap is ready",
+          body: "See your wins and what to focus on next week.",
+          channelId: REMINDER_CHANNEL,
+          schedule: { on: { weekday: Weekday.Sunday, hour: 18, minute: 0 }, allowWhileIdle: true },
+          autoCancel: true,
+        },
+      ],
+    });
+  } catch {
+    // The recap is still on the Progress tab.
+  }
+}
+
+/** Our own Android plugin (android/.../RestCountdownPlugin.java). */
+const RestCountdown = registerPlugin<{
+  show(o: { endsAt: number; label: string }): Promise<void>;
+  hide(): Promise<void>;
+}>("RestCountdown");
+
+/**
+ * Rest time counting down on the lock screen and in the notification shade.
+ * Android runs the clock itself, so it keeps going while the app sleeps.
+ * Silent; the "Rest over" alert is still scheduleRestAlert's job.
+ */
+export function showRestCountdown(endsAt: number, label: string): void {
+  if (!isNative()) return;
+  RestCountdown.show({ endsAt, label }).catch(() => {});
+}
+
+export function hideRestCountdown(): void {
+  if (!isNative()) return;
+  RestCountdown.hide().catch(() => {});
 }
 
 export async function cancelRestAlert(): Promise<void> {

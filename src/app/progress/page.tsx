@@ -7,6 +7,8 @@ import { LineChart } from "@/components/charts/line-chart";
 import { PeriodizationCard } from "@/components/periodization-card";
 import { ActivityTab } from "@/components/progress/activity";
 import { BodyTab } from "@/components/progress/body";
+import { ConsistencyCard, RecapCard, StrainCard } from "@/components/progress/insight-cards";
+import { LiftsTab } from "@/components/progress/lifts";
 import {
   CalendarCard,
   CompareCard,
@@ -32,6 +34,11 @@ import {
   type WorkoutSession,
 } from "@/lib/workout-api";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { ChartNoAxesColumn } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 const RANGES = [
   { key: "4w", label: "4 weeks", days: 28 },
@@ -51,7 +58,7 @@ export default function ProgressPage() {
   );
 }
 
-type ProgressTab = "overview" | "body" | "activity";
+type ProgressTab = "overview" | "lifts" | "body" | "activity";
 
 function Progress() {
   const [tab, setTab] = useState<ProgressTab>("overview");
@@ -64,8 +71,8 @@ function Progress() {
   return (
     <div className="flex flex-col gap-4">
       <ProfileHeader syncing={loading} onSync={() => setReload((r) => r + 1)} />
-      <div className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1" role="tablist" aria-label="Progress">
-        {(["overview", "body", "activity"] as const).map((t) => (
+      <div className="bg-secondary grid grid-cols-4 gap-1 rounded-xl p-1" role="tablist" aria-label="Progress">
+        {(["overview", "lifts", "body", "activity"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -80,15 +87,32 @@ function Progress() {
       </div>
       {error && <p className="text-destructive text-sm">{error}</p>}
 
+      {tab === "lifts" && (data ? <LiftsTab data={data} reloadKey={reload} /> : !error && <p className="text-muted-foreground text-sm">Loading…</p>)}
       {tab === "body" && <BodyTab />}
       {tab === "activity" && <ActivityTab reloadKey={reload} onChanged={() => setReload((r) => r + 1)} />}
 
       {tab === "overview" && (
         <>
+          {data?.total === 0 && (
+            <EmptyState
+              icon={ChartNoAxesColumn}
+              title="Your progress starts with one workout"
+              action={
+                <Button asChild>
+                  <Link href="/workout/">Start a workout</Link>
+                </Button>
+              }
+            >
+              After your first workout, this fills in with your weekly volume, records, strength trend and which muscles you&apos;ve trained.
+            </EmptyState>
+          )}
           {data ? (
             <>
+              <RecapCard data={data} />
               <WeekCards data={data} />
+              <StrainCard reloadKey={reload} />
               <CalendarCard data={data} onChanged={() => setReload((r) => r + 1)} />
+              <ConsistencyCard data={data} />
               <ProgressIndexCard data={data} />
               <MuscleBreakdownCard data={data} />
               <TopLiftsCard data={data} />
@@ -96,7 +120,7 @@ function Progress() {
               <CompareCard data={data} />
             </>
           ) : (
-            !error && <p className="text-muted-foreground text-sm">Loading…</p>
+            !error && <SkeletonList rows={4} rowClassName="h-32" />
           )}
           <PeriodizationCard />
           <h2 className="text-muted-foreground mt-2 text-xs font-semibold tracking-wide uppercase">Charts</h2>

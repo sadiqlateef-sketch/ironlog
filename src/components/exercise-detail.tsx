@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { Star, Target } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { ExerciseAnimation } from "@/components/exercise-animation";
+import { OverviewTab } from "@/components/exercise-overview";
 import { LineChart } from "@/components/charts/line-chart";
 import { MuscleFigure } from "@/components/muscle-map";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   getExerciseHistory,
   getExercisePrefs,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/workout-api";
 import { shortDate } from "@/lib/chart-scale";
 import { EQUIPMENT_LABELS, MUSCLE_LABELS } from "@/lib/labels";
-import { kgToLb, toKg } from "@/lib/units";
+import { kgToLb } from "@/lib/units";
 import {
   CHART_RANGES,
   chartPoints,
@@ -26,19 +26,20 @@ import {
   groupHistory,
   instructionSteps,
   muscleShare,
-  parseNumber,
   roundHalf,
   type HistoryDay,
 } from "@/lib/workout-logic";
 import { cn } from "@/lib/utils";
 import { describeTimedSet } from "@/lib/cardio";
 import type { MuscleGroup } from "@/types/database";
+import { SkeletonList } from "@/components/ui/skeleton";
 
-export type Tab = "history" | "chart" | "guide";
+export type Tab = "overview" | "history" | "chart" | "guide";
 
 /**
- * Everything about one exercise in a bottom sheet: your history, a progress
- * chart with your goal, and a how-to guide with the muscles it works.
+ * Everything about one exercise in a bottom sheet: your goal, records and
+ * strength level, your history, a progress chart with your goal, and a how-to
+ * guide with the muscles it works.
  */
 export function ExerciseDetail({
   exercise,
@@ -69,6 +70,7 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
   const [prefs, setPrefs] = useState<ExercisePrefs | null>(null);
   const [history, setHistory] = useState<HistoryDay[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingGoal, setEditingGoal] = useState(false);
   const u = unit === "imperial" ? "lb" : "kg";
   /** kg -> the user's unit, to the nearest 0.5 (42.5 lb stays 42.5) */
   const show = (kg: number) => roundHalf(unit === "imperial" ? kgToLb(kg) : kg);
@@ -117,7 +119,15 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
       </DialogHeader>
 
       <div className="flex gap-2">
-        <GoalButton goalKg={prefs?.goal_weight_kg ?? null} unit={unit} show={show} onSave={(kg) => save({ goal_weight_kg: kg })} />
+        <GoalButton
+          goalKg={prefs?.goal_weight_kg ?? null}
+          unit={unit}
+          show={show}
+          onClick={() => {
+            setTab("overview");
+            setEditingGoal(true);
+          }}
+        />
         <Button
           variant="secondary"
           className="flex-1"
@@ -129,8 +139,8 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
         </Button>
       </div>
 
-      <div role="tablist" aria-label="Exercise details" className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1">
-        {(["history", "chart", "guide"] as const).map((t) => (
+      <div role="tablist" aria-label="Exercise details" className="bg-secondary grid grid-cols-4 gap-1 rounded-xl p-1">
+        {(["overview", "history", "chart", "guide"] as const).map((t) => (
           <button
             key={t}
             role="tab"
@@ -149,6 +159,16 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
+      {tab === "overview" && (
+        <OverviewTab
+          exercise={exercise}
+          history={history}
+          prefs={prefs}
+          editingGoal={editingGoal}
+          setEditingGoal={setEditingGoal}
+          onSaveGoal={(patch) => save(patch)}
+        />
+      )}
       {tab === "history" && <HistoryTab history={history} show={show} u={u} />}
       {tab === "chart" && <ChartTab history={history} show={show} u={u} goalKg={prefs?.goal_weight_kg ?? null} />}
       {tab === "guide" && <GuideTab exercise={exercise} />}
@@ -160,63 +180,27 @@ function Detail({ exercise, initialTab }: { exercise: Exercise; initialTab: Tab 
 
 function emptyPrefs(exerciseId: string): ExercisePrefs {
   const now = new Date().toISOString();
-  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, favorite: false, notes: null, created_at: now, updated_at: now };
+  return { user_id: "", exercise_id: exerciseId, goal_weight_kg: null, goal_date: null, goal_start_kg: null, favorite: false, notes: null, rest_seconds: null, unilateral: null, created_at: now, updated_at: now };
 }
 
 function GoalButton({
   goalKg,
   unit,
   show,
-  onSave,
+  onClick,
 }: {
   goalKg: number | null;
   unit: "metric" | "imperial";
   show: (kg: number) => number;
-  onSave: (kg: number | null) => void;
+  onClick: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState("");
   const u = unit === "imperial" ? "lb" : "kg";
-
-  if (editing) {
-    const commit = () => {
-      const v = parseNumber(text);
-      onSave(v && v > 0 ? toKg(v, unit) : null);
-      setEditing(false);
-    };
-    return (
-      <form
-        className="flex flex-1 gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          commit();
-        }}
-      >
-        <Input
-          autoFocus
-          inputMode="decimal"
-          aria-label={`Goal weight in ${u}`}
-          placeholder={`Goal (${u})`}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={commit}
-        />
-      </form>
-    );
-  }
   return (
-    <Button
-      variant="secondary"
-      className="flex-1"
-      onClick={() => {
-        setText(goalKg ? String(show(goalKg)) : "");
-        setEditing(true);
-      }}
-    >
+    <Button variant="secondary" className="flex-1" onClick={onClick}>
       <Target className="text-success" />
       {goalKg ? (
         <>
-          Goal <span className="font-mono font-bold">{show(goalKg)}</span> {u}
+          Goal <span className="num font-bold">{show(goalKg)}</span> {u}
         </>
       ) : (
         "Set a goal"
@@ -227,7 +211,7 @@ function GoalButton({
 
 function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: (kg: number) => number; u: string }) {
   const { unit } = useAuth();
-  if (!history) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!history) return <SkeletonList rows={3} />;
   if (!history.length) return <p className="text-muted-foreground text-sm">You haven&apos;t logged this yet. Your sets will show up here.</p>;
   return (
     <ul className="flex flex-col gap-3">
@@ -242,10 +226,10 @@ function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: 
               <p className="text-muted-foreground shrink-0 text-xs">
                 {d.restSeconds != null && (
                   <>
-                    Rest <span className="font-mono">{formatClock(d.restSeconds)}</span> ·{" "}
+                    Rest <span className="num">{formatClock(d.restSeconds)}</span> ·{" "}
                   </>
                 )}
-                1RM <span className="text-foreground font-mono font-bold">{show(d.e1rm)}</span>
+                1RM <span className="text-foreground num font-bold">{show(d.e1rm)}</span>
               </p>
             </div>
             <ol className="flex flex-col gap-1">
@@ -253,11 +237,11 @@ function HistoryTab({ history, show, u }: { history: HistoryDay[] | null; show: 
                 const label = s.set_type === "warmup" ? "W" : String(++working);
                 const best = i === d.best;
                 return (
-                  <li key={i} className="flex items-center gap-3 font-mono">
+                  <li key={i} className="flex items-center gap-3 num">
                     <span className={cn("w-5 text-center text-sm font-bold", s.set_type === "warmup" ? "text-set-warmup" : "text-muted-foreground")}>
                       {label}
                     </span>
-                    <span className={cn("text-lg font-extrabold", best && "text-primary-text")}>
+                    <span className={cn("text-lg font-bold", best && "text-primary-text")}>
                       {describeTimedSet({ ...s, duration_seconds: s.duration_seconds ?? null, distance_m: s.distance_m ?? null }, unit, (kg) => `${show(kg)} ${u}`) ?? `${show(s.weight)} ${u} × ${s.reps}`}
                     </span>
                     {best && <span className="text-primary-text font-sans text-xs font-semibold">Best set</span>}
@@ -285,7 +269,7 @@ function ChartTab({
 }) {
   const [range, setRange] = useState<(typeof CHART_RANGES)[number]["label"]>("3M");
   const [metric, setMetric] = useState<"e1rm" | "volume">("e1rm");
-  if (!history) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!history) return <SkeletonList rows={3} />;
 
   const days = CHART_RANGES.find((r) => r.label === range)!.days;
   const { points, min, max } = chartPoints(history, metric, days);
@@ -354,7 +338,7 @@ function ChartTab({
         ).map(([label, v]) => (
           <div key={label} className="glass rounded-2xl p-3">
             <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{label}</p>
-            <p className="font-mono text-2xl font-extrabold">
+            <p className="num text-2xl font-bold">
               {v == null ? "–" : show(v.value).toLocaleString()} <span className="text-muted-foreground text-sm font-normal">{u}</span>
             </p>
             {v && <p className="text-muted-foreground text-xs">{shortDate(v.date)}</p>}
@@ -389,7 +373,7 @@ function GuideTab({ exercise }: { exercise: Exercise }) {
             <li key={s.muscle} className="flex flex-col gap-1">
               <div className="flex justify-between text-sm">
                 <span className={cn(i === 0 && "font-semibold")}>{MUSCLE_LABELS[s.muscle]}</span>
-                <span className="text-primary-text font-mono font-bold">{s.pct}%</span>
+                <span className="text-primary-text num font-bold">{s.pct}%</span>
               </div>
               <div className="bg-secondary h-1.5 rounded-full">
                 <div className="bg-primary h-full rounded-full" style={{ width: `${s.pct}%`, opacity: i === 0 ? 1 : 0.6 }} />
@@ -404,7 +388,7 @@ function GuideTab({ exercise }: { exercise: Exercise }) {
           <ol className="flex flex-col gap-2">
             {steps.map((s, i) => (
               <li key={i} className="flex gap-3 text-sm leading-relaxed">
-                <span className="bg-secondary text-primary-text flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold">
+                <span className="bg-secondary text-primary-text flex size-6 shrink-0 items-center justify-center rounded-full num text-xs font-bold">
                   {i + 1}
                 </span>
                 <span>{s}</span>
@@ -421,7 +405,7 @@ function NotesField({ initial, onSave }: { initial: string; onSave: (notes: stri
   const [text, setText] = useState(initial);
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">My notes</span>
+      <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">My notes · shown every time you log it</span>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

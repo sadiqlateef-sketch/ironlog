@@ -2,32 +2,51 @@
 
 import { useState } from "react";
 import {
+  ArrowDown,
   ArrowLeftRight,
+  ArrowUp,
+  ArrowUpDown,
+  ArrowUpToLine,
   Calculator,
   ChartColumn,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock,
+  Copy,
   Dumbbell,
+  Flame,
+  Hourglass,
+  Layers,
   Link2,
+  ListPlus,
   MoreHorizontal,
   Pencil,
   PersonStanding,
+  Pin,
   PlayCircle,
   Plus,
+  Split,
   Timer,
   Trash2,
   Unlink,
 } from "lucide-react";
+import type { EffortScale, SetType } from "@/types/database";
 import { useAuth } from "@/components/providers/auth-provider";
 import { ExerciseAnimation } from "@/components/exercise-animation";
-import { SetRow } from "@/components/workout/set-row";
+import { EffortPicker } from "@/components/workout/effort-picker";
+import { LastTime, ROW_GRID, SIDES_GRID, SetRow } from "@/components/workout/set-row";
 import { ActionSheet, type SheetAction } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { toDisplay, type Block, type UiSet } from "@/hooks/use-workout";
 import { PLATE_LOADED } from "@/lib/labels";
 import { formatWeight } from "@/lib/units";
+import { dropWeight } from "@/lib/keypad";
+import { useLoggerPrefs, weightStep } from "@/lib/logger-prefs";
 import { describeTimedSet, distanceUnit, formatDuration, pace, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import { bestE1rm, formatClock, parseNumber, workingSetNumbers } from "@/lib/workout-logic";
+import { calculatePlates, ownedPlates } from "@/lib/plates";
+import { effortBadge, matchPrevious } from "@/lib/set-logic";
 import { cn } from "@/lib/utils";
 
 export function ExerciseBlock({
@@ -43,12 +62,30 @@ export function ExerciseBlock({
   onPlates,
   onToggleSuperset,
   onRemove,
+  onDoNext,
+  onMoveUp,
+  onMoveDown,
+  onReorder,
+  onAddAfter,
   onAddSet,
   onRemoveSet,
   onChangeSet,
   onCommitSet,
   onCycleType,
   onToggleDone,
+  onSetType,
+  onDuplicateSet,
+  onAddDropSet,
+  collapsed,
+  onToggleCollapse,
+  effortScale,
+  effortAskId,
+  onEffort,
+  onSkipEffort,
+  onNote,
+  onToggleUnilateral,
+  onWarmups,
+  onHold,
 }: {
   block: Block;
   isLast: boolean;
@@ -63,18 +100,49 @@ export function ExerciseBlock({
   onPlates: (weight: number | null) => void;
   onToggleSuperset: () => void;
   onRemove: () => void;
+  /** Move this exercise up to be done next. Leave out when it already is. */
+  onDoNext?: () => void;
+  /** Leave out at the top / bottom. */
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  /** Open the whole-workout reorder list. */
+  onReorder: () => void;
+  /** Pick an exercise to go straight after this one. */
+  onAddAfter: () => void;
   onAddSet: () => void;
   onRemoveSet: (id: string) => void;
   onChangeSet: (id: string, patch: Partial<UiSet>) => void;
   onCommitSet: (id: string) => void;
   onCycleType: (id: string) => void;
   onToggleDone: (id: string) => Promise<boolean>;
+  onSetType: (id: string, type: SetType) => void;
+  onDuplicateSet: (id: string) => void;
+  /** Weight in the user's unit, already filled in. */
+  onAddDropSet: (id: string, weight: string) => void;
+  /** All view: finished exercises shrink to one line. */
+  collapsed?: boolean;
+  /** Leave out where cards can't collapse (the One view). */
+  onToggleCollapse?: () => void;
+  effortScale: EffortScale;
+  /** The set just finished, waiting for "how hard was it?". */
+  effortAskId: string | null;
+  onEffort: (id: string, rpe: number) => void;
+  onSkipEffort: () => void;
+  onNote: () => void;
+  onToggleUnilateral: () => void;
+  onWarmups: () => void;
+  /** Timed holds: open the hold stopwatch. */
+  onHold: () => void;
 }) {
-  const { unit } = useAuth();
+  const { unit, profile } = useAuth();
+  const prefs = useLoggerPrefs();
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
   const [demo, setDemo] = useState(false);
+  /** The set whose long-press menu is open. */
+  const [setMenuFor, setSetMenuFor] = useState<string | null>(null);
   const numbers = workingSetNumbers(block.sets.map((s) => s.type));
+  const prevOf = matchPrevious(block.sets.map((s) => s.type), block.previous);
   const u = unit === "imperial" ? "lb" : "kg";
   const plateLoaded = PLATE_LOADED.includes(block.exercise.equipment);
   const nextUndone = block.sets.find((s) => !s.done);
@@ -82,6 +150,8 @@ export function ExerciseBlock({
   const lastPrev = block.previous.at(-1);
   const tracking = block.exercise.tracking ?? "weight_reps";
   const timed = tracking !== "weight_reps";
+  const sides = block.unilateral && tracking === "weight_reps";
+  const grid = sides ? SIDES_GRID : ROW_GRID;
   const lastRun = tracking === "distance_time" ? block.sets.filter((x) => x.done).at(-1) : undefined;
   const todayPace = lastRun ? pace(parseDuration(lastRun.time), toMetres(parseNumber(lastRun.distance) ?? 0, unit), unit) : null;
   /** "Last time" for one set, short enough for its column. */
@@ -89,7 +159,23 @@ export function ExerciseBlock({
     if (!p) return "–";
     if (tracking === "distance_time") return [p.distance_m ? toDistanceDisplay(p.distance_m, unit) : null, p.duration_seconds ? formatDuration(p.duration_seconds) : null].filter(Boolean).join("/") || "–";
     if (tracking === "time") return p.duration_seconds ? formatDuration(p.duration_seconds) : "–";
-    return `${toDisplay(p.weight, unit) || "0"}×${p.reps}`;
+    const reps = p.reps_left != null && p.reps_right != null ? `${p.reps_left}/${p.reps_right}` : p.reps;
+    return `${toDisplay(p.weight, unit) || "0"}×${reps}`;
+  };
+  // Warm-ups on a loaded bar show the plates per side instead of last time.
+  const warmupPlates = (set: UiSet) => {
+    const w = parseNumber(set.weight);
+    if (!plateLoaded || set.type !== "warmup" || !w) return null;
+    const { bar, plates } = ownedPlates(profile, unit);
+    const r = calculatePlates(w, bar, plates);
+    return r.remainder > 0 ? null : r.perSide.length ? r.perSide.join("+") : "Bar";
+  };
+  // Today's suggested weight fills working sets; anything else repeats last time.
+  const weightHint = (i: number) => {
+    const set = block.sets[i];
+    if (block.suggestion && (set.type === "normal" || set.type === "failure")) return String(block.suggestion.weight);
+    const prev = prevOf[i];
+    return prev ? toDisplay(prev.weight, unit) || "0" : "0";
   };
 
   // Live estimated 1RM: today's best logged set, else your best from last time.
@@ -107,17 +193,27 @@ export function ExerciseBlock({
   const plates = () => {
     const w = nextUndone ? parseNumber(nextUndone.weight) : null;
     const prevIdx = nextUndone ? block.sets.indexOf(nextUndone) : -1;
-    const prev = block.previous[prevIdx];
+    const prev = prevOf[prevIdx];
     onPlates(w ?? (prev ? parseNumber(toDisplay(prev.weight, unit)) : null));
   };
 
   const actions: SheetAction[] = [
+    ...(onDoNext ? [{ label: "Do next", icon: ArrowUpToLine, onSelect: onDoNext }] : []),
+    ...(onMoveUp ? [{ label: "Move up", icon: ArrowUp, onSelect: onMoveUp }] : []),
+    ...(onMoveDown ? [{ label: "Move down", icon: ArrowDown, onSelect: onMoveDown }] : []),
+    { label: "Reorder exercises", icon: ArrowUpDown, onSelect: onReorder },
+    { label: "Add exercise after this", icon: ListPlus, onSelect: onAddAfter },
     ...(block.supersetGroup != null
       ? [{ label: "Remove from superset", icon: Unlink, onSelect: onToggleSuperset }]
       : !isLast
         ? [{ label: "Add a superset", icon: Link2, onSelect: onToggleSuperset }]
         : []),
     { label: "Swap exercise", icon: ArrowLeftRight, onSelect: onSwap },
+    ...(tracking === "weight_reps" ? [{ label: "Warm-up sets", icon: Flame, onSelect: onWarmups }] : []),
+    { label: block.note ? "Edit exercise note" : "Add exercise note", icon: Pin, onSelect: onNote },
+    ...(tracking === "weight_reps"
+      ? [{ label: sides ? "Log both sides together" : "Log left and right separately", icon: Split, onSelect: onToggleUnilateral }]
+      : []),
     ...(plateLoaded ? [{ label: "Plate calculator", icon: Calculator, onSelect: plates }] : []),
     { label: "Edit available weights", icon: Dumbbell, onSelect: onEquipment },
     { label: demo ? "Hide form demo" : "Show form demo", icon: PlayCircle, onSelect: () => setDemo((d) => !d) },
@@ -125,6 +221,74 @@ export function ExerciseBlock({
     { label: "Edit sets", icon: Pencil, onSelect: () => setEditing(true) },
     { label: "Remove exercise", icon: Trash2, onSelect: onRemove, destructive: true },
   ];
+
+  // Long-press menu for one set.
+  const menuSet = block.sets.find((x) => x.id === setMenuFor) ?? null;
+  const menuIdx = menuSet ? block.sets.indexOf(menuSet) : -1;
+  const setActions: SheetAction[] = menuSet
+    ? [
+        { label: "Duplicate set", icon: Copy, onSelect: () => onDuplicateSet(menuSet.id) },
+        menuSet.type === "warmup"
+          ? { label: "Make it a working set", icon: Dumbbell, onSelect: () => onSetType(menuSet.id, "normal") }
+          : { label: "Mark as warm-up", icon: Flame, onSelect: () => onSetType(menuSet.id, "warmup") },
+        ...(tracking === "weight_reps"
+          ? [
+              {
+                label: "Add drop set",
+                icon: Layers,
+                onSelect: () => {
+                  const prev = prevOf[menuIdx];
+                  const w = parseNumber(menuSet.weight) ?? (prev ? parseNumber(toDisplay(prev.weight, unit)) : null) ?? 0;
+                  const d = dropWeight(w, weightStep(prefs, unit));
+                  onAddDropSet(menuSet.id, d ? String(d) : "");
+                },
+              },
+            ]
+          : []),
+        { label: "Delete set", icon: Trash2, onSelect: () => onRemoveSet(menuSet.id), destructive: true },
+      ]
+    : [];
+
+  const doneSets = block.sets.filter((x) => x.done);
+  const finished = block.sets.length > 0 && doneSets.length === block.sets.length;
+
+  if (collapsed) {
+    const best = !timed
+      ? doneSets
+          .filter((x) => x.type !== "warmup")
+          .reduce<UiSet | null>((b, x) => {
+            const e = (x2: UiSet) => (parseNumber(x2.weight) ?? 0) * (1 + (parseNumber(x2.reps) ?? 0) / 30);
+            return !b || e(x) > e(b) ? x : b;
+          }, null)
+      : null;
+    return (
+      <section className="glass rounded-2xl" data-testid="exercise-block" data-collapsed>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-expanded={false}
+          className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left"
+        >
+          <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", finished ? "bg-success text-[#08200d]" : "bg-secondary text-muted-foreground")}>
+            {finished ? <Check className="size-5" strokeWidth={3} aria-hidden /> : <span className="num text-sm font-bold">{doneSets.length}</span>}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-semibold">{block.exercise.name}</span>
+            <span className="num text-muted-foreground block truncate text-sm">
+              {doneSets.length} of {block.sets.length} {block.sets.length === 1 ? "set" : "sets"}
+              {best && (
+                <>
+                  {" "}· best <LastTime text={`${best.weight || 0} ${u}×${best.reps}`} />
+                </>
+              )}
+            </span>
+          </span>
+          <ChevronDown className="text-muted-foreground size-5 shrink-0" aria-hidden />
+          <span className="sr-only">Show sets</span>
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -166,7 +330,7 @@ export function ExerciseBlock({
               <>Last time: {describeTimedSet(block.previous.at(-1)!, unit, (kg) => formatWeight(kg, unit)) ?? "–"}</>
             ) : !timed && bestPrev ? (
               <>
-                Last time: {formatWeight(bestPrev.weight, unit)} × {bestPrev.reps}
+                Last time: <span className="num font-semibold"><LastTime text={`${formatWeight(bestPrev.weight, unit)}×${bestPrev.reps}`} /></span>
               </>
             ) : (
               "First time logging this"
@@ -180,13 +344,38 @@ export function ExerciseBlock({
             )}
           </p>
           {block.targetNote && <p className="text-foreground/80 text-xs">{block.targetNote}</p>}
+          {block.suggestion && block.sets.some((s) => !s.done && !s.weight && s.type !== "warmup") && (
+            <p className="text-primary-text text-sm font-semibold" data-testid="suggested-weight">
+              Try <span className="num">{block.suggestion.weight}</span> {u} today ·{" "}
+              {block.suggestion.why.charAt(0).toLowerCase() + block.suggestion.why.slice(1)}
+            </p>
+          )}
           {todayPace && <p className="text-primary-text text-sm font-semibold">Pace {todayPace}</p>}
         </button>
-        {e1rm > 0 && !timed && (
-          <div className="shrink-0 px-1 text-right" aria-label={`Estimated one rep max ${e1rm} ${u}`}>
-            <p className="text-muted-foreground text-[11px] font-bold tracking-wider">EST. 1RM</p>
-            <p className="text-primary-text font-mono text-xl font-extrabold">{e1rm}</p>
+        {(onDoNext || (e1rm > 0 && !timed)) && (
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {onDoNext && (
+              <button
+                type="button"
+                onClick={onDoNext}
+                className="bg-primary/20 text-primary-text flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold"
+                data-testid="do-next"
+              >
+                <ArrowUpToLine className="size-4" aria-hidden /> Do next
+              </button>
+            )}
+            {e1rm > 0 && !timed && (
+              <div className="px-1 text-right" aria-label={`Estimated one rep max ${e1rm} ${u}`}>
+                <p className="text-muted-foreground text-[11px] font-bold tracking-wider">EST. 1RM</p>
+                <p className="num text-primary-text text-[22px] leading-tight font-bold">{e1rm.toLocaleString("en-US")}</p>
+              </div>
+            )}
           </div>
+        )}
+        {onToggleCollapse && (
+          <Button variant="ghost" size="icon" aria-label="Collapse" aria-expanded onClick={onToggleCollapse} className="-mr-1 shrink-0">
+            <ChevronUp />
+          </Button>
         )}
       </header>
 
@@ -199,18 +388,37 @@ export function ExerciseBlock({
         </div>
       )}
 
+      {block.note && (
+        <button
+          type="button"
+          onClick={onNote}
+          className="bg-set-warmup/10 text-foreground/90 -mt-1 flex items-start gap-2 rounded-xl px-3 py-2 text-left text-sm"
+          aria-label={`Exercise note: ${block.note}. Tap to edit.`}
+          data-testid="exercise-note"
+        >
+          <Pin className="text-set-warmup mt-0.5 size-4 shrink-0" aria-hidden />
+          <span className="min-w-0 whitespace-pre-line">{block.note}</span>
+        </button>
+      )}
+
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onRest}
-          className="bg-secondary flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium"
+          className="bg-secondary flex h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium"
           aria-label={`Rest timer ${formatClock(block.restSeconds)}. Tap to change.`}
         >
-          <Clock className="size-4" /> Rest <span className="text-primary-text font-mono font-bold">{formatClock(block.restSeconds)}</span>
+          <Clock className="size-4" /> Rest <span className="num text-primary-text font-bold">{formatClock(block.restSeconds)}</span>
         </button>
-        <button type="button" onClick={onInterval} className="bg-secondary flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium">
-          <Timer className="size-4" /> Interval
-        </button>
+        {tracking === "time" ? (
+          <button type="button" onClick={onHold} className="bg-secondary flex h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium">
+            <Hourglass className="size-4" /> Hold
+          </button>
+        ) : (
+          <button type="button" onClick={onInterval} className="bg-secondary flex h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium">
+            <Timer className="size-4" /> Interval
+          </button>
+        )}
         <div className="ml-auto flex">
           <Button variant="ghost" size="icon" aria-label="History and chart" onClick={onChart}>
             <ChartColumn />
@@ -224,27 +432,43 @@ export function ExerciseBlock({
         </div>
       </div>
 
-      <div className="text-muted-foreground grid grid-cols-[2.5rem_1fr_4.5rem_4rem_3rem] gap-2 px-1 text-center text-[11px] font-semibold tracking-wide uppercase">
+      <div className={cn(grid, "text-muted-foreground px-1 text-center text-[11px] font-semibold tracking-wide uppercase")}>
         <span>Set</span>
-        <span>Last time</span>
-        <span>{tracking === "distance_time" ? distanceUnit(unit) : tracking === "time" ? `+${u}` : u}</span>
-        <span>{timed ? "Time" : "Reps"}</span>
+        {sides ? (
+          <>
+            <span>{u}</span>
+            <span>Left</span>
+            <span>Right</span>
+          </>
+        ) : (
+          <>
+            <span>Last time</span>
+            <span>{tracking === "distance_time" ? distanceUnit(unit) : tracking === "time" ? `+${u}` : u}</span>
+            <span>{timed ? "Time" : "Reps"}</span>
+          </>
+        )}
         <span />
       </div>
 
       {block.sets.map((set, i) => {
-        const prev = block.previous[i];
+        const prev = prevOf[i];
+        const repHint = (side: number | null | undefined) => (prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "0"));
         return (
+          <div key={set.id} className="flex flex-col gap-1">
           <SetRow
-            key={set.id}
             set={set}
             workingNumber={numbers[i]}
-            previousText={prevText(prev)}
+            previousText={warmupPlates(set) ?? prevText(prev)}
+            sides={sides}
+            leftPlaceholder={set.reps || repHint(prev?.reps_left)}
+            effort={effortBadge(set.rpe, effortScale)}
             tracking={tracking}
             timePlaceholder={prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "0:00") : "0:00"}
             distancePlaceholder={prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "0"}
-            weightPlaceholder={prev ? toDisplay(prev.weight, unit) || "0" : "0"}
-            repPlaceholder={prev ? String(prev.reps) : (block.repTarget?.split("-")[0] ?? "0")}
+            weightPlaceholder={weightHint(i)}
+            repPlaceholder={sides ? set.repsLeft || repHint(prev?.reps_right) : repHint(null)}
+            weightUnit={u}
+            distanceLabel={distanceUnit(unit)}
             current={set === nextUndone}
             editing={editing}
             onChange={(patch) => onChangeSet(set.id, patch)}
@@ -252,7 +476,12 @@ export function ExerciseBlock({
             onCycleType={() => onCycleType(set.id)}
             onToggleDone={() => onToggleDone(set.id)}
             onRemove={() => onRemoveSet(set.id)}
+            onLongPress={() => setSetMenuFor(set.id)}
           />
+          {effortAskId === set.id && set.done && (
+            <EffortPicker scale={effortScale} onPick={(rpe) => onEffort(set.id, rpe)} onSkip={onSkipEffort} />
+          )}
+          </div>
         );
       })}
 
@@ -261,18 +490,27 @@ export function ExerciseBlock({
         type="button"
         onClick={onAddSet}
         aria-label="Add set"
-        className="hover:bg-accent grid grid-cols-[2.5rem_1fr_4.5rem_4rem_3rem] items-center gap-2 rounded-lg px-1 py-1 text-center"
+        className={cn(grid, "hover:bg-accent min-h-14 rounded-xl px-1 py-1 text-center")}
       >
-        <Plus className="text-muted-foreground mx-auto size-5" />
-        <span aria-hidden className="text-muted-foreground/70 font-mono text-sm">
-          {lastPrev ? prevText(lastPrev) : ""}
-        </span>
-        <span aria-hidden className="text-foreground/35 font-mono text-xl font-extrabold">{(tracking === "distance_time" ? last?.distance : last?.weight) || ""}</span>
-        <span aria-hidden className="text-foreground/35 font-mono text-xl font-extrabold">{(timed ? last?.time : last?.reps) || ""}</span>
+        <Plus className="text-muted-foreground mx-auto size-6" />
+        {!sides && (
+          <span aria-hidden className="num text-muted-foreground/70 truncate text-sm">
+            {lastPrev ? <LastTime text={prevText(lastPrev)} tight /> : ""}
+          </span>
+        )}
+        <span aria-hidden className="num text-foreground/35 text-xl font-bold">{(tracking === "distance_time" ? last?.distance : last?.weight) || ""}</span>
+        {sides && <span aria-hidden className="num text-foreground/35 text-xl font-bold">{last?.repsLeft || last?.reps || ""}</span>}
+        <span aria-hidden className="num text-foreground/35 text-xl font-bold">{(timed ? last?.time : last?.reps) || ""}</span>
         <span className="text-muted-foreground text-xs font-semibold">Add</span>
       </button>
 
       <ActionSheet open={menu} onOpenChange={setMenu} title={block.exercise.name} actions={actions} />
+      <ActionSheet
+        open={!!menuSet}
+        onOpenChange={(o) => !o && setSetMenuFor(null)}
+        title={menuSet ? `${block.exercise.name}, set ${menuIdx + 1}` : ""}
+        actions={setActions}
+      />
     </section>
   );
 }

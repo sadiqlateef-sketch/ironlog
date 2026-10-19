@@ -20,8 +20,8 @@ export function useActiveProgram(reloadKey = 0) {
   return progress;
 }
 
-/** The big "do this next" card for the active program. */
-export function UpNext({ progress }: { progress: ProgramProgress }) {
+/** The big "do this next" card for the active program (`embedded`: just its contents, for Home's Today card). */
+export function UpNext({ progress, embedded }: { progress: ProgramProgress; embedded?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +41,9 @@ export function UpNext({ progress }: { progress: ProgramProgress }) {
     }
   }
 
+  const Wrap = embedded ? "div" : Card;
   return (
-    <Card className="border-primary gap-3 p-4" data-testid="up-next">
+    <Wrap className={embedded ? "flex flex-col gap-3" : "border-primary gap-3 p-4"} data-testid="up-next">
       <div className="min-w-0">
         <p className="text-primary-text text-xs font-bold tracking-wide uppercase">
           {finished ? "Program complete" : `Up next · Week ${progress.next_week} of ${progress.weeks}`}
@@ -64,6 +65,6 @@ export function UpNext({ progress }: { progress: ProgramProgress }) {
         </Button>
       )}
       {error && <p className="text-destructive text-sm">{error}</p>}
-    </Card>
+    </Wrap>
   );
 }

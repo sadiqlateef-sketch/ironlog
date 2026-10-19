@@ -2,6 +2,7 @@
 
 import type { PlanInput } from "@/lib/workout-api";
 import type { Tables } from "@/types/database";
+import { activeKit } from "@/lib/kit";
 
 export const GOALS = [
   { v: "strength", l: "Strength", d: "Lift heavier on the big lifts" },
@@ -27,7 +28,8 @@ export function planDefaults(profile: Tables<"users"> | null): PlanInput {
     weeks: 8,
     session_minutes: 60,
     experience: "intermediate",
-    equipment: profile?.training_equipment?.length ? profile.training_equipment : DEFAULT_EQUIPMENT,
+    // What your current place has (your gym, unless you switched to another kit).
+    equipment: profile ? [...activeKit(profile).equipment] : DEFAULT_EQUIPMENT,
     notes: "",
   };
 }
