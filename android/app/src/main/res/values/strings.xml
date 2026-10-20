@@ -4,4 +4,5 @@
     <string name="title_activity_main">Ironlog</string>
     <string name="package_name">com.ironlog.app</string>
     <string name="custom_url_scheme">com.ironlog.app</string>
+    <string name="health_privacy">Ironlog and Health Connect\n\nWhat Ironlog writes: each workout you finish (its name, start and end time, type, and a short list of the exercises and sets), plus the distance of runs, walks, rides and rows.\n\nWhat Ironlog reads: heart rate during your workouts, to show your average and peak heart rate on each workout, and body weight, to fill in the weight chart on your Body tab.\n\nThis data is saved to your own Ironlog account and is only visible to you. It is never sold, shared with anyone else, or used for ads. You can turn any of this off at any time in Health Connect.</string>
 </resources>
