@@ -387,7 +387,7 @@ function TemplateSheet({
                   {d.items.map((it) => (
                     <li key={it.slug} className="flex justify-between gap-2">
                       <span className="truncate">{library.get(it.slug)?.name ?? it.slug}</span>
-                      <span className="text-muted-foreground shrink-0 font-mono">
+                      <span className="text-muted-foreground shrink-0 num">
                         {it.sets} × {it.reps}
                         {it.repsMax ? `–${it.repsMax}` : ""}
                       </span>

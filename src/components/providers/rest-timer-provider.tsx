@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { buzz, cancelRestAlert, onAppActiveChange, scheduleRestAlert } from "@/lib/native";
+import { cancelRestAlert, hideRestCountdown, onAppActiveChange, scheduleRestAlert, showRestCountdown } from "@/lib/native";
+import { cueRestOver, cueRestTick } from "@/lib/cues";
 
 // The timer stores the moment it ENDS, not a countdown. That way it stays
 // correct if the phone locks, the tab sleeps, or the page reloads.
@@ -21,6 +22,9 @@ interface RestTimerApi {
   start: (seconds: number, label: string) => void;
   adjust: (deltaSeconds: number) => void;
   stop: () => void;
+  /** A screen is showing its own big timer (focus mode), so the bar steps aside. */
+  inline: boolean;
+  setInline: (on: boolean) => void;
 }
 
 const RestTimerContext = createContext<RestTimerApi | null>(null);
@@ -45,32 +49,13 @@ function save(t: TimerState | null) {
   }
 }
 
-/** Three short beeps plus a vibration so you notice from across the rack. */
-function alertDone() {
-  try {
-    if (!buzz()) navigator.vibrate?.([300, 150, 300]);
-  } catch {}
-  try {
-    const ctx = new AudioContext();
-    [0, 0.25, 0.5].forEach((offset) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = 880;
-      gain.gain.value = 0.2;
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(ctx.currentTime + offset);
-      osc.stop(ctx.currentTime + offset + 0.15);
-    });
-    setTimeout(() => ctx.close(), 1000);
-  } catch {}
-}
-
 export function RestTimerProvider({ children }: { children: ReactNode }) {
   // Safe to read storage during the first render: the timer bar only appears
   // after sign-in is known, which never happens in the prerendered HTML.
   const [timer, setTimer] = useState<TimerState | null>(() => (typeof window === "undefined" ? null : load()));
   const [now, setNow] = useState(() => Date.now());
   const firedFor = useRef<number | null>(null);
+  const [inline, setInline] = useState(false);
 
   useEffect(() => {
     if (!timer) return;
@@ -97,10 +82,29 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // Lock screen / notification shade countdown, kept in step with +15 / -15.
+  const endsAt = timer?.endsAt;
+  const label = timer?.label ?? "";
+  useEffect(() => {
+    if (endsAt == null) return hideRestCountdown();
+    showRestCountdown(endsAt, label);
+  }, [endsAt, label]);
+
+  // 3, 2, 1: a soft tick each second before the end.
+  const whole = Math.ceil(remaining);
+  const tickedAt = useRef<string | null>(null);
+  useEffect(() => {
+    if (!timer || whole < 1 || whole > 3 || timer.duration < 10) return;
+    const key = `${timer.endsAt}:${whole}`;
+    if (tickedAt.current === key) return;
+    tickedAt.current = key;
+    cueRestTick();
+  }, [timer, whole]);
+
   useEffect(() => {
     if (timer && remaining <= 0 && firedFor.current !== timer.endsAt) {
       firedFor.current = timer.endsAt;
-      alertDone();
+      cueRestOver();
       // Keep "0:00" on screen briefly, then clear.
       const id = setTimeout(() => {
         setTimer(null);
@@ -133,7 +137,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     save(null);
   }, []);
 
-  return <RestTimerContext value={{ timer, remaining, start, adjust, stop }}>{children}</RestTimerContext>;
+  return <RestTimerContext value={{ timer, remaining, start, adjust, stop, inline, setInline }}>{children}</RestTimerContext>;
 }
 
 export function useRestTimer(): RestTimerApi {

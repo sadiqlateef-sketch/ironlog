@@ -4,11 +4,18 @@
 // equipment, gym and calendar, the Claude connector, alerts, and sign out.
 
 import { useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Dumbbell, FileDown, HeartPulse, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bell, BriefcaseMedical, ChevronRight, Dumbbell, FileDown, FileUp, HeartPulse, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { AppearanceSettings } from "@/components/appearance-settings";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
+import { BackupButton } from "@/components/import/backup-button";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
 import { HealthSheet } from "@/components/health-sheet";
+import { ShiftsSheet } from "@/components/shifts-sheet";
+import { ReminderRow } from "@/components/workout/home-tab";
+import { useKits } from "@/hooks/use-kits";
+import { normalizeShifts } from "@/lib/shifts";
 import { AboutYouForm } from "@/components/progress/body";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -17,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { toCsv } from "@/lib/export-csv";
 import { isNative, recoveryReminderOn, setRecoveryReminder, shareImage } from "@/lib/native";
 import { listSetsForExport } from "@/lib/workout-api";
-import { EQUIPMENT, EQUIPMENT_LABEL, GOALS } from "@/lib/plan-options";
+import { GOALS } from "@/lib/plan-options";
 import { cn } from "@/lib/utils";
 
 function Row({ icon: Icon, label, detail, onClick }: { icon: typeof Dumbbell; label: string; detail?: string; onClick: () => void }) {
@@ -45,11 +52,20 @@ function Section({ id, title, description, children }: { id?: string; title: str
   );
 }
 
+const EFFORT = [
+  { v: "rir", l: "Reps left" },
+  { v: "rpe", l: "RPE" },
+  { v: "off", l: "Don't ask" },
+] as const;
+
 export function SettingsScreen() {
   const { profile, unit, setUnit, updateProfile, signOut } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [note, setNote] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | "health" | null>(null);
+  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | "shifts" | "health" | null>(null);
+  const { kits } = useKits();
+  const upcomingShifts = normalizeShifts(profile?.work_shifts).filter((x) => x.date >= new Date().toISOString().slice(0, 10)).length;
 
   async function save(patch: Parameters<typeof updateProfile>[0], message = "Saved.") {
     try {
@@ -61,8 +77,8 @@ export function SettingsScreen() {
   }
 
   const goal = profile?.training_goal ?? null;
-  const equipment = profile?.training_equipment ?? [];
   const days = profile?.training_days_per_week ?? null;
+  const effort = profile?.effort_scale ?? "rir";
 
   return (
     <div className="flex flex-col gap-4">
@@ -102,11 +118,15 @@ export function SettingsScreen() {
         <p className="text-muted-foreground text-xs">{profile?.email}</p>
       </Section>
 
+      <Section id="appearance" title="Appearance" description="Saved on this phone. Dark is easiest to read under bright gym lights.">
+        <AppearanceSettings />
+      </Section>
+
       <Section id="about" title="About you" description="Used for BMI and the body fat estimate. Only you can see it.">
         {profile && <AboutYouForm key={profile.updated_at} onDone={() => setNote("Saved.")} />}
       </Section>
 
-      <Section title="Training" description="The program builder starts from these.">
+      <Section title="Training" description="The program builder and your week plan start from these.">
         <div className="flex flex-col gap-2 text-sm">
           Goal
           <div className="flex flex-wrap gap-2">
@@ -117,19 +137,13 @@ export function SettingsScreen() {
             ))}
           </div>
         </div>
-        <div className="flex flex-col gap-2 text-sm">
-          Equipment
-          <div className="flex flex-wrap gap-2">
-            {EQUIPMENT.map((x) => {
-              const on = equipment.includes(x);
-              return (
-                <Chip key={x} on={on} onClick={() => save({ training_equipment: on ? equipment.filter((e) => e !== x) : [...equipment, x] })}>
-                  {EQUIPMENT_LABEL[x]}
-                </Chip>
-              );
-            })}
-          </div>
-        </div>
+        <Row icon={Dumbbell} label="Equipment" detail={kits.map((k) => k.name).join(" · ")} onClick={() => setSheet("weights")} />
+        <Row
+          icon={BriefcaseMedical}
+          label="Work shifts"
+          detail={upcomingShifts ? `${upcomingShifts} coming up. Heavy days stay off them.` : "Mark your shifts so heavy days stay off them"}
+          onClick={() => setSheet("shifts")}
+        />
         <div className="flex flex-col gap-2 text-sm">
           Days a week
           <div className="grid grid-cols-5 gap-2" role="group" aria-label="Days a week">
@@ -139,22 +153,41 @@ export function SettingsScreen() {
                 type="button"
                 aria-pressed={days === d}
                 onClick={() => save({ training_days_per_week: d })}
-                className={cn("h-10 rounded-lg font-mono font-bold", days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}
+                className={cn("h-10 rounded-lg num font-bold", days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}
               >
                 {d}
               </button>
             ))}
           </div>
         </div>
+        <div className="flex flex-col gap-2 text-sm">
+          After each set, ask how hard it was
+          <div className="bg-secondary grid grid-cols-3 gap-1 rounded-xl p-1" role="group" aria-label="Ask how hard each set was">
+            {EFFORT.map((x) => (
+              <button
+                key={x.v}
+                type="button"
+                aria-pressed={effort === x.v}
+                onClick={() => save({ effort_scale: x.v })}
+                className={cn("h-10 rounded-lg font-semibold", effort === x.v ? "bg-foreground text-background" : "text-muted-foreground")}
+              >
+                {x.l}
+              </button>
+            ))}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Reps left means &quot;how many more could you have done?&quot; It helps decide when to go heavier.
+          </p>
+        </div>
       </Section>
 
       <Section title="Reminders">
         <RecoveryToggle />
+        <ReminderRow />
       </Section>
 
       <Section title="Gym and connections">
         <div className="flex flex-col">
-          <Row icon={Dumbbell} label="Bar, plates and rest time" detail="What the plate calculator and rest timer use" onClick={() => setSheet("weights")} />
           <Row icon={MapPin} label="Gym & calendar" detail={profile?.gym_name ?? "Check in at your gym, add workouts to Google Calendar"} onClick={() => setSheet("gym")} />
           <Row icon={HeartPulse} label="Health Connect" detail="Share workouts with Samsung Health; bring in heart rate and weight" onClick={() => setSheet("health")} />
           <Row icon={MessageCircle} label="Connect to Claude" detail="Log workouts from a Claude chat" onClick={() => setSheet("claude")} />
@@ -162,6 +195,8 @@ export function SettingsScreen() {
       </Section>
 
       <Section title="Your data">
+        <Row icon={FileUp} label="Import from JEFIT or another app" detail="Bring your whole workout history in" onClick={() => router.push("/import/?tab=file")} />
+        <BackupButton />
         <Row
           icon={FileDown}
           label="Export workouts (CSV)"
@@ -185,6 +220,7 @@ export function SettingsScreen() {
       </Button>
 
       <EquipmentSheet open={sheet === "weights"} onOpenChange={(o) => !o && setSheet(null)} />
+      <ShiftsSheet open={sheet === "shifts"} onOpenChange={(o) => !o && setSheet(null)} />
       <GymSheet open={sheet === "gym"} onOpenChange={(o) => !o && setSheet(null)} />
       <ClaudeConnectSheet open={sheet === "claude"} onOpenChange={(o) => !o && setSheet(null)} />
       <HealthSheet open={sheet === "health"} onOpenChange={(o) => !o && setSheet(null)} />

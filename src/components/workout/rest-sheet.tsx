@@ -31,7 +31,7 @@ export function RestSheet({
           <Button variant="secondary" size="icon" aria-label="15 seconds less" onClick={() => onChange(Math.max(0, seconds - 15))}>
             <Minus />
           </Button>
-          <p className="w-32 text-center font-mono text-5xl font-extrabold tracking-tight" aria-live="polite">
+          <p className="w-32 text-center num text-5xl font-bold tracking-tight" aria-live="polite">
             {formatClock(seconds)}
           </p>
           <Button variant="secondary" size="icon" aria-label="15 seconds more" onClick={() => onChange(Math.min(1800, seconds + 15))}>
@@ -45,7 +45,7 @@ export function RestSheet({
               type="button"
               onClick={() => onChange(p)}
               className={cn(
-                "h-11 rounded-xl border font-mono text-sm font-semibold",
+                "h-11 rounded-xl border num text-sm font-semibold",
                 p === seconds ? "bg-primary text-primary-foreground border-primary" : "bg-secondary",
               )}
             >

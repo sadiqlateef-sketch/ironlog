@@ -6,8 +6,9 @@
 //   "calendars"   calendars you can add events to
 //   "choose"      save which calendar to use ({ calendar_id })
 //   "disconnect"  forget the Google sign-in
-//   "sync"        add every finished gym workout longer than 30 minutes
-//                 (last 14 days) that isn't on the calendar yet
+//   "sync"        add every finished gym workout longer than 30 minutes, and
+//                 every home workout you said "Add to calendar" to (last 14
+//                 days) that isn't on the calendar yet
 // GET ?code&state is where Google sends you back after signing in, so this
 // function checks the caller itself instead of requiring a JWT.
 // GET ?page=home|privacy|terms are the public pages Google's sign-in screen
@@ -22,9 +23,8 @@ import {
   exchangeCode,
   GoogleError,
   insertEvent,
+  isDue,
   listCalendars,
-  MIN_GYM_MINUTES,
-  minutesOf,
   signState,
   verifyState,
   type GymWorkout,
@@ -115,6 +115,7 @@ async function callback(url: URL): Promise<Response> {
 
 // ---------- Adding workouts ----------
 
+
 async function sync(userId: string, db: Awaited<ReturnType<typeof userClient>>["db"]): Promise<{ added: number }> {
   const conn = await getConnection(userId);
   if (!conn?.calendar_id) return { added: 0 };
@@ -122,14 +123,14 @@ async function sync(userId: string, db: Awaited<ReturnType<typeof userClient>>["
   const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
   const { data: sessions, error } = await db
     .from("workout_sessions")
-    .select("id, name, start_time, end_time, volume")
-    .eq("at_gym", true)
+    .select("id, name, start_time, end_time, volume, at_gym, add_to_calendar")
+    .or("at_gym.eq.true,add_to_calendar.eq.true")
     .is("calendar_event_id", null)
     .not("end_time", "is", null)
     .gte("start_time", since)
     .order("start_time");
   if (error) throw new HttpError(500, error.message);
-  const due = (sessions ?? []).filter((s) => minutesOf(s) > MIN_GYM_MINUTES);
+  const due = (sessions ?? []).filter((s) => isDue(s));
   if (!due.length) return { added: 0 };
 
   const [{ data: profile }, { data: sets }] = await Promise.all([
@@ -148,7 +149,7 @@ async function sync(userId: string, db: Awaited<ReturnType<typeof userClient>>["
     const mine = (sets ?? []).filter((x) => x.session_id === s.id);
     const names = [...new Set(mine.map((x) => (x.exercises as unknown as { name: string } | null)?.name).filter((n): n is string => !!n))];
     const workout: GymWorkout = { id: s.id, name: s.name, start_time: s.start_time, end_time: s.end_time!, volume_kg: Number(s.volume) || 0, sets: mine.length, exercises: names };
-    const eventId = await insertEvent(token, conn.calendar_id, buildEvent(workout, { gymName: profile?.gym_name ?? null, unit: profile?.unit_system ?? "imperial" }));
+    const eventId = await insertEvent(token, conn.calendar_id, buildEvent(workout, { gymName: s.at_gym ? (profile?.gym_name ?? null) : null, unit: profile?.unit_system ?? "imperial" }));
     const { error: upErr } = await db.from("workout_sessions").update({ calendar_event_id: eventId }).eq("id", s.id);
     if (upErr) throw new HttpError(500, upErr.message);
     added++;

@@ -167,6 +167,16 @@ export function minutesOf(w: Pick<GymWorkout, "start_time" | "end_time">): numbe
   return (Date.parse(w.end_time) - Date.parse(w.start_time)) / 60_000;
 }
 
+/**
+ * Goes on the calendar: you said yes at the end of a home workout, or it was
+ * at the gym and ran over 30 minutes (unless you said no).
+ */
+export function isDue(s: { at_gym: boolean | null; add_to_calendar: boolean | null; start_time: string; end_time: string | null }): boolean {
+  if (s.add_to_calendar === true) return true;
+  if (s.add_to_calendar === false || !s.end_time) return false;
+  return s.at_gym === true && minutesOf({ start_time: s.start_time, end_time: s.end_time }) > MIN_GYM_MINUTES;
+}
+
 export function buildEvent(w: GymWorkout, opts: { gymName: string | null; unit: "imperial" | "metric" }) {
   const mins = Math.round(minutesOf(w));
   const volume = opts.unit === "imperial" ? `${Math.round(w.volume_kg * 2.2046226218).toLocaleString("en-US")} lb` : `${Math.round(w.volume_kg).toLocaleString("en-US")} kg`;
