@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { OpQueue, classify, uuid, type Op, type Outcome } from "../src/queue.ts";
 import {
-  currentPosition, displayWeight, groupSets, hrZone, prefill, restSeconds, snapKg, stepKg, toHrRows, weightStepKg, type WatchSet,
+  currentPosition, displayWeight, groupSets, hrZone, planWorkout, prefill, restSeconds, snapKg, stepKg, toHrRows, weightStepKg, type WatchSet,
 } from "../src/logic.ts";
 
 class MemoryKV {
@@ -151,4 +151,36 @@ test("heart-rate zones", () => {
   assert.equal(hrZone(100, 30), 1);
   assert.equal(hrZone(150, 30), 3);
   assert.equal(hrZone(185, 30), 5);
+});
+
+test("a routine started with no signal is laid out like the phone does it", () => {
+  let n = 0;
+  const { rows, groups, targets } = planWorkout(
+    {
+      id: "r1",
+      name: "Week 1 · Day 1",
+      items: [
+        { exerciseId: "bench", name: "Bench Press", mechanic: "compound", supersetGroup: null, sets: 3, warmups: 1, weightKg: 80, rest: 180, reps: 5 },
+        { exerciseId: "row", name: "Row", mechanic: "compound", supersetGroup: null, sets: 2, warmups: 0, weightKg: null, rest: null, reps: 10 },
+      ],
+    },
+    "s1",
+    () => `id${++n}`,
+  );
+  assert.equal(rows.length, 6);
+  assert.deepEqual(rows.map((r) => [r.exercise_order, r.set_number, r.set_type, r.weight]), [
+    [1, 1, "warmup", 0], [1, 2, "normal", 80], [1, 3, "normal", 80], [1, 4, "normal", 80], [2, 1, "normal", 0], [2, 2, "normal", 0],
+  ]);
+  assert.ok(rows.every((r) => r.session_id === "s1" && r.id === r.client_id));
+  assert.deepEqual(groups.map((g) => [g.name, g.sets.length]), [["Bench Press", 4], ["Row", 2]]);
+  assert.deepEqual(targets[1], { rest: 180, reps: 5 });
+  assert.equal(currentPosition(groups)?.group, 0);
+});
+
+test("queue.add saves at once, even when sending is stuck", async () => {
+  const kv = new MemoryKV();
+  const q = new OpQueue(kv, () => new Promise<Outcome>(() => {}));
+  await q.add({ kind: "start", session: { id: "s1", name: "x", routine_id: null, start_time: "t" }, rows: [] });
+  assert.equal(await q.pending(), 1);
+  assert.match(kv.data.get("ironlog.queue") ?? "", /"start"/);
 });

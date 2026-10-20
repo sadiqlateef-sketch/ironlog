@@ -2,7 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { calculatePlates } from "../src/lib/plates.ts";
 import {
+  doNextIndex,
+  exerciseUnits,
   formatClock,
+  matchTargets,
+  moveUnit,
+  workingOn,
   nextSetType,
   parseNumber,
   shouldStartRest,
@@ -192,4 +197,65 @@ test("instruction steps split on sentences", () => {
     "Lie back.", "Grip at 1.5x shoulder width.", "Press up!",
   ]);
   assert.deepEqual(instructionSteps(null), []);
+});
+
+// ---------- Reordering exercises mid-workout ----------
+
+const blk = (order: number, done: boolean[], supersetGroup: number | null = null) => ({
+  order,
+  supersetGroup,
+  sets: done.map((d) => ({ done: d })),
+});
+
+test("reorder: supersets are one unit", () => {
+  const units = exerciseUnits([blk(1, []), blk(2, [], 1), blk(3, [], 1), blk(4, [])]);
+  assert.deepEqual(units.map((u) => u.map((b) => b.order)), [[1], [2, 3], [4]]);
+});
+
+test("reorder: moving a superset member moves its partner too", () => {
+  const list = [blk(1, []), blk(2, [], 1), blk(3, [], 1), blk(4, [])];
+  assert.deepEqual(moveUnit(list, 3, 0).map((b) => b.order), [2, 3, 1, 4]);
+  assert.deepEqual(moveUnit(list, 1, 2).map((b) => b.order), [2, 3, 4, 1]);
+  assert.deepEqual(moveUnit(list, 4, 99).map((b) => b.order), [1, 2, 3, 4]);
+});
+
+test("reorder: do next goes right after the exercise you're partway through", () => {
+  // Squat done, bench halfway, rows and an added curl still to do.
+  const list = [blk(1, [true, true]), blk(2, [true, false]), blk(3, [false]), blk(4, [false])];
+  const current = workingOn(list, 2, 4);
+  assert.equal(current, 2);
+  const to = doNextIndex(list, 4, current);
+  assert.deepEqual(moveUnit(list, 4, to).map((b) => b.order), [1, 2, 4, 3]);
+});
+
+test("reorder: do next jumps ahead of an exercise you haven't started", () => {
+  const list = [blk(1, [true, true]), blk(2, [false, false]), blk(3, [false])];
+  const current = workingOn(list, null, 3);
+  assert.equal(current, 2);
+  assert.deepEqual(moveUnit(list, 3, doNextIndex(list, 3, current)).map((b) => b.order), [1, 3, 2]);
+});
+
+test("reorder: do next with nothing started goes first", () => {
+  const list = [blk(1, [false]), blk(2, [false]), blk(3, [false])];
+  assert.deepEqual(moveUnit(list, 3, doNextIndex(list, 3, workingOn(list, null, 3))).map((b) => b.order), [3, 1, 2]);
+});
+
+test("reorder: routine targets follow a moved exercise", () => {
+  const targets = [
+    { position: 1, exercise_id: "squat" },
+    { position: 2, exercise_id: "bench" },
+    { position: 3, exercise_id: "row" },
+  ];
+  // Row moved first, then squat, bench; plus a curl that isn't in the plan.
+  const m = matchTargets(targets, [
+    { order: 1, exerciseId: "row" },
+    { order: 2, exerciseId: "squat" },
+    { order: 3, exerciseId: "bench" },
+    { order: 4, exerciseId: "curl" },
+  ]);
+  assert.deepEqual([...m.entries()].sort(), [
+    [1, 2],
+    [2, 0],
+    [3, 1],
+  ]);
 });

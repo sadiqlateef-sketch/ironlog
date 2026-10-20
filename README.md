@@ -201,7 +201,7 @@ Hosted:
 
 ```bash
 npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-npx supabase functions deploy generate-plan suggest-adjustments import-workout
+npx supabase functions deploy generate-plan suggest-adjustments import-workout weekly-recap
 ```
 
 The app uses `claude-opus-5-5` with adaptive thinking, and the system
@@ -253,6 +253,18 @@ counts toward the 20 imports a day. The mic uses the phone's own speech
 recognizer in the Android app (it asks for microphone permission the first
 time) and the browser's speech recognition on the web, where the browser has
 one; otherwise the mic button is hidden and your keyboard's mic still works.
+
+### Say a set mid-workout
+
+In the logger, tap the mic next to **Log Set** and say the set: "bench 185 for
+8", "8 reps at 60 kilos", "one eighty five for eight", "same for 6",
+"bodyweight for 12". It ticks off the next set of the exercise you named (or
+the one you're on), starts the rest timer, and shows **Undo** for a few
+seconds. The words are read on the phone (`src/lib/voice-set.ts`), not by
+Claude, so it needs no signal and doesn't count toward any limit. The speech
+itself goes through the phone's recognizer, which works offline when the
+phone has its offline speech language installed (most Android phones do for
+English; check Settings > Google > Voice > Offline speech recognition).
 
 ## Log workouts from a Claude chat
 
@@ -337,6 +349,39 @@ only the Edge Function can read (RLS on, no policies).
    Ironlog**, tick the calendar boxes, and continue. You land back in Ironlog;
    pick the calendar (one named "Workout" is chosen for you if you have it).
 
+## Equipment, swaps, work shifts and home workouts
+
+**Your equipment (Settings > Equipment).** One kit per place you train: your
+gym and your home set. Each kit has the equipment types, whether there's a
+bench, squat rack and pull-up bar, the bar weight, your plates (a gym "has
+plenty"; at home you count them) and your dumbbells (a full rack, or exactly
+the ones you own). The plate calculator, the program builder, Instant
+workouts and swaps only use what the kit has. "Save and use here now" picks
+the kit that's in use.
+
+**Smart swaps.** In a workout, Swap shows the best match first: same main
+muscle, the closest helper muscles, equipment this place has, and nothing
+that's already in the workout. "Not here" swaps it and remembers this place
+doesn't have that exercise (undo it in the kit).
+
+**Work shifts (Settings > Work shifts).** Tap days to mark Day, Evening or
+Night shifts for the next four weeks. The Planned tab then shows "Your week
+around work": heavy days go on days off, lighter ones around evening shifts
+or before a night shift, and the day after a night shift is rest. "Use this
+order" makes Up next follow it.
+
+**Use What You Got (Workout > Home).** A 15, 20 or 25 minute workout (or
+"Surprise me") built only from your home kit, in supersets so short sessions
+still cover a lot. It's the same workout all evening and a new one each
+night; shuffle for another, or swap any exercise. It logs like any workout.
+At the end, "Add to calendar?" puts it on your Google Calendar (the answer is
+remembered). An evening reminder can be turned on in the Home tab or
+Settings > Reminders (Android app).
+
+After this update: run **Deploy database and functions** once (adds the
+migration `20261018233000_kits_shifts_home.sql` and the updated
+`gym-calendar` and `generate-plan` functions), then rebuild the APK.
+
 ## Progress screen (Phase 3)
 
 - **Muscle recovery heatmap.** Front and back body views, coloured from dark
@@ -352,6 +397,43 @@ only the Edge Function can read (RLS on, no policies).
   rounded to loadable weights.
 - One range filter (4 weeks / 12 weeks / 1 year) scopes the charts. Every chart
   has a "Show as table" view, and values appear on hover, tap or keyboard focus.
+
+### Insights (Overview and Lifts tabs)
+
+- **Weekly recap** (top of Overview). From 6 PM on Sunday you get a short
+  recap of the week: a headline, wins, things to watch and what to focus on
+  next week. The `weekly-recap` Edge Function writes it once per week (Claude
+  when the key is set, otherwise simple rules) and stores it in
+  `weekly_recaps`, so reopening the app never costs another Claude call. It has
+  its own limit of 3 a day in `ai_usage`. If notifications are allowed, the
+  phone reminds you on Sundays at 6 PM.
+- **Daily strain** (0-100). Heart-rate load from the watch (minutes in each
+  zone, weighted 1-5) plus lifting load (working sets weighted by RPE; sets
+  without RPE count as about RPE 7.5). Without heart rate it estimates from
+  workout time and says so. Shows today's readout, a 14-day chart and how this
+  week compares with last.
+- **Streaks and consistency.** Week streak, longest streak, weeks in a row on
+  your weekly target (from onboarding), active days, a 26-week calendar shaded
+  by volume, and workouts per month against your target.
+- **Lifts tab: goals.** Set a target estimated 1RM and an optional date from
+  any exercise. You get a progress bar, a countdown, the pace you need per week
+  and your actual pace over the last 8 weeks.
+- **Lifts tab: relative strength.** Your best squat, bench, deadlift, overhead
+  press and row divided by your latest logged bodyweight (Body tab or Health
+  Connect), with a level from Beginner to Elite. Levels need your sex set in
+  Settings and are rounded from common strength standards.
+- **Lifts tab: plateau watch.** Lifts with 3+ workouts in a row without a new
+  best, with one suggestion each (lighter week, reset, more frequency, new rep
+  range, or smaller jumps).
+- **Exercise sheet: Overview tab.** Goal, strength level, plateau check and
+  personal records (best est. 1RM, heaviest set, most reps, best workout volume,
+  and the heaviest weight for 1, 3, 5, 8, 10 and 12 reps).
+- **Finish screen.** After Finish: time, volume, sets, exercises, new records,
+  the workout's strain, your week streak, best set per exercise and a Share
+  button for the image card.
+
+The maths is in `src/lib/insights.ts` (tested in `tests/insights.test.ts`), the
+recap logic in `supabase/functions/_shared/recap.ts`.
 
 ## Using the logger
 
@@ -369,8 +451,38 @@ only the Edge Function can read (RLS on, no policies).
   timer only starts after the last exercise of the round.
 - 🧮 (barbell lifts) opens the **plate calculator** with the set's weight filled in.
 - ⋮ shows delete buttons for sets and the exercise.
+- **Changing the order mid-workout:** after you add an exercise, tap **Do next**
+  on the pop-up to move it straight after the one you're on (or ahead of it, if
+  you haven't started it yet). Exercises you haven't started also show a
+  **Do next** button. ⋯ has **Move up**, **Move down**, **Add exercise after
+  this** and **Reorder exercises** (a drag list, also behind the ↑↓ button next
+  to One / All). In the All view, **Add here** between exercises drops a new
+  one in that spot. Supersets move together, and a planned workout's targets
+  and "next time" suggestions follow an exercise wherever you move it.
+- Tap the round photo next to an exercise's name to open its **form demo**
+  right in the logger: the start and end photos fade back and forth like a GIF
+  (tap it to pause). With "reduce motion" on in your phone's settings, the two
+  photos sit side by side instead. The same demo is on the exercise's Guide tab.
+  Photos come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db)
+  (public domain). Some machine and cable exercises borrow the photos of the
+  same movement on other equipment and say so under the demo; a few with no
+  close match show a placeholder. If you set `animation_url` on an exercise to a
+  GIF, MP4 or WebM, that plays instead.
 - **Finish** drops unchecked sets and saves the workout. Unit (lb / kg) is on
   the home screen.
+- **Swipe a set** right to finish it (or undo it), left to delete it (with an
+  Undo button for 5 seconds). **Hold a set** to duplicate it, mark it as a
+  warm-up, or add a drop set straight after it (about 20% lighter).
+- Tapping a weight or reps box opens Ironlog's **number pad**: big keys, − / +
+  buttons (weight steps switch between 5 and 2.5 lb, or 2.5 and 1.25 kg), and a
+  **Reps** / **Log set** key to move on. Weights show to the nearest 0.5 lb.
+- In the All view, finished exercises **collapse to one line**; tap to open.
+- The sliders button at the top opens **Logger display**: **Focus mode** (just the
+  set you're on and a big rest timer), **One-handed mode** (weight and reps with
+  − / + next to Log Set), the number pad, sounds and vibration. Saved per phone.
+- While resting, the countdown also shows on the **lock screen and notification
+  shade** (Android app, when notifications are allowed), and ticks in the last
+  3 seconds.
 
 ## What's in here
 
@@ -533,6 +645,30 @@ answers filled in, and once Claude has built it, **Start Day 1** makes it your
 active program and opens the first workout. Accounts that already had
 workouts or programs skip the questions.
 
+After that (and once on each phone, including after updating), a four-screen
+tour shows where things are. Replay it from **More > Take the tour**.
+
+## Getting around
+
+Four tabs at the bottom: **Home** (the Today card: resume, the program's next
+day or a start button, plus how recovered you are), **Workout**, **Progress**
+and **More** (programs, exercise library, plate calculator, logging and photo
+import, watch pairing, settings). New screens for More go in
+`src/lib/nav.ts`.
+
+- **Workout bar.** Mid-workout, every other screen shows a bar above the tabs
+  with the workout's time and the rest countdown. Tap it to go back.
+- **Search** (Home's magnifier, or the box on More) finds exercises by name,
+  nickname, muscle or equipment, your workouts from the last year, programs
+  and their days, and the app's own screens.
+- **Appearance** (Settings) has dark (default), light or match-the-phone, and
+  four text sizes. Saved on the phone (`src/lib/appearance.ts`) and applied
+  before the first paint, so nothing flashes.
+- **Android back button and back swipe** close an open sheet first, then go
+  back a screen. On Home it leaves the app, except mid-workout, when it only
+  sends the app to the background so the workout and timer keep running
+  (`src/lib/back-button.ts`).
+
 ## Logging without signal
 
 The workout logger keeps working with no signal. Every change is saved on the
@@ -554,6 +690,32 @@ the app:
 1. Open your project's [URL Configuration](https://supabase.com/dashboard/project/_/auth/url-configuration).
 2. Under **Redirect URLs**, click **Add URL**, enter `com.ironlog.app://reset-password`
    and save.
+
+## Sign in with Google
+
+The sign-in screen has **Continue with Google**. In the Android app Google
+opens in a browser tab and sends you straight back into Ironlog, signed in.
+If you already have an Ironlog account with the same Gmail address, Google
+sign-in opens that same account (Supabase links them by email), so your
+workouts are all there. A new Google user gets a fresh account and the
+usual first-run setup.
+
+It reuses the Google keys from [Google Calendar](#turning-on-google-calendar-one-time-no-command-line).
+With those already set up, it's two steps:
+
+1. Open https://console.cloud.google.com/auth/clients (project **Ironlog**
+   selected at the top) and click your **Ironlog** client. Under **Authorized
+   redirect URIs** click **Add URI**, paste
+   `https://<your project ref>.supabase.co/auth/v1/callback`, and **Save**.
+   (Keep the `gym-calendar` one that's already there.)
+2. Run **Actions > Deploy database and functions**, then rebuild the APK.
+   The deploy turns on Supabase's Google provider with your
+   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` secrets and adds the app's
+   return link `com.ironlog.app://auth-callback` to the allowed redirect URLs.
+
+Sign-in uses PKCE: the link back into the app carries a one-time code that
+only the phone that started the sign-in can turn into a session. Code:
+`src/lib/google-sign-in.ts`.
 
 ## Security
 

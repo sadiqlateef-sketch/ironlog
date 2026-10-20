@@ -41,7 +41,7 @@ Deno.serve(
         .order("position"),
       db
         .from("workout_sets")
-        .select("exercise_id, exercise_order, set_type, weight, reps, is_completed")
+        .select("exercise_id, exercise_order, set_type, weight, reps, rpe, is_completed")
         .eq("session_id", session.id)
         .eq("is_completed", true)
         .neq("set_type", "warmup")
@@ -54,12 +54,30 @@ Deno.serve(
     ]);
     const unit: UnitSystem = profile?.unit_system ?? "imperial";
 
-    // Workouts started from a routine number exercises 1..n in routine order.
+    // Workouts started from a routine number exercises 1..n in routine order,
+    // but you can reorder them mid-workout. Pair each plan row with its slot:
+    // same slot and exercise first, then the first unclaimed slot of that exercise.
+    const slotOf = new Map<number, number>();
+    const slots = [...new Map((sets ?? []).map((s) => [s.exercise_order, s.exercise_id])).entries()].sort((a, b) => a[0] - b[0]);
+    const claimed = new Set<number>();
+    (targets ?? []).forEach((t, i) => {
+      if (!slots.some(([o, e]) => o === i + 1 && e === t.exercise_id)) return;
+      slotOf.set(i, i + 1);
+      claimed.add(i + 1);
+    });
+    (targets ?? []).forEach((t, i) => {
+      if (slotOf.has(i)) return;
+      const free = slots.find(([o, e]) => !claimed.has(o) && e === t.exercise_id);
+      if (!free) return;
+      slotOf.set(i, free[0]);
+      claimed.add(free[0]);
+    });
+
     const rules: RuleResult[] = [];
     (targets ?? []).forEach((t, i) => {
       const logged: LoggedSet[] = (sets ?? [])
-        .filter((s) => s.exercise_order === i + 1 && s.exercise_id === t.exercise_id)
-        .map((s) => ({ weight: Number(s.weight), reps: s.reps }));
+        .filter((s) => s.exercise_order === slotOf.get(i))
+        .map((s) => ({ weight: Number(s.weight), reps: s.reps, rpe: s.rpe == null ? null : Number(s.rpe) }));
       if (logged.length === 0) return; // skipped exercise: nothing to judge
       const ex = t.exercises as unknown as { name: string; primary_muscle: string } | null;
       const r = ruleFor(

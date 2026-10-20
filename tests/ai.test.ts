@@ -92,6 +92,22 @@ test("rule: small miss -> hold weight; big miss -> deload ~10%", () => {
   assert.equal(quit.action, "deload");
 });
 
+test("rule: how hard the sets felt changes the call", () => {
+  // Hit the top of the range, but the last set was all-out: hold first.
+  const grind = ruleFor(bench, [10, 10, 10].map((reps, i) => ({ weight: kgOf(185), reps, rpe: i === 2 ? 10 : 9 })), "imperial");
+  assert.equal(grind.action, "hold");
+  assert.equal(lbOf(grind.suggested_weight_kg!), 185);
+  assert.match(grind.facts, /10 @ RPE 10/);
+  // In range with 3+ reps left on every set: go up even below the top.
+  const easy = ruleFor(bench, [9, 9, 8].map((reps) => ({ weight: kgOf(185), reps, rpe: 7 })), "imperial");
+  assert.equal(easy.action, "increase");
+  assert.equal(lbOf(easy.suggested_weight_kg!), 190);
+  // Not every set rated: the plain rule decides.
+  const partly = ruleFor(bench, [9, 9, 8].map((reps, i) => ({ weight: kgOf(185), reps, rpe: i ? null : 6 })), "imperial");
+  assert.equal(partly.action, "hold");
+  assert.equal(partly.suggested_weight_kg, null);
+});
+
 test("clamp: Claude can't jump more than +10% / -20%, and a deload must go down", () => {
   const rule = ruleFor(bench, [6, 5, 4].map((reps) => ({ weight: kgOf(185), reps })), "imperial");
   const wild = clampSuggestion({ routine_exercise_id: "re1", action: "deload", suggested_weight_kg: kgOf(50), suggested_reps: 3, suggested_reps_max: 2, reason: " Go light. " }, rule, "imperial");

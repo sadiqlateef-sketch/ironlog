@@ -33,15 +33,21 @@ function locked<T>(fn: () => Promise<T>): Promise<T> {
   return p;
 }
 
+/** Fired on window whenever the workout in progress starts, changes or ends (the workout bar listens). */
+export const ACTIVE_WORKOUT_EVENT = "ironlog:active-workout";
+const changed = () => {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(ACTIVE_WORKOUT_EVENT));
+};
+
 function writeMirror(m: Mirror | null): Promise<void> {
-  return locked(() => kvSet(KEY, m));
+  return locked(() => kvSet(KEY, m)).then(changed);
 }
 
 function changeMirror(fn: (m: Mirror) => Mirror | null): Promise<void> {
   return locked(async () => {
     const m = await readMirror();
     if (m) await kvSet(KEY, fn(m));
-  });
+  }).then(changed);
 }
 
 function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
@@ -64,6 +70,12 @@ async function commit(...ops: Op[]): Promise<void> {
 const now = () => new Date().toISOString();
 
 // ---------- Reading ----------
+
+/** The workout in progress as this phone last saw it. Instant: no network. */
+export async function peekActiveWorkout(): Promise<{ session: WorkoutSession; sets: number; done: number } | null> {
+  const m = await readMirror();
+  return m ? { session: m.session, sets: m.sets.length, done: m.sets.filter((s) => s.completed_at).length } : null;
+}
 
 /** The unfinished workout, from the server when it's reachable and caught up. */
 export async function getActiveSession(): Promise<WorkoutSession | null> {
@@ -113,7 +125,7 @@ export interface PlannedExercise {
 
 /** Start a workout with these exercises' sets laid out, ready to fill in. Works offline. */
 export async function startPlannedSession(
-  info: { name: string; routineId?: string | null },
+  info: { name: string; routineId?: string | null; kitId?: string | null; addToCalendar?: boolean | null },
   items: PlannedExercise[],
 ): Promise<WorkoutSession> {
   const uid = await userId();
@@ -132,6 +144,9 @@ export async function startPlannedSession(
     notes: null,
     at_gym: null,
     calendar_event_id: null,
+    kit_id: info.kitId ?? null,
+    add_to_calendar: info.addToCalendar ?? null,
+    import_key: null,
     created_at: t,
     updated_at: t,
   };
@@ -149,7 +164,18 @@ export async function startPlannedSession(
     {
       kind: "insert",
       table: "workout_sessions",
-      rows: [{ id: session.id, routine_id: session.routine_id, name: session.name, source: session.source, start_time: t }],
+      rows: [
+        {
+          id: session.id,
+          routine_id: session.routine_id,
+          name: session.name,
+          source: session.source,
+          start_time: t,
+          // Only sent when set, so ordinary workouts don't depend on the newer columns.
+          ...(info.kitId ? { kit_id: info.kitId } : {}),
+          ...(info.addToCalendar != null ? { add_to_calendar: info.addToCalendar } : {}),
+        },
+      ],
     },
   ];
   if (sets.length) ops.push({ kind: "insert", table: "workout_sets", rows: sets.map(insertable) });
@@ -169,6 +195,12 @@ export async function finishSession(session: WorkoutSession): Promise<{ synced: 
 export async function discardSession(sessionId: string): Promise<void> {
   await changeMirror((m) => (m.session.id === sessionId ? null : m));
   await commit({ kind: "delete", table: "workout_sessions", ids: [sessionId] });
+}
+
+/** The "Add to calendar?" answer for a finished home workout. */
+export async function setSessionCalendar(sessionId: string, on: boolean): Promise<boolean> {
+  await enqueue({ kind: "update", table: "workout_sessions", ids: [sessionId], patch: { add_to_calendar: on } });
+  return flush();
 }
 
 export async function updateSessionNotes(sessionId: string, notes: string): Promise<void> {
@@ -201,15 +233,24 @@ function toRow(s: SetInsert, uid: string): WorkoutSet {
     client_id: null,
     duration_seconds: s.duration_seconds ?? null,
     distance_m: s.distance_m ?? null,
+    reps_left: s.reps_left ?? null,
+    reps_right: s.reps_right ?? null,
     created_at: t,
     updated_at: t,
   };
 }
 
-/** The columns sent to the server (the rest are filled in there). */
+/**
+ * The columns sent to the server (the rest are filled in there). Each side's
+ * reps go only when used, so logging still works before the database update.
+ */
 function insertable(r: WorkoutSet): Record<string, unknown> {
-  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m } = r;
-  return { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m };
+  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m, reps_left, reps_right } = r;
+  return {
+    id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m,
+    ...(reps_left != null && { reps_left }),
+    ...(reps_right != null && { reps_right }),
+  };
 }
 
 export async function insertSets(inserts: SetInsert[]): Promise<WorkoutSet[]> {
@@ -228,6 +269,36 @@ export async function updateSets(ids: string[], patch: SetUpdate): Promise<void>
 }
 
 export const updateSet = (id: string, patch: SetUpdate) => updateSets([id], patch);
+
+/**
+ * Give exercises new slots in the workout. Slots are unique per set number,
+ * so swapping two would clash halfway: park each moved exercise on a
+ * negative slot first, then move it to its real one.
+ */
+export async function reorderExercises(moves: { ids: string[]; order: number }[]): Promise<void> {
+  moves = moves.filter((m) => m.ids.length);
+  if (!moves.length) return;
+  const slot = new Map(moves.flatMap((m) => m.ids.map((id) => [id, m.order] as const)));
+  await changeMirror((m) => ({ ...m, sets: m.sets.map((s) => (slot.has(s.id) ? { ...s, exercise_order: slot.get(s.id)! } : s)) }));
+  await commit(
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: m.ids, patch: { exercise_order: -m.order } })),
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: m.ids, patch: { exercise_order: m.order } })),
+  );
+}
+
+/**
+ * Give sets new numbers within their exercise. Numbers are unique per exercise
+ * slot, so move each one well out of the way first, then to its real number.
+ */
+export async function renumberSets(moves: { id: string; setNumber: number }[]): Promise<void> {
+  if (!moves.length) return;
+  const num = new Map(moves.map((m) => [m.id, m.setNumber]));
+  await changeMirror((m) => ({ ...m, sets: m.sets.map((s) => (num.has(s.id) ? { ...s, set_number: num.get(s.id)! } : s)) }));
+  await commit(
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: [m.id], patch: { set_number: m.setNumber + 500 } })),
+    ...moves.map((m): Op => ({ kind: "update", table: "workout_sets", ids: [m.id], patch: { set_number: m.setNumber } })),
+  );
+}
 
 export async function deleteSets(ids: string[]): Promise<void> {
   if (!ids.length) return;

@@ -3,24 +3,25 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { ChartLine, Dumbbell, House, ListChecks } from "lucide-react";
+import { ActiveWorkoutBar } from "@/components/active-workout-bar";
 import { useAuth } from "@/components/providers/auth-provider";
 import { RestTimerBar } from "@/components/rest-timer-bar";
 import { SyncBanner } from "@/components/sync-banner";
+import { Tour, useTour } from "@/components/tour";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useActiveWorkout } from "@/hooks/use-active-workout";
+import { TABS, tabFor } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
-const tabs = [
-  { href: "/", label: "Home", icon: House },
-  { href: "/workout/", label: "Workout", icon: Dumbbell },
-  { href: "/progress/", label: "Progress", icon: ChartLine },
-  { href: "/exercises/", label: "Exercises", icon: ListChecks },
-];
-
-/** Signed-in layout: page content, rest timer, and the bottom tab bar. */
+/** Signed-in layout: page content, the workout bar, and the bottom tab bar. */
 export function AppShell({ children }: { children: ReactNode }) {
   const { session, profile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const workout = useActiveWorkout();
+  const current = tabFor(pathname);
+  const onWorkout = current?.href === "/workout/";
+  const tour = useTour(profile, pathname);
 
   useEffect(() => {
     if (session === null) router.replace("/login/");
@@ -35,33 +36,51 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!session) {
     return (
-      <div className="text-muted-foreground grid flex-1 place-items-center text-sm">Loading…</div>
+      <div role="status" className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-6">
+        <span className="sr-only">Loading…</span>
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-36 w-full rounded-2xl" />
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <Skeleton className="h-20 w-full rounded-2xl" />
+      </div>
     );
   }
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className="mx-auto w-full max-w-md flex-1 px-4 pt-6 pb-40">{children}</main>
+      {/* Keyed by screen so each one fades in as you switch. */}
+      <main key={pathname} className={cn("page-in mx-auto w-full max-w-md flex-1 px-4 pt-6", workout && !onWorkout ? "pb-48" : "pb-40")}>
+        {children}
+      </main>
       <div className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
         <SyncBanner />
-        <RestTimerBar />
+        {/* Mid-workout, every other screen shows the workout (and its rest countdown);
+            the workout screen has the full-size rest timer. */}
+        {workout && !onWorkout ? <ActiveWorkoutBar workout={workout} /> : <RestTimerBar />}
         {/* Pages can put a sticky action bar here (the workout's "Log Set"). */}
         <div id="bottom-bar-slot" />
-        <nav className="mx-auto max-w-md px-3 pb-3">
+        <nav className="mx-auto max-w-md px-3 pb-3" aria-label="Main">
           <ul className="glass-strong grid grid-cols-4 rounded-3xl">
-            {tabs.map(({ href, label, icon: Icon }) => {
-              const active = href === "/" ? pathname === "/" : pathname.startsWith(href.slice(0, -1));
+            {TABS.map(({ href, label, icon: Icon }) => {
+              const active = current?.href === href;
               return (
                 <li key={href}>
                   <Link
                     href={href}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex flex-col items-center gap-1 py-3 text-xs font-semibold",
+                      "relative flex flex-col items-center gap-1 py-3 text-xs font-semibold transition-colors",
                       active ? "text-primary-text" : "text-muted-foreground",
                     )}
                   >
-                    <Icon className="size-6" strokeWidth={active ? 2.4 : 2} />
+                    <Icon className="size-6" strokeWidth={active ? 2.4 : 2} aria-hidden />
                     {label}
+                    {href === "/workout/" && workout && !active && (
+                      <>
+                        <span className="bg-success absolute top-2.5 left-[calc(50%+0.6rem)] size-2 rounded-full" aria-hidden />
+                        <span className="sr-only"> (in progress)</span>
+                      </>
+                    )}
                   </Link>
                 </li>
               );
@@ -69,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </ul>
         </nav>
       </div>
+      {tour.open && <Tour onDone={tour.finish} />}
     </div>
   );
 }
