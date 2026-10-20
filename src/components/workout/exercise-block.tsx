@@ -22,6 +22,7 @@ import {
   ListPlus,
   MoreHorizontal,
   Pencil,
+  PersonStanding,
   Pin,
   PlayCircle,
   Plus,
@@ -32,6 +33,7 @@ import {
 } from "lucide-react";
 import type { EffortScale, SetType } from "@/types/database";
 import { useAuth } from "@/components/providers/auth-provider";
+import { ExerciseAnimation } from "@/components/exercise-animation";
 import { EffortPicker } from "@/components/workout/effort-picker";
 import { LastTime, ROW_GRID, SIDES_GRID, SetRow } from "@/components/workout/set-row";
 import { ActionSheet, type SheetAction } from "@/components/ui/action-sheet";
@@ -136,6 +138,7 @@ export function ExerciseBlock({
   const prefs = useLoggerPrefs();
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [demo, setDemo] = useState(false);
   /** The set whose long-press menu is open. */
   const [setMenuFor, setSetMenuFor] = useState<string | null>(null);
   const numbers = workingSetNumbers(block.sets.map((s) => s.type));
@@ -213,7 +216,8 @@ export function ExerciseBlock({
       : []),
     ...(plateLoaded ? [{ label: "Plate calculator", icon: Calculator, onSelect: plates }] : []),
     { label: "Edit available weights", icon: Dumbbell, onSelect: onEquipment },
-    { label: "Video & how-to", icon: PlayCircle, onSelect: onShowInfo },
+    { label: demo ? "Hide form demo" : "Show form demo", icon: PlayCircle, onSelect: () => setDemo((d) => !d) },
+    { label: "How-to & muscles", icon: PersonStanding, onSelect: onShowInfo },
     { label: "Edit sets", icon: Pencil, onSelect: () => setEditing(true) },
     { label: "Remove exercise", icon: Trash2, onSelect: onRemove, destructive: true },
   ];
@@ -295,6 +299,27 @@ export function ExerciseBlock({
       data-testid="exercise-block"
     >
       <header className="flex items-start gap-1">
+        <button
+          type="button"
+          onClick={() => setDemo((d) => !d)}
+          aria-label={demo ? "Hide form demo" : "Show form demo"}
+          aria-expanded={demo}
+          className={cn(
+            "relative mt-0.5 flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full",
+            block.exercise.image_urls?.[0] ? "bg-white" : "bg-secondary",
+            demo && "ring-primary ring-2",
+          )}
+        >
+          {block.exercise.image_urls?.[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={block.exercise.image_urls?.[0]} alt="" className="size-full object-cover" />
+          ) : (
+            <PersonStanding className="text-muted-foreground size-6" strokeWidth={1.5} />
+          )}
+          <span className="absolute right-0 bottom-0 flex size-5 items-center justify-center rounded-full bg-black/75 text-white">
+            <PlayCircle className="size-3.5" />
+          </span>
+        </button>
         <button type="button" onClick={onShowInfo} className="min-w-0 flex-1 px-1 text-left">
           {block.supersetGroup != null && <p className="text-set-drop text-xs font-bold tracking-wide">SUPERSET</p>}
           <h2 className={cn("font-bold tracking-tight", focused ? "text-2xl leading-tight" : "truncate text-xl")}>
@@ -353,6 +378,15 @@ export function ExerciseBlock({
           </Button>
         )}
       </header>
+
+      {demo && (
+        <div className="flex flex-col gap-1">
+          <ExerciseAnimation exercise={block.exercise} compact />
+          <button type="button" onClick={onShowInfo} className="text-primary-text self-start px-1 text-sm font-semibold">
+            Full how-to
+          </button>
+        </div>
+      )}
 
       {block.note && (
         <button

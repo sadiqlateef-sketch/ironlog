@@ -459,6 +459,15 @@ recap logic in `supabase/functions/_shared/recap.ts`.
   to One / All). In the All view, **Add here** between exercises drops a new
   one in that spot. Supersets move together, and a planned workout's targets
   and "next time" suggestions follow an exercise wherever you move it.
+- Tap the round photo next to an exercise's name to open its **form demo**
+  right in the logger: the start and end photos fade back and forth like a GIF
+  (tap it to pause). With "reduce motion" on in your phone's settings, the two
+  photos sit side by side instead. The same demo is on the exercise's Guide tab.
+  Photos come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db)
+  (public domain). Some machine and cable exercises borrow the photos of the
+  same movement on other equipment and say so under the demo; a few with no
+  close match show a placeholder. If you set `animation_url` on an exercise to a
+  GIF, MP4 or WebM, that plays instead.
 - **Finish** drops unchecked sets and saves the workout. Unit (lb / kg) is on
   the home screen.
 - **Swipe a set** right to finish it (or undo it), left to delete it (with an
