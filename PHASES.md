@@ -88,3 +88,23 @@ This is an append-only log of approved and verified implementation phases.
   - Android Build: `cd android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 18s**.
   - Wear OS TypeScript & Tests: `cd watch && npm run typecheck && npm test` → **0 errors, 16/16 PASS**.
 - **Master Verification Decision:** **APPROVED** — Ecosystem bridge hardened with full fault isolation, signature permission architecture intact, and automated test coverage across all integration paths. Ready for Phase 4.
+
+---
+
+## Phase 4: Foldable Interaction & Layout Polish (P1.1, P1.6)
+- **Date:** 2026-10-24
+- **Objective:** Optimize IronLog for the Samsung Galaxy Z Fold8 across both folded cover (< 600dp) and unfolded main (> 600dp) postures, delivering one-handed touch ergonomics on the outer screen, dual-pane exercise execution and session navigation on the inner display, and zero-loss posture continuity.
+- **Files Changed:**
+  - `src/components/app-shell.tsx` (responsively expanded `<main>` from mobile max-w-md to `md:max-w-4xl lg:max-w-5xl`, and bottom navigation to `md:max-w-xl`).
+  - `src/components/active-workout-bar.tsx` & `src/components/rest-timer-bar.tsx` (adapted floating pill width to `md:max-w-xl` for wider unfolded posture balance).
+  - `src/components/workout/workout-screen.tsx` (added `UnfoldedWorkoutNavigator` sidebar for focus mode on wide screens; created responsive 2-column grid `md:grid-cols-2` for list view; preserved compact single-column layout for cover screen).
+  - `tests/foldable-layout.test.ts` (new automated test suite verifying: superset unit grouping, multi-column grid item gap markers, and 600dp foldable breakpoint logic).
+- **Independent Verification Outcomes:**
+  - Root App Unit Tests: `npm test` → **195/195 PASS (100%)** across 26 test suites.
+  - Root App Lint: `npm run lint` → **0 errors, 0 warnings**.
+  - Root App TypeScript: `npm run typecheck` → **0 errors**.
+  - Root App Production Build: `npm run build` → **16/16 static pages generated in 2.9s**, clean export.
+  - Capacitor Android Sync: `npm run android:sync` → **Successful asset sync**.
+  - Android Build: `cd android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 21s**.
+  - Wear OS TypeScript & Tests: `cd watch && npm run typecheck && npm test` → **0 errors, 16/16 PASS**.
+- **Master Verification Decision:** **APPROVED** — Foldable dual-pane layout and cover screen ergonomics verified. Ready for Phase 5.
