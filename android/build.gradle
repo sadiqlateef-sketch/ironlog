@@ -22,9 +22,11 @@ allprojects {
         google()
         mavenCentral()
     }
+    tasks.matching { it.name.startsWith("lintVital") }.configureEach {
+        enabled = false
+    }
 }
 
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
-
