@@ -48,8 +48,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Keyed by screen so each one fades in as you switch. */}
-      <main key={pathname} className={cn("page-in mx-auto w-full max-w-md flex-1 px-4 pt-6", workout && !onWorkout ? "pb-48" : "pb-40")}>
+      {/* Keyed by screen so each one fades in as you switch. Responsively scales for foldable unfolded inner displays. */}
+      <main key={pathname} className={cn("page-in mx-auto w-full max-w-md md:max-w-4xl lg:max-w-5xl flex-1 px-4 pt-6 transition-all", workout && !onWorkout ? "pb-48" : "pb-40")}>
         {children}
       </main>
       <div className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
@@ -59,8 +59,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         {workout && !onWorkout ? <ActiveWorkoutBar workout={workout} /> : <RestTimerBar />}
         {/* Pages can put a sticky action bar here (the workout's "Log Set"). */}
         <div id="bottom-bar-slot" />
-        <nav className="mx-auto max-w-md px-3 pb-3" aria-label="Main">
-          <ul className="glass-strong grid grid-cols-4 rounded-3xl">
+        <nav className="mx-auto max-w-md md:max-w-xl px-3 pb-3 transition-all" aria-label="Main">
+          <ul className="glass-strong grid grid-cols-4 rounded-3xl md:py-1">
             {TABS.map(({ href, label, icon: Icon }) => {
               const active = current?.href === href;
               return (

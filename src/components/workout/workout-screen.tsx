@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpDown, ArrowUpToLine, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { ArrowUpDown, ArrowUpToLine, Check, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -365,6 +365,67 @@ function ActiveWorkout({
     setFocus(focusAfterLog(focus.order, updated));
   }
 
+  function renderExerciseBlock(block: Block, i: number, gap: boolean) {
+    const u = unitIndex(blocks, block.order);
+    return (
+      <div key={block.order} id={`exercise-${block.order}`} className={cn("scroll-mt-4", gap && "md:col-span-2")}>
+        {gap && (
+          <button
+            type="button"
+            onClick={() => (setInsertAt(u), setPicking(true))}
+            className="text-muted-foreground hover:text-foreground -mt-2 mb-2 flex h-8 w-full items-center gap-2 text-xs font-semibold"
+            aria-label={`Add an exercise before ${block.exercise.name}`}
+          >
+            <span className="bg-foreground/15 h-px flex-1" />
+            <Plus className="size-4" aria-hidden /> Add here
+            <span className="bg-foreground/15 h-px flex-1" />
+          </button>
+        )}
+        <ExerciseBlock
+          block={block}
+          focused={view === "focus"}
+          isLast={blocks.indexOf(block) === blocks.length - 1}
+          onShowInfo={() => onInfo(block.exercise)}
+          onChart={() => setChartFor(block.exercise)}
+          onSwap={() => setSwapFor(block.order)}
+          onRest={() => setRestFor(block.order)}
+          onInterval={() => setIntervalOpen(true)}
+          onEquipment={() => setEquipment(true)}
+          onPlates={(weight) => setPlates({ open: true, weight })}
+          onToggleSuperset={() => w.toggleSuperset(block.order)}
+          onRemove={() => w.removeExercise(block.order)}
+          onDoNext={canDoNext(block) ? () => doNext(block.order) : undefined}
+          onMoveUp={u > 0 ? () => moveBy(block.order, -1) : undefined}
+          onMoveDown={u < units.length - 1 ? () => moveBy(block.order, 1) : undefined}
+          onReorder={() => setReordering(true)}
+          onAddAfter={() => (setInsertAt(u + 1), setPicking(true))}
+          onAddSet={() => w.addSet(block.order)}
+          onRemoveSet={(id) => removeSet(block.order, id)}
+          onChangeSet={(id, patch) => w.patchSet(block.order, id, patch)}
+          onCommitSet={(id) => w.commitSet(block.order, id)}
+          onCycleType={(id) => w.cycleType(block.order, id)}
+          onSetType={(id, type) => w.setSetType(block.order, id, type)}
+          onDuplicateSet={(id) => w.duplicateSet(block.order, id)}
+          onAddDropSet={(id, weight) => w.addDropSet(block.order, id, weight)}
+          collapsed={collapsedCard(block)}
+          onToggleCollapse={view === "list" ? () => setOpenCards((m) => new Map(m).set(block.order, collapsedCard(block))) : undefined}
+          onToggleDone={(id) => {
+            setFocus(block.order);
+            return w.toggleDone(block.order, id);
+          }}
+          effortScale={w.effortScale}
+          effortAskId={w.effortAsk?.order === block.order ? w.effortAsk.id : null}
+          onEffort={(id, rpe) => w.setEffort(block.order, id, rpe)}
+          onSkipEffort={w.dismissEffort}
+          onNote={() => setNoteFor(block.order)}
+          onToggleUnilateral={() => w.setUnilateral(block.order, !block.unilateral)}
+          onWarmups={() => setWarmupFor(block.order)}
+          onHold={() => setHoldFor(block.order)}
+        />
+      </div>
+    );
+  }
+
   const logLabel = !focus ? "Add exercise" : nextSet ? "Log Set" : after != null ? "Next exercise" : "Finish workout";
   const shown = view === "focus" && focus ? [focus] : blocks;
   const states = segmentStates(blocks, focusOrder);
@@ -513,70 +574,41 @@ function ActiveWorkout({
         );
       })()}
 
-      {!focusMode && shown.map((block, i) => {
-        const u = unitIndex(blocks, block.order);
-        // In the full list, a thin "add here" between exercises (not inside a superset).
-        const gap = view === "list" && i > 0 && unitIndex(blocks, shown[i - 1].order) !== u;
-        return (
-        <div key={block.order} id={`exercise-${block.order}`} className="scroll-mt-4">
-          {gap && (
-            <button
-              type="button"
-              onClick={() => (setInsertAt(u), setPicking(true))}
-              className="text-muted-foreground hover:text-foreground -mt-2 mb-2 flex h-8 w-full items-center gap-2 text-xs font-semibold"
-              aria-label={`Add an exercise before ${block.exercise.name}`}
-            >
-              <span className="bg-foreground/15 h-px flex-1" />
-              <Plus className="size-4" aria-hidden /> Add here
-              <span className="bg-foreground/15 h-px flex-1" />
-            </button>
-          )}
-          <ExerciseBlock
-            block={block}
-            focused={view === "focus"}
-            isLast={blocks.indexOf(block) === blocks.length - 1}
-            onShowInfo={() => onInfo(block.exercise)}
-            onChart={() => setChartFor(block.exercise)}
-            onSwap={() => setSwapFor(block.order)}
-            onRest={() => setRestFor(block.order)}
-            onInterval={() => setIntervalOpen(true)}
-            onEquipment={() => setEquipment(true)}
-            onPlates={(weight) => setPlates({ open: true, weight })}
-            onToggleSuperset={() => w.toggleSuperset(block.order)}
-            onRemove={() => w.removeExercise(block.order)}
-            onDoNext={canDoNext(block) ? () => doNext(block.order) : undefined}
-            onMoveUp={u > 0 ? () => moveBy(block.order, -1) : undefined}
-            onMoveDown={u < units.length - 1 ? () => moveBy(block.order, 1) : undefined}
-            onReorder={() => setReordering(true)}
-            onAddAfter={() => (setInsertAt(u + 1), setPicking(true))}
-            onAddSet={() => w.addSet(block.order)}
-            onRemoveSet={(id) => removeSet(block.order, id)}
-            onChangeSet={(id, patch) => w.patchSet(block.order, id, patch)}
-            onCommitSet={(id) => w.commitSet(block.order, id)}
-            onCycleType={(id) => w.cycleType(block.order, id)}
-            onSetType={(id, type) => w.setSetType(block.order, id, type)}
-            onDuplicateSet={(id) => w.duplicateSet(block.order, id)}
-            onAddDropSet={(id, weight) => w.addDropSet(block.order, id, weight)}
-            collapsed={collapsedCard(block)}
-            onToggleCollapse={view === "list" ? () => setOpenCards((m) => new Map(m).set(block.order, collapsedCard(block))) : undefined}
-            onToggleDone={(id) => {
-              setFocus(block.order);
-              return w.toggleDone(block.order, id);
-            }}
-            effortScale={w.effortScale}
-            effortAskId={w.effortAsk?.order === block.order ? w.effortAsk.id : null}
-            onEffort={(id, rpe) => w.setEffort(block.order, id, rpe)}
-            onSkipEffort={w.dismissEffort}
-            onNote={() => setNoteFor(block.order)}
-            onToggleUnilateral={() => w.setUnilateral(block.order, !block.unilateral)}
-            onWarmups={() => setWarmupFor(block.order)}
-            onHold={() => setHoldFor(block.order)}
-          />
+      {!focusMode && view === "focus" && (
+        <div className="flex flex-col gap-4 md:grid md:grid-cols-5 md:gap-6 md:items-start">
+          <div className="md:col-span-3 flex flex-col gap-4">
+            {shown.map((block, i) => renderExerciseBlock(block, i, false))}
+          </div>
+          <div className="md:col-span-2">
+            <UnfoldedWorkoutNavigator
+              blocks={blocks}
+              focusOrder={focusOrder}
+              onJump={jumpTo}
+              onAdd={() => (setInsertAt(null), setPicking(true))}
+            />
+          </div>
         </div>
-        );
-      })}
+      )}
 
-      {!focusMode && (
+      {!focusMode && view === "list" && (
+        <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-4 md:items-start">
+          {shown.map((block, i) => {
+            const u = unitIndex(blocks, block.order);
+            const gap = i > 0 && unitIndex(blocks, shown[i - 1].order) !== u;
+            return renderExerciseBlock(block, i, gap);
+          })}
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => (setInsertAt(null), setPicking(true))}
+            className="md:col-span-2"
+          >
+            <Plus /> Add exercise
+          </Button>
+        </div>
+      )}
+
+      {!focusMode && view === "focus" && (
         <Button size="lg" variant="outline" onClick={() => (setInsertAt(null), setPicking(true))}>
           <Plus /> Add exercise
         </Button>
@@ -1047,5 +1079,71 @@ function NextTime({ sessionId }: { sessionId: string }) {
       <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Next time</h3>
       <AdjustmentList items={items} onChange={refresh} />
     </section>
+  );
+}
+
+/** Companion sidebar for unfolded foldables (> 600dp) during focus/one-exercise mode. */
+function UnfoldedWorkoutNavigator({
+  blocks,
+  focusOrder,
+  onJump,
+  onAdd,
+}: {
+  blocks: Block[];
+  focusOrder: number | null;
+  onJump: (order: number) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <aside className="glass hidden md:flex md:flex-col gap-3 rounded-3xl p-4 sticky top-4" aria-label="Workout overview">
+      <div className="flex items-center justify-between pb-1 border-b border-border/40">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Session Exercises</h3>
+        <span className="num text-xs font-semibold text-muted-foreground">
+          {blocks.filter((b) => b.sets.every((s) => s.done)).length} / {blocks.length} done
+        </span>
+      </div>
+      <ol className="flex flex-col gap-2">
+        {blocks.map((b) => {
+          const isCurrent = b.order === focusOrder;
+          const doneSets = b.sets.filter((s) => s.done).length;
+          const totalSets = b.sets.length;
+          const allDone = totalSets > 0 && doneSets === totalSets;
+          return (
+            <li key={b.order}>
+              <button
+                type="button"
+                onClick={() => onJump(b.order)}
+                className={cn(
+                  "w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-all",
+                  isCurrent
+                    ? "bg-primary/20 text-primary-text border border-primary/30 font-bold shadow-sm"
+                    : allDone
+                    ? "bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+                    : "bg-secondary text-foreground hover:bg-secondary/80 font-medium",
+                )}
+              >
+                <div className="min-w-0 flex-1 truncate">
+                  <p className="truncate text-sm">{b.exercise.name}</p>
+                  <p className="text-xs text-muted-foreground num">
+                    {b.supersetGroup ? `Superset ${b.supersetGroup} · ` : ""}
+                    {doneSets} of {totalSets} sets
+                  </p>
+                </div>
+                {allDone ? (
+                  <Check className="size-4 text-success shrink-0" strokeWidth={3} />
+                ) : isCurrent ? (
+                  <span className="size-2 rounded-full bg-primary-text shrink-0 animate-pulse" />
+                ) : (
+                  <ChevronRight className="size-4 text-muted-foreground/60 shrink-0" />
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <Button variant="outline" size="sm" onClick={onAdd} className="mt-1 w-full text-xs">
+        <Plus className="size-3.5 mr-1.5" /> Add exercise
+      </Button>
+    </aside>
   );
 }
