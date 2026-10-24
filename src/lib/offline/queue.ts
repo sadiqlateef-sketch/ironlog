@@ -16,8 +16,8 @@ export type Op =
   | { kind: "insert"; table: Table; rows: Row[] }
   | { kind: "update"; table: Table; ids: string[]; patch: Row }
   | { kind: "delete"; table: Table; ids: string[] }
-  /** Finishing: drop the unchecked sets, then stamp the end time. */
-  | { kind: "finish"; sessionId: string; endTime: string }
+  /** Finishing: drop the unchecked sets, then stamp the end time and volume. */
+  | { kind: "finish"; sessionId: string; endTime: string; volume?: number }
   /** Ask for "next time" suggestions once a routine workout has synced. */
   | { kind: "adjust"; sessionId: string };
 
@@ -126,7 +126,13 @@ async function sendOnce(op: Op): Promise<void> {
       return check(await db.from(op.table).delete().in("id", op.ids));
     case "finish":
       check(await db.from("workout_sets").delete().eq("session_id", op.sessionId).eq("is_completed", false));
-      return check(await db.from("workout_sessions").update({ end_time: op.endTime }).eq("id", op.sessionId).is("end_time", null));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return check(
+        await (db.from("workout_sessions") as any).update({
+          end_time: op.endTime,
+          ...(op.volume != null ? { volume: op.volume } : {}),
+        }).eq("id", op.sessionId).is("end_time", null)
+      );
     case "adjust": {
       const { error } = await db.functions.invoke("suggest-adjustments", { body: { session_id: op.sessionId } });
       // Suggestions are a bonus: only "no signal" is worth retrying.

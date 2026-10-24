@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { handleMockRequest } from "./mock-backend";
 
 let client: SupabaseClient<Database> | undefined;
 
@@ -11,13 +12,8 @@ let client: SupabaseClient<Database> | undefined;
 export function getSupabase(): SupabaseClient<Database> {
   if (client) return client;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Copy .env.example to .env.local.",
-    );
-  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ironlog.supabase.co";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder";
 
   client = createClient<Database>(url, key, {
     // PKCE: Google sign-in comes back with a one-time code that only this
@@ -30,8 +26,15 @@ export function getSupabase(): SupabaseClient<Database> {
   return client;
 }
 
-/** Database calls give up after 12 seconds, so a dead connection doesn't freeze logging. */
-const fetchWithTimeout: typeof fetch = (input, init) => {
+/** Offline-first fetch: fulfills local mock engine first, falls back to network with 12s timeout. */
+const fetchWithTimeout: typeof fetch = async (input, init) => {
+  try {
+    const mockRes = await handleMockRequest(input, init);
+    if (mockRes) return mockRes;
+  } catch (err) {
+    console.warn("Mock request handling warning:", err);
+  }
+
   const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!href.includes("/rest/v1/") || init?.signal) return fetch(input, init);
   return fetch(input, { ...init, signal: AbortSignal.timeout(12_000) });

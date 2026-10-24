@@ -24,6 +24,8 @@ import {
   discardSession,
   finishSession,
   getActiveSession,
+  getStaleSession,
+  resumeStaleSession,
   insertSets,
   listActiveSets,
   renumberSets,
@@ -33,6 +35,7 @@ import {
   updateSets,
 } from "@/lib/offline/workout-store";
 import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
+import { IronLogEcosystemSync } from "@/services/ironlogEcosystemSync";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
@@ -163,6 +166,7 @@ export function useWorkout() {
   const bestRef = useRef(new Map<string, number>());
   const recordsRef = useRef(new Set<string>());
   const [record, setRecord] = useState<RecordHit | null>(null);
+  const [staleSession, setStaleSession] = useState<WorkoutSession | null>(null);
   // Your per-exercise settings (note, rest, one side at a time), by exercise id.
   const prefsRef = useRef(new Map<string, ExercisePrefs>());
   const [effortAsk, setEffortAsk] = useState<EffortAsk | null>(null);
@@ -209,7 +213,12 @@ export function useWorkout() {
   // ---- Load the active workout (if any) ----
   const fetchWorkout = useCallback(async (): Promise<{ session: WorkoutSession | null; blocks: Block[] }> => {
     const active = await getActiveSession();
-    if (!active) return { session: null, blocks: [] };
+    if (!active) {
+      const stale = await getStaleSession();
+      setStaleSession(stale);
+      return { session: null, blocks: [] };
+    }
+    setStaleSession(null);
     const [sets, exercises, targets, prefs] = await Promise.all([
       listActiveSets(active.id),
       listExercises(),
@@ -395,6 +404,26 @@ export function useWorkout() {
         addToCalendar: session.add_to_calendar ?? null,
         startedWithCalendar: session.add_to_calendar ?? null,
       };
+            try {
+        const durationSec = Math.max(1, Math.round((endedAt - new Date(session.start_time).getTime()) / 1000));
+        const totalVolLb = done.reduce((sum, s) => {
+          const wNum = parseNumber(s.weight) || 0;
+          const rNum = parseNumber(s.reps) || 0;
+          const lb = unit === "imperial" ? wNum : wNum * 2.20462;
+          return sum + (lb * rNum);
+        }, 0);
+        IronLogEcosystemSync.onWorkoutCompleted({
+          id: session.id,
+          title: session.name ?? "Workout",
+          startTime: session.start_time,
+          durationSeconds: durationSec,
+          totalVolumeLb: Math.round(totalVolLb),
+          totalSets: done.length,
+          dailyStrain: Math.min(100, Math.round(done.length * 3.5)),
+          prsHit: [...recordsRef.current],
+        }, new Date().toISOString().split("T")[0]).catch(() => {});
+      } catch {}
+      setStaleSession(null);
       recordsRef.current = new Set();
       setSession(null);
       setBlocks(() => []);
@@ -405,12 +434,27 @@ export function useWorkout() {
     }
   }, [session, profile, restTimer, fail, setBlocks]);
 
+  const resumeStale = useCallback(async () => {
+    if (!staleSession) return;
+    await resumeStaleSession(staleSession);
+    setStaleSession(null);
+    await load();
+  }, [staleSession, load]);
+
+  const discardStale = useCallback(async () => {
+    if (!staleSession) return;
+    await discardSession(staleSession.id);
+    setStaleSession(null);
+    await load();
+  }, [staleSession, load]);
+
   const discard = useCallback(async () => {
     if (!session) return;
     try {
       await discardSession(session.id);
       recordsRef.current = new Set();
       restTimer.stop();
+      setStaleSession(null);
       setSession(null);
       setBlocks(() => []);
     } catch (e) {
@@ -1078,6 +1122,9 @@ export function useWorkout() {
     start,
     finish,
     discard,
+    staleSession,
+    resumeStale,
+    discardStale,
     addExercise,
     reorder,
     /** The exercises as they are right now (after any change still settling into state). */

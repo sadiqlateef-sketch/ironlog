@@ -69,29 +69,110 @@ async function commit(...ops: Op[]): Promise<void> {
 
 const now = () => new Date().toISOString();
 
+export function isToday(isoDateString: string | null | undefined): boolean {
+  if (!isoDateString) return false;
+  const d = new Date(isoDateString);
+  const cur = new Date();
+  return (
+    d.getFullYear() === cur.getFullYear() &&
+    d.getMonth() === cur.getMonth() &&
+    d.getDate() === cur.getDate()
+  );
+}
+
+export function isSessionCompleted(session: WorkoutSession | null | undefined): boolean {
+  if (!session) return false;
+  return session.end_time != null || (session as any).completed_at != null;
+}
+
 // ---------- Reading ----------
 
 /** The workout in progress as this phone last saw it. Instant: no network. */
 export async function peekActiveWorkout(): Promise<{ session: WorkoutSession; sets: number; done: number } | null> {
   const m = await readMirror();
-  return m ? { session: m.session, sets: m.sets.length, done: m.sets.filter((s) => s.completed_at).length } : null;
+  if (!m) return null;
+  // If completed, clear mirror and return null
+  if (isSessionCompleted(m.session)) {
+    await writeMirror(null);
+    return null;
+  }
+  // Guard: If not from today, it's stale - never silently show as active
+  if (!isToday(m.session.start_time)) {
+    return null;
+  }
+  return { session: m.session, sets: m.sets.length, done: m.sets.filter((s) => s.completed_at || s.is_completed).length };
 }
 
 /** The unfinished workout, from the server when it's reachable and caught up. */
 export async function getActiveSession(): Promise<WorkoutSession | null> {
   await flush();
-  if (await hasPending()) return (await readMirror())?.session ?? null;
+  if (await hasPending()) {
+    const s = (await readMirror())?.session ?? null;
+    if (s && (isSessionCompleted(s) || !isToday(s.start_time))) {
+      await writeMirror(null);
+      return null;
+    }
+    return s;
+  }
   try {
-    const active: WorkoutSession | null = unwrap(await getSupabase().from("workout_sessions").select("*").is("end_time", null).maybeSingle());
+    const active: WorkoutSession | null = unwrap(
+      await getSupabase().from("workout_sessions").select("*").is("end_time", null).maybeSingle()
+    );
     const m = await readMirror();
-    if (!active) await writeMirror(null);
-    else if (m?.session.id !== active.id) await writeMirror({ session: active, sets: [] });
+    if (!active || isSessionCompleted(active)) {
+      await writeMirror(null);
+      return null;
+    }
+    // Guard: Only restore as active if it is from today!
+    if (!isToday(active.start_time)) {
+      if (m?.session.id === active.id) await writeMirror(null);
+      return null;
+    }
+    if (m?.session.id !== active.id) await writeMirror({ session: active, sets: [] });
     else await writeMirror({ sets: m.sets, session: active });
     return active;
   } catch (e) {
-    if (isNetworkError(e)) return (await readMirror())?.session ?? null;
+    if (isNetworkError(e)) {
+      const s = (await readMirror())?.session ?? null;
+      if (s && (isSessionCompleted(s) || !isToday(s.start_time))) {
+        await writeMirror(null);
+        return null;
+      }
+      return s;
+    }
     throw e;
   }
+}
+
+/** Check if there is an unfinished workout session from a prior day (stale). */
+export async function getStaleSession(): Promise<WorkoutSession | null> {
+  try {
+    const m = await readMirror();
+    if (m?.session && !isSessionCompleted(m.session) && !isToday(m.session.start_time)) {
+      return m.session;
+    }
+    const sessions: WorkoutSession[] = unwrap(
+      await getSupabase()
+        .from("workout_sessions")
+        .select("*")
+        .is("end_time", null)
+        .order("start_time", { ascending: false })
+        .limit(1)
+    );
+    const s = sessions[0] ?? null;
+    if (s && !isSessionCompleted(s) && !isToday(s.start_time)) {
+      return s;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Resumes a stale session, making it the active session. */
+export async function resumeStaleSession(session: WorkoutSession): Promise<void> {
+  const sets = await listActiveSets(session.id);
+  await writeMirror({ session, sets });
 }
 
 /** The active workout's sets (falls back to the phone's copy without signal). */
@@ -160,6 +241,22 @@ export async function startPlannedSession(
   const sets = inserts.map((s) => toRow(s, uid));
 
   await writeMirror({ session, sets });
+
+  // Direct write to mock local storage if active so session is instantly present
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      const sessKey = "ironlog_table_workout_sessions";
+      const raw = window.localStorage.getItem(sessKey);
+      const list = raw ? JSON.parse(raw) : [];
+      list.push(session);
+      window.localStorage.setItem(sessKey, JSON.stringify(list));
+      const setsKey = "ironlog_table_workout_sets";
+      const rawSets = window.localStorage.getItem(setsKey);
+      const sList = rawSets ? JSON.parse(rawSets) : [];
+      window.localStorage.setItem(setsKey, JSON.stringify([...sList, ...sets]));
+    } catch {}
+  }
+
   const ops: Op[] = [
     {
       kind: "insert",
@@ -185,8 +282,37 @@ export async function startPlannedSession(
 
 export async function finishSession(session: WorkoutSession): Promise<{ synced: boolean }> {
   const endTime = now();
+  const m = await readMirror();
+  const completedSets = (m?.sets ?? []).filter((s) => (s.is_completed || s.completed_at) && s.set_type !== "warmup");
+  const volume = completedSets.reduce((sum, s) => sum + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0);
+
+  // Clear active workout mirror atomically
   await writeMirror(null);
-  const ops: Op[] = [{ kind: "finish", sessionId: session.id, endTime }];
+
+  // Synchronously update local mock storage if present
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      const sessKey = "ironlog_table_workout_sessions";
+      const raw = window.localStorage.getItem(sessKey);
+      if (raw) {
+        const list = JSON.parse(raw);
+        const idx = list.findIndex((s: any) => s.id === session.id);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], end_time: endTime, volume, updated_at: endTime };
+          window.localStorage.setItem(sessKey, JSON.stringify(list));
+        }
+      }
+      const setsKey = "ironlog_table_workout_sets";
+      const rawSets = window.localStorage.getItem(setsKey);
+      if (rawSets) {
+        const setsList = JSON.parse(rawSets);
+        const kept = setsList.filter((s: any) => !(s.session_id === session.id && !s.is_completed));
+        window.localStorage.setItem(setsKey, JSON.stringify(kept));
+      }
+    } catch {}
+  }
+
+  const ops: Op[] = [{ kind: "finish", sessionId: session.id, endTime, volume }];
   if (session.routine_id) ops.push({ kind: "adjust", sessionId: session.id });
   await enqueue(...ops);
   return { synced: await flush() };
@@ -194,6 +320,25 @@ export async function finishSession(session: WorkoutSession): Promise<{ synced: 
 
 export async function discardSession(sessionId: string): Promise<void> {
   await changeMirror((m) => (m.session.id === sessionId ? null : m));
+  await writeMirror(null);
+
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      const sessKey = "ironlog_table_workout_sessions";
+      const raw = window.localStorage.getItem(sessKey);
+      if (raw) {
+        const list = JSON.parse(raw).filter((s: any) => s.id !== sessionId);
+        window.localStorage.setItem(sessKey, JSON.stringify(list));
+      }
+      const setsKey = "ironlog_table_workout_sets";
+      const rawSets = window.localStorage.getItem(setsKey);
+      if (rawSets) {
+        const list = JSON.parse(rawSets).filter((s: any) => s.session_id !== sessionId);
+        window.localStorage.setItem(setsKey, JSON.stringify(list));
+      }
+    } catch {}
+  }
+
   await commit({ kind: "delete", table: "workout_sessions", ids: [sessionId] });
 }
 

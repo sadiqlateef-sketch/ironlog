@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpDown, ArrowUpToLine, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Plus, SlidersHorizontal, Sparkles, Undo2 } from "lucide-react";
+import { ArrowUpDown, ArrowUpToLine, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
@@ -105,6 +105,38 @@ export function WorkoutScreen() {
     return (
       <>
         <StartWorkout onStart={w.start} onStartWith={w.startWith} error={w.error} />
+        {w.staleSession && (
+          <Dialog open={!!w.staleSession} onOpenChange={(o) => !o && w.discardStale()}>
+            <DialogContent data-testid="stale-workout-dialog">
+              <DialogHeader>
+                <DialogTitle>Unfinished workout from previous day</DialogTitle>
+                <DialogDescription>
+                  You have an unfinished workout ({w.staleSession.name ?? "Workout"}) from{" "}
+                  {new Date(w.staleSession.start_time).toLocaleDateString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                  . Would you like to resume it or discard it?
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-2 pt-3">
+                <Button size="lg" onClick={w.resumeStale} data-testid="resume-stale">
+                  <Play className="size-4 mr-2" /> Resume workout
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="text-destructive hover:bg-destructive/10"
+                  onClick={w.discardStale}
+                  data-testid="discard-stale"
+                >
+                  <Trash2 className="size-4 mr-2" /> Discard workout
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
         <Dialog open={!!summary} onOpenChange={(o) => !o && closeSummary()}>
           <DialogContent>
             <DialogHeader className="sr-only">
@@ -170,6 +202,7 @@ function ActiveWorkout({
   onInfo: (e: Exercise | null) => void;
 }) {
   const session = w.session!;
+  const router = useRouter();
   const { profile, unit } = useAuth();
   const { markMissing } = useKits();
   const kit = kitFor(session.kit_id, profile);
@@ -181,6 +214,7 @@ function ActiveWorkout({
   const [added, setAdded] = useState<{ order: number; name: string } | null>(null);
   const [plates, setPlates] = useState<{ open: boolean; weight: number | null }>({ open: false, weight: null });
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [view, setViewState] = useState<View>(savedView);
   const [focusPick, setFocus] = useState<number | null>(null);
   const [restFor, setRestFor] = useState<number | null>(null);
@@ -354,11 +388,20 @@ function ActiveWorkout({
             )}
           </div>
         </div>
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Button variant="ghost" size="icon" aria-label="Logger display options" onClick={() => setOptions(true)}>
             <SlidersHorizontal />
           </Button>
-          <Button onClick={() => (undone > 0 ? setConfirmFinish(true) : finish())}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:bg-destructive/10 font-semibold"
+            onClick={() => setConfirmDiscard(true)}
+            data-testid="discard-button"
+          >
+            Discard
+          </Button>
+          <Button onClick={() => (undone > 0 ? setConfirmFinish(true) : finish())} data-testid="finish-button">
             <Flag /> Finish
           </Button>
         </div>
@@ -547,8 +590,9 @@ function ActiveWorkout({
 
       <button
         type="button"
-        className="text-destructive mx-auto py-2 text-sm"
-        onClick={() => confirm("Discard this workout? Nothing will be saved.") && w.discard()}
+        className="text-destructive mx-auto py-2 text-sm font-semibold"
+        onClick={() => setConfirmDiscard(true)}
+        data-testid="bottom-discard-button"
       >
         Discard workout
       </button>
@@ -761,6 +805,33 @@ function ActiveWorkout({
               Keep going
             </Button>
             <Button onClick={finish}>Finish</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <DialogContent data-testid="discard-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>Discard workout?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to discard this workout? All logged sets will be deleted and nothing will be saved to your history.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-3">
+            <Button
+              variant="destructive"
+              size="lg"
+              onClick={async () => {
+                setConfirmDiscard(false);
+                await w.discard();
+                router.push("/");
+              }}
+              data-testid="confirm-discard"
+            >
+              Yes, discard workout
+            </Button>
+            <Button variant="outline" size="lg" onClick={() => setConfirmDiscard(false)}>
+              Keep editing
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

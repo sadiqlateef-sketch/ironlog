@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ACTIVE_WORKOUT_EVENT, getActiveSession, peekActiveWorkout } from "@/lib/offline/workout-store";
+import { ACTIVE_WORKOUT_EVENT, getActiveSession, isSessionCompleted, isToday, peekActiveWorkout } from "@/lib/offline/workout-store";
 
 export type ActiveWorkout = Awaited<ReturnType<typeof peekActiveWorkout>>;
 
@@ -16,14 +16,17 @@ let checkedServer = false;
  * server, to catch a workout started on the watch.
  */
 export function useActiveWorkout(): ActiveWorkout | undefined {
+  if (last?.session && (isSessionCompleted(last.session) || !isToday(last.session.start_time))) {
+    last = undefined;
+  }
   const [workout, setWorkout] = useState(last);
   useEffect(() => {
     let alive = true;
     const read = () =>
       peekActiveWorkout()
         .then((w) => {
-          last = w;
-          if (alive) setWorkout(w);
+          last = w ?? undefined;
+          if (alive) setWorkout(w ?? undefined);
         })
         .catch(() => {});
     read();

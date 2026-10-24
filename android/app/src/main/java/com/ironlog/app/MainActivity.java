@@ -6,8 +6,9 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // App-only plugins have to be registered before the bridge starts.
+        // Register native plugins before bridge starts
         registerPlugin(RestCountdownPlugin.class);
+        registerPlugin(IronLogEcosystemPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
