@@ -97,6 +97,7 @@ export function SetRow({
   onLongPress: () => void;
 }) {
   const [shake, setShake] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const secondRef = useRef<HTMLInputElement>(null);
   const swipe = useSwipe({
     onRight: () => done(),
@@ -105,10 +106,16 @@ export function SetRow({
   });
 
   async function done() {
-    const ok = await onToggleDone();
-    if (!ok) {
-      setShake(true);
-      setTimeout(() => setShake(false), 400);
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const ok = await onToggleDone();
+      if (!ok) {
+        setShake(true);
+        setTimeout(() => setShake(false), 400);
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -259,11 +266,14 @@ export function SetRow({
           <button
             type="button"
             onClick={done}
+            disabled={submitting}
+            aria-busy={submitting}
             aria-label={set.done ? `Mark set not done${effort ? ` (effort ${effort})` : ""}` : "Complete set"}
             aria-pressed={set.done}
             className={cn(
               "relative grid h-14 w-full place-items-center rounded-xl transition-colors",
               set.done ? "bg-success text-[#08200d]" : "bg-secondary text-muted-foreground",
+              submitting && "opacity-75 cursor-not-allowed pointer-events-none",
             )}
           >
             <Check className="size-7" strokeWidth={3} />

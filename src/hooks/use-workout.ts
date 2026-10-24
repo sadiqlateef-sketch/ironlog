@@ -171,6 +171,8 @@ export function useWorkout() {
   const prefsRef = useRef(new Map<string, ExercisePrefs>());
   const [effortAsk, setEffortAsk] = useState<EffortAsk | null>(null);
   const effortScale = profile?.effort_scale ?? "rir";
+  const inFlightSetsRef = useRef<Set<string>>(new Set());
+  const lastToggleTimeRef = useRef<Map<string, number>>(new Map());
 
   // The ref is updated straight away so a change made right after another
   // (add an exercise, then move it) sees the first one.
@@ -1011,99 +1013,115 @@ export function useWorkout() {
   /**
    * The one-tap action. Empty fields fall back to last time's numbers (shown as
    * grey placeholders), then the rest timer starts on its own.
-   * Returns false if there's no rep count to log.
+   * Debounced and locked against in-flight race conditions.
+   * Returns false if there's no rep count to log or if locked.
    */
   const toggleDone = useCallback(
     async (order: number, id: string): Promise<boolean> => {
-      const block = blocksRef.current.find((b) => b.order === order);
-      const idx = block?.sets.findIndex((s) => s.id === id) ?? -1;
-      if (!block || idx < 0) return false;
-      const set = block.sets[idx];
-
-      if (set.done) {
-        setEffortAsk((a) => (a?.id === id ? null : a));
-        patchSet(order, id, { done: false });
-        try {
-          await updateSet(id, { is_completed: false });
-        } catch (e) {
-          fail(e);
-        }
-        return true;
+      const nowMs = Date.now();
+      if (inFlightSetsRef.current.has(id)) {
+        return false;
       }
+      const lastTime = lastToggleTimeRef.current.get(id) ?? 0;
+      if (nowMs - lastTime < 350) {
+        return false;
+      }
+      inFlightSetsRef.current.add(id);
+      lastToggleTimeRef.current.set(id, nowMs);
 
-      const prev = matchPrevious(block.sets.map((s) => s.type), block.previous)[idx];
-      const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
-      const startRest = () => {
-        if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
-          restTimer.start(block.restSeconds, block.exercise.name);
-        } else if (set.type === "warmup") {
-          restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
+      try {
+        const block = blocksRef.current.find((b) => b.order === order);
+        const idx = block?.sets.findIndex((s) => s.id === id) ?? -1;
+        if (!block || idx < 0) return false;
+        const set = block.sets[idx];
+
+        if (set.done) {
+          setEffortAsk((a) => (a?.id === id ? null : a));
+          patchSet(order, id, { done: false });
+          try {
+            await updateSet(id, { is_completed: false });
+          } catch (e) {
+            fail(e);
+          }
+          return true;
         }
-      };
 
-      // Timed and cardio sets: empty fields fall back to last time, then the target.
-      const tracking = block.exercise.tracking;
-      if (tracking !== "weight_reps") {
-        const time =
-          set.time ||
-          (prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "") : "");
-        const distance = tracking === "distance_time" ? set.distance || (prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "") : "";
-        const seconds = parseDuration(time);
-        const metres = toMetres(parseNumber(distance) ?? 0, unit);
-        if (!seconds && !metres) return false;
-        const weight = tracking === "time" ? set.weight || (prev?.weight ? toDisplay(prev.weight, unit) : "") : "";
-        patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
+        const prev = matchPrevious(block.sets.map((s) => s.type), block.previous)[idx];
+        const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
+        const startRest = () => {
+          if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
+            restTimer.start(block.restSeconds, block.exercise.name);
+          } else if (set.type === "warmup") {
+            restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
+          }
+        };
+
+        // Timed and cardio sets: empty fields fall back to last time, then the target.
+        const tracking = block.exercise.tracking;
+        if (tracking !== "weight_reps") {
+          const time =
+            set.time ||
+            (prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "") : "");
+          const distance = tracking === "distance_time" ? set.distance || (prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "") : "";
+          const seconds = parseDuration(time);
+          const metres = toMetres(parseNumber(distance) ?? 0, unit);
+          if (!seconds && !metres) return false;
+          const weight = tracking === "time" ? set.weight || (prev?.weight ? toDisplay(prev.weight, unit) : "") : "";
+          patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
+          cueSetSaved();
+          startRest();
+          if (tracking === "time" && set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
+          try {
+            await updateSet(id, {
+              weight: toKg(parseNumber(weight) ?? 0, unit),
+              reps: 0,
+              duration_seconds: seconds,
+              distance_m: metres || null,
+              is_completed: true,
+            });
+          } catch (e) {
+            fail(e);
+          }
+          return true;
+        }
+
+        // Working sets fill in today's suggested weight when there is one.
+        const suggested = block.suggestion && (set.type === "normal" || set.type === "failure") ? String(block.suggestion.weight) : null;
+        const weight = set.weight || suggested || (prev ? toDisplay(prev.weight, unit) : "");
+        const fallback = (side: number | null | undefined) =>
+          prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "");
+        let reps = set.reps || fallback(prev?.reps_right);
+        let repsLeft = "";
+        let sides: ReturnType<typeof sideReps> = null;
+        if (block.unilateral) {
+          // A side left blank did the same as the other side (or last time's).
+          repsLeft = set.repsLeft || set.reps || fallback(prev?.reps_left);
+          reps = set.reps || set.repsLeft || reps;
+          sides = sideReps(intOrNull(repsLeft), intOrNull(reps));
+        }
+        const repsNum = sides ? sides.reps : parseNumber(reps);
+        if (repsNum == null || repsNum === 0) return false;
+
+        patchSet(order, id, { weight, reps, repsLeft, done: true });
         cueSetSaved();
         startRest();
-        if (tracking === "time" && set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
+        if (set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
+        const kg = toKg(parseNumber(weight) ?? 0, unit);
+        if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
         try {
           await updateSet(id, {
-            weight: toKg(parseNumber(weight) ?? 0, unit),
-            reps: 0,
-            duration_seconds: seconds,
-            distance_m: metres || null,
+            weight: kg,
+            reps: Math.round(repsNum),
+            ...sides,
             is_completed: true,
           });
         } catch (e) {
           fail(e);
         }
         return true;
+      } finally {
+        inFlightSetsRef.current.delete(id);
       }
-
-      // Working sets fill in today's suggested weight when there is one.
-      const suggested = block.suggestion && (set.type === "normal" || set.type === "failure") ? String(block.suggestion.weight) : null;
-      const weight = set.weight || suggested || (prev ? toDisplay(prev.weight, unit) : "");
-      const fallback = (side: number | null | undefined) =>
-        prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "");
-      let reps = set.reps || fallback(prev?.reps_right);
-      let repsLeft = "";
-      let sides: ReturnType<typeof sideReps> = null;
-      if (block.unilateral) {
-        // A side left blank did the same as the other side (or last time's).
-        repsLeft = set.repsLeft || set.reps || fallback(prev?.reps_left);
-        reps = set.reps || set.repsLeft || reps;
-        sides = sideReps(intOrNull(repsLeft), intOrNull(reps));
-      }
-      const repsNum = sides ? sides.reps : parseNumber(reps);
-      if (repsNum == null || repsNum === 0) return false;
-
-      patchSet(order, id, { weight, reps, repsLeft, done: true });
-      cueSetSaved();
-      startRest();
-      if (set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
-      const kg = toKg(parseNumber(weight) ?? 0, unit);
-      if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
-      try {
-        await updateSet(id, {
-          weight: kg,
-          reps: Math.round(repsNum),
-          ...sides,
-          is_completed: true,
-        });
-      } catch (e) {
-        fail(e);
-      }
-      return true;
     },
     [patchSet, unit, restTimer, fail, session, checkRecord, effortScale],
   );
