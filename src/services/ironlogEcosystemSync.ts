@@ -58,27 +58,39 @@ export const IronLogEcosystemSync = {
     if (!plugin) return;
 
     // A. Mirror workout to native IronLogContentProvider
-    await plugin.upsertWorkoutRecord?.(summary);
+    try {
+      await plugin.upsertWorkoutRecord?.(summary);
+    } catch (e) {
+      console.warn("Ecosystem: Failed to upsert to IronLogContentProvider", e);
+    }
 
     // B. Check off matching Gym/Workout task & water Oak tree in Bujo Tasks
-    await plugin.completeBujoWorkoutAndWaterOak?.({
-      date: todayIso,
-      workoutTitle: summary.title,
-      durationMinutes: Math.max(1, Math.round(summary.durationSeconds / 60)),
-      totalVolumeLb: summary.totalVolumeLb,
-      strain: summary.dailyStrain,
-      treeSpecies: 'oak',
-      treeName: 'Oak · Tree of Vitality'
-    });
+    try {
+      await plugin.completeBujoWorkoutAndWaterOak?.({
+        date: todayIso,
+        workoutTitle: summary.title,
+        durationMinutes: Math.max(1, Math.round(summary.durationSeconds / 60)),
+        totalVolumeLb: summary.totalVolumeLb,
+        strain: summary.dailyStrain,
+        treeSpecies: 'oak',
+        treeName: 'Oak · Tree of Vitality'
+      });
+    } catch (e) {
+      console.warn("Ecosystem: Failed to sync to Bujo Tasks", e);
+    }
 
     // C. Push PR & endorphin context to Braindump for Nashae's evening reflection prompt
     if (summary.prsHit.length > 0 || summary.dailyStrain >= 65) {
-      await plugin.pushWorkoutContextToBraindump?.({
-        date: todayIso,
-        summaryText: `Trained ${summary.title} (${Math.round(summary.totalVolumeLb).toLocaleString()} lb volume, Strain ${summary.dailyStrain}/100${
-          summary.prsHit.length ? `, PRs: ${summary.prsHit.join(', ')}` : ''
-        })`
-      });
+      try {
+        await plugin.pushWorkoutContextToBraindump?.({
+          date: todayIso,
+          summaryText: `Trained ${summary.title} (${Math.round(summary.totalVolumeLb).toLocaleString()} lb volume, Strain ${summary.dailyStrain}/100${
+            summary.prsHit.length ? `, PRs: ${summary.prsHit.join(', ')}` : ''
+          })`
+        });
+      } catch (e) {
+        console.warn("Ecosystem: Failed to push context to Braindump", e);
+      }
     }
   },
 
@@ -89,12 +101,16 @@ export const IronLogEcosystemSync = {
   async syncRecoveryToBujo(recoveryScore: number, dailyStrain: number, todayIso: string) {
     const plugin = getEcosystemPlugin();
     if (!plugin?.syncRecoveryState) return;
-    await plugin.syncRecoveryState({
-      date: todayIso,
-      recoveryScore,
-      dailyStrain,
-      recommendRestToken: recoveryScore < 35 || dailyStrain >= 85
-    });
+    try {
+      await plugin.syncRecoveryState({
+        date: todayIso,
+        recoveryScore,
+        dailyStrain,
+        recommendRestToken: recoveryScore < 35 || dailyStrain >= 85
+      });
+    } catch (e) {
+      console.warn("Ecosystem: Failed to sync recovery to Bujo Tasks", e);
+    }
   },
 
   /**
