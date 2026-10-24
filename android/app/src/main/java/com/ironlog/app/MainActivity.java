@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         // Register native plugins before bridge starts
         registerPlugin(RestCountdownPlugin.class);
         registerPlugin(IronLogEcosystemPlugin.class);
+        registerPlugin(WearableBridgePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

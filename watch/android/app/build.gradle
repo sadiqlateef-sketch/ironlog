@@ -127,6 +127,8 @@ dependencies {
     implementation("com.facebook.react:react-android")
     // Wear OS heart-rate sensor (see HeartRateModule.kt)
     implementation("androidx.health:health-services-client:1.1.0")
+    // Google Play Services Wearable Data Layer (direct Bluetooth/Wi-Fi phone sync)
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
     // Health Services returns Guava ListenableFutures but doesn't put Guava on our classpath
     implementation("com.google.guava:guava:33.7.1-android")
 

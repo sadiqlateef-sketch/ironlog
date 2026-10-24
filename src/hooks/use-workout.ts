@@ -36,6 +36,7 @@ import {
 } from "@/lib/offline/workout-store";
 import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
 import { IronLogEcosystemSync } from "@/services/ironlogEcosystemSync";
+import { wearableBridge } from "@/services/wearableBridge";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
@@ -1136,6 +1137,52 @@ export function useWorkout() {
     },
     [patchSet, toggleDone],
   );
+
+  // ---- Wear OS Live Companion Auto-Sync ----
+  useEffect(() => {
+    if (!session) return;
+    const allSets = blocks.flatMap((b) => b.sets);
+    wearableBridge.broadcastActiveWorkout(session, allSets).catch(() => {});
+
+    const unsubSet = wearableBridge.onSetLogged(async (data) => {
+      if (!data || data.sessionId !== session.id) return;
+      const block = blocksRef.current.find((b) => b.exercise.id === data.exerciseId) ?? blocksRef.current[0];
+      if (!block) return;
+      const targetSet = block.sets.find((s) => s.setNumber === data.setNumber) ?? block.sets.find((s) => !s.done);
+      if (!targetSet) return;
+
+      const updates: Record<string, unknown> = {};
+      if (data.weightKg != null) updates.weight_kg = data.weightKg;
+      if (data.reps != null) updates.reps = data.reps;
+      if (data.rpe != null) updates.rpe = data.rpe;
+
+      if (Object.keys(updates).length > 0) {
+        patchSet(block.order, targetSet.id, updates);
+        await updateSet(targetSet.id, updates).catch(() => {});
+      }
+
+      if (data.isCompleted && !targetSet.done) {
+        await toggleDone(block.order, targetSet.id);
+      }
+    });
+
+    const unsubFinish = wearableBridge.onWorkoutFinished((data) => {
+      if (data && data.sessionId === session.id) {
+        void finish();
+      }
+    });
+
+    const unsubReq = wearableBridge.onRequestActive(() => {
+      const currentSets = blocksRef.current.flatMap((b) => b.sets);
+      wearableBridge.broadcastActiveWorkout(session, currentSets).catch(() => {});
+    });
+
+    return () => {
+      unsubSet();
+      unsubFinish();
+      unsubReq();
+    };
+  }, [session, blocks, patchSet, toggleDone, finish]);
 
   return {
     startWith,

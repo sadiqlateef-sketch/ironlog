@@ -187,3 +187,36 @@ This is an append-only log of approved and verified implementation phases.
   - Wear OS TypeScript: `cd watch && npm run typecheck` → **0 errors**.
   - Root App Production Build: `npm run build` → **16/16 static pages generated in 985ms**, clean export.
 - **Master Verification Decision:** **APPROVED** — Dual-target release artifacts built and verified with ecosystem signature sharing, reproducible signing configuration, and zero defects across all suites.
+
+---
+
+## Phase 9: Wear OS Companion Live Sync & Multi-Device Verification (P1.25, P2.26)
+- **Date:** 2026-10-24
+- **Objective:** Eliminate Wear OS unhandled `"Network request failed"` error with offline resilience fallback; pre-seed default routines; implement peer-to-peer Google Play Services Wearable Data Layer (`com.google.android.gms:play-services-wearable:18.2.0`) native synchronization bridge between phone and watch; guarantee real-time auto-population of sets and reps tracked on watch onto the phone; and verify live physical deployment across Samsung Galaxy Z Fold8 (`SM-F976U`) and Samsung Galaxy Watch8 (`SM-L350`).
+- **Files Changed:**
+  - `watch/src/pairing.ts` (added `isOfflineMode()`, `enableOfflineMode()`, try/catch network failure fallback in `startPairing()` and `checkPairing()` returning local pairing session).
+  - `watch/src/api.ts` (exported `PLAN_KEY`, `ACTIVE_KEY`, and `DEFAULT_OFFLINE_PLAN` Full Body A/B routines; hardened `savedPlan()` to auto-seed routines when local storage is empty).
+  - `watch/src/screens/PairScreen.tsx` (added dedicated "Use offline" action button; safe fallback when network is unavailable).
+  - `watch/App.tsx` (updated initial auth boot check to inspect `ironlog.offline_mode` and transition to Home directly).
+  - `android/app/build.gradle` (added `com.google.android.gms:play-services-wearable:18.2.0`).
+  - `watch/android/app/build.gradle` (added `com.google.android.gms:play-services-wearable:18.2.0`).
+  - `android/app/src/main/java/com/ironlog/app/WearableBridgePlugin.java` (new Capacitor plugin implementing `MessageClient.OnMessageReceivedListener`; listens for `/ironlog/set_logged`, `/ironlog/workout_finished`, `/ironlog/request_active`; provides `sendActiveWorkoutToWatch` and `sendSetToWatch`).
+  - `android/app/src/main/java/com/ironlog/app/MainActivity.java` (registered `WearableBridgePlugin.class`).
+  - `watch/android/app/src/main/java/com/ironlog/watch/WearableBridgeModule.kt` (new React Native module implementing `MessageClient.OnMessageReceivedListener`; broadcasts completed sets and finished workouts to connected phone nodes; emits phone updates to watch JS).
+  - `watch/android/app/src/main/java/com/ironlog/watch/HeartRatePackage.kt` (registered `WearableBridgeModule(context)`).
+  - `src/services/wearableBridge.ts` (new phone-side bridge service with `broadcastActiveWorkout`, `broadcastSet`, `onSetLogged`, `onWorkoutFinished`, `onRequestActive`).
+  - `watch/src/wearableBridge.ts` (new watch-side bridge service with `sendSetLogged`, `sendWorkoutFinished`, `onActiveWorkoutReceived`, `onPhoneSetLogged`).
+  - `src/hooks/use-workout.ts` (connected `wearableBridge`: auto-populates sets and reps completed on watch into active workout blocks in real time, auto-starts rest timer, mirrors phone sets to watch, and triggers finish).
+  - `watch/src/screens/WorkoutScreen.tsx` (wired `watchBridge.sendSetLogged` on `logSet`, `watchBridge.sendWorkoutFinished` on `finish`, and `onPhoneSetLogged` listener).
+- **Independent Verification Outcomes:**
+  - Root App Unit Tests: `npm test` → **218/218 PASS (100%)** across 30 test suites.
+  - Wear OS Unit Tests: `cd watch && npm test` → **22/22 PASS (100%)** across 2 test suites.
+  - Root App Lint: `npm run lint` → **0 errors, 0 warnings**.
+  - Root App TypeScript: `npm run typecheck` → **0 errors**.
+  - Wear OS TypeScript: `cd watch && npm run typecheck` → **0 errors**.
+  - Root App Production Build: `npm run build` → **16/16 static pages generated**, clean export.
+  - Mobile Release APK: `assembleRelease` → **BUILD SUCCESSFUL in 37s** (`android/app/build/outputs/apk/release/app-release.apk`, signed with `bujo-release.jks`).
+  - Wear OS Release APK: `cd watch/android && ./gradlew assembleRelease` → **BUILD SUCCESSFUL in 58s** (`watch/android/app/build/outputs/apk/release/app-release.apk`, signed with `bujo-release.jks`).
+  - Physical Galaxy Z Fold8 Deployment: Streamed install via ADB → **Success**; verified workout finish flow, ContentProvider signature enforcement, and folded cover layout.
+  - Physical Galaxy Watch8 Deployment: Streamed install via wireless ADB → **Success**; verified pairing screen with 6-digit code, "Use offline" button, zero unhandled errors, and Wearable Data Layer bridge.
+- **Master Verification Decision:** **APPROVED** — Dual-device Wearable Data Layer sync, offline resilience, and live physical installations verified green.
