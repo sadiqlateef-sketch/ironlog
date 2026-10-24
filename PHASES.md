@@ -51,3 +51,22 @@ This is an append-only log of approved and verified implementation phases.
   - Wear OS TypeScript: `cd watch && npm run typecheck` → **0 errors**.
   - Wear OS Unit Tests: `cd watch && npm test` → **16/16 PASS**.
 - **Master Verification Decision:** **APPROVED** — All exit gates satisfied. Baseline quality is green across the entire monorepo.
+
+---
+
+## Phase 2: Core Workout Lifecycle & Mutation Safety Hardening (P0)
+- **Date:** 2026-10-24
+- **Objective:** Eliminate rapid double-tap race conditions on set completion, implement in-flight mutation locking and gym debounce guards, ensure crash & process-death recovery resilience (wall-clock elapsed time, completed sets, and rest timer restoration), and establish comprehensive automated set mutation test coverage.
+- **Files Changed:**
+  - `src/hooks/use-workout.ts` (added `inFlightSetsRef` and `lastToggleTimeRef` debouncing/cooldown to `toggleDone`; locks against concurrent in-flight mutations; prevents rapid double-tap bouncing).
+  - `src/components/workout/set-row.tsx` (added `submitting` UI guard, `aria-busy`, disabled pointer-events during in-flight completion to prevent accidental double-tap bounce on sweaty touchscreens).
+  - `tests/set-mutation-safety.test.ts` (new comprehensive suite verifying: concurrent set completion mutations, set renumbering with warm-ups/working/drop sets, exercise slot swapping via negative parking slots, and process-death wall-clock / rest timer restoration).
+- **Independent Verification Outcomes:**
+  - Root App Unit Tests: `npm test` → **186/186 PASS (100%)** across 24 test suites.
+  - Root App Lint: `npm run lint` → **0 errors, 0 warnings**.
+  - Root App TypeScript: `npm run typecheck` → **0 errors**.
+  - Root App Production Build: `npm run build` → **16/16 static pages generated in 1817ms**, clean export.
+  - Capacitor Android Sync: `npm run android:sync` → **Successful asset sync**.
+  - Android Build: `cd android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 17s**.
+  - Wear OS TypeScript & Tests: `cd watch && npm run typecheck && npm test` → **0 errors, 16/16 PASS**.
+- **Master Verification Decision:** **APPROVED** — Core workout lifecycle and mutation safety hardened. Zero lint/type errors, 186/186 unit tests green, debug APK compiled. Ready for Phase 3.

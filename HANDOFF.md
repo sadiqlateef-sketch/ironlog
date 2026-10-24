@@ -2,13 +2,16 @@
 
 Version: 1.1  
 Date: 2026-10-24  
-Current Status: Phase 1 (Baseline Quality & Toolchain Health) Completed & Independently Verified  
+Current Status: Phase 2 (Core Workout Lifecycle & Mutation Safety Hardening) Completed & Independently Verified  
 
 ---
 
 ## 1. Verified State of Truth
 
 - **Implemented:**
+  - In-flight mutation locking and 350ms rapid-tap debounce cooldown on set completion (`use-workout.ts`).
+  - Tactile button submission guard (`submitting`, `aria-busy`, disabled pointer-events during in-flight transition) in `set-row.tsx` to prevent double-tap bounce on sweaty touchscreens.
+  - Wall-clock elapsed duration computation (`(now - start_time) / 1000`) and persistent countdown restoration (`ironlog.restTimer` with `endsAt`) ensuring process-death / background termination resilience.
   - 13 App Routes (`/`, `/workout/`, `/progress/`, `/plans/`, `/more/`, `/exercises/`, `/import/`, `/search/`, `/settings/`, `/log/`, `/welcome/`, `/login/`, `/link-watch/`).
   - Strict typed PostgREST mock engine (`mock-backend.ts`).
   - Pure React 19 active workout hook (`use-active-workout.ts`) and cascading-render-free workout manager (`use-workout.ts`).
@@ -20,38 +23,36 @@ Current Status: Phase 1 (Baseline Quality & Toolchain Health) Completed & Indepe
   - Workout finish flow hooked to ecosystem sync (`IronLogEcosystemSync.onWorkoutCompleted`).
   - Offline local storage table cache with query filtering and atomic volume calculations.
 - **Tested:**
-  - **182 / 182 App Unit Tests PASS** across 23 test suites (`tests/*.test.ts`).
+  - **186 / 186 App Unit Tests PASS (100%)** across 24 test suites (`tests/*.test.ts`), including `tests/set-mutation-safety.test.ts`.
   - **16 / 16 Wear OS Unit Tests PASS** (`watch/tests/*.test.ts`).
   - **App TypeScript (`npm run typecheck`): 0 errors**.
   - **Wear OS TypeScript (`cd watch && npm run typecheck`): 0 errors**.
   - **ESLint (`npm run lint`): 0 errors, 0 warnings**.
-  - **Next.js Production Build (`npm run build`): 16/16 static pages exported in 1984ms**.
-- **Device-Verified (Samsung Galaxy Z Fold8 `SM-F976U`):**
-  - Finished workout closes and appears in Recent Workouts with non-zero duration/timestamp.
-  - Active workout bar disappears after finish; active workout never reopens on tab navigation (`/progress/`, `/more/`, `/`).
-  - Discard escape hatch operates cleanly with confirmation dialog.
-  - Stale workout from previous day never auto-resurrects.
+  - **Next.js Production Build (`npm run build`): 16/16 static pages exported in 1817ms**.
+  - **Android Build (`cd android && ./gradlew assembleDebug`): BUILD SUCCESSFUL in 17s**.
+- **Device Verification State:**
+  - Android debug APK assembled and ready.
+  - Previous live checks on Galaxy Z Fold8 verified atomic finish, discard escape hatch, and stale session suppression.
+  - Galaxy Z Fold8 wireless ADB at `192.168.1.185:5555` is currently offline/sleeping; device test gate ready to run upon wake/reconnect.
 - **Release-Ready:**
-  - Codebase baseline quality gates are fully green. Next step is Phase 2 (Workout Lifecycle & Mutation Safety Hardening) and Phase 3 (Bujo Ecosystem Bridge Live Verification).
+  - Phase 1 and Phase 2 gates are green. Ready for Phase 3 (Bujo Ecosystem Bridge Live Verification).
 
 ---
 
 ## 2. Outstanding Risks & Next Priorities
 
-1. **Phase 2 (P0/P1): Core Workout Lifecycle & Mutation Safety Hardening:**
-   - Add rapid-tap set debouncing in `set-row.tsx` / `workout-screen.tsx`.
-   - Implement and verify process-death recovery on Fold8.
-2. **Phase 3 (P2.33): Bujo Ecosystem Bridge Live Verification:**
+1. **Phase 3 (P2.33): Bujo Ecosystem Bridge Live Verification:**
    - Verify two-app IPC with Bujo Tasks and Braindump on Galaxy Z Fold8.
-3. **Phase 4 (P1): Foldable Interaction & Layout Polish:**
+   - Test `IronLogContentProvider` query/insert from Bujo Tasks client.
+2. **Phase 4 (P1): Foldable Interaction & Layout Polish:**
    - Dual-pane layout on Fold8 unfolded; touch target and keyboard clearance on cover screen.
-4. **Phase 5 (P1.25): Wear OS Companion Verification & Sync:**
+3. **Phase 5 (P1.25): Wear OS Companion Verification & Sync:**
    - Pairing handshake, real-time set logging, and offline queue synchronization.
 
 ---
 
 ## 3. Recommended Next Phase
 
-**Phase 2: Core Workout Lifecycle & Mutation Safety Hardening (P0 / P1)**
-- Debounce set completion taps to prevent double sets under rapid/sweaty tapping.
-- Implement explicit process death / background termination recovery with accurate elapsed timers.
+**Phase 3: Bujo Ecosystem Bridge Live Verification (P2.33)**
+- Verify ContentProvider queries and updates between IronLog, Bujo Tasks, and Braindump under signature permission.
+- Ensure fallback to standalone mock operation when Bujo Tasks is absent.
