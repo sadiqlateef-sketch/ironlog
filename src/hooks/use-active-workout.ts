@@ -16,11 +16,16 @@ let checkedServer = false;
  * server, to catch a workout started on the watch.
  */
 export function useActiveWorkout(): ActiveWorkout | undefined {
-  if (last?.session && (isSessionCompleted(last.session) || !isToday(last.session.start_time))) {
-    last = undefined;
-  }
-  const [workout, setWorkout] = useState(last);
+  const [workout, setWorkout] = useState(() => {
+    if (last?.session && (isSessionCompleted(last.session) || !isToday(last.session.start_time))) {
+      return undefined;
+    }
+    return last;
+  });
   useEffect(() => {
+    if (last?.session && (isSessionCompleted(last.session) || !isToday(last.session.start_time))) {
+      last = undefined;
+    }
     let alive = true;
     const read = () =>
       peekActiveWorkout()

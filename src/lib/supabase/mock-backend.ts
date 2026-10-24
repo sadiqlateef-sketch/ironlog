@@ -825,14 +825,14 @@ const DEFAULT_ROUTINE_EXERCISES = [
   },
 ];
 
-function parseFilterVal(val: string): any {
+function parseFilterVal(val: string): unknown {
   if (val === "null") return null;
   if (val === "true") return true;
   if (val === "false") return false;
   return val;
 }
 
-function evaluateFilter(row: any, key: string, paramValue: string): boolean {
+function evaluateFilter(row: Record<string, unknown>, key: string, paramValue: string): boolean {
   if (key === "select" || key === "order" || key === "limit" || key === "offset") return true;
 
   if (paramValue === "not.is.null") {
@@ -886,7 +886,7 @@ function evaluateFilter(row: any, key: string, paramValue: string): boolean {
   return true;
 }
 
-function applyQuery(items: any[], url: URL): any[] {
+function applyQuery<T extends Record<string, unknown>>(items: T[], url: URL): T[] {
   let matched = items.filter((item) => {
     for (const [k, v] of url.searchParams.entries()) {
       if (!evaluateFilter(item, k, v)) return false;
@@ -901,8 +901,8 @@ function applyQuery(items: any[], url: URL): any[] {
       for (const part of parts) {
         const [field, dir] = part.trim().split(".");
         const desc = dir === "desc";
-        const av = a[field];
-        const bv = b[field];
+        const av = a[field] as string | number | null | undefined;
+        const bv = b[field] as string | number | null | undefined;
         if (av === bv) continue;
         if (av == null) return desc ? 1 : -1;
         if (bv == null) return desc ? -1 : 1;
@@ -922,7 +922,21 @@ function applyQuery(items: any[], url: URL): any[] {
 }
 
 function recalculateSessionVolume(sessionId: string): number {
-  const sets = getStored<any[]>("ironlog_table_workout_sets", []);
+  interface MockSetRow {
+    session_id?: string;
+    is_completed?: boolean;
+    completed_at?: string | null;
+    set_type?: string;
+    weight?: number;
+    reps?: number;
+    [k: string]: unknown;
+  }
+  interface MockSessionRow {
+    id?: string;
+    volume?: number;
+    [k: string]: unknown;
+  }
+  const sets = getStored<MockSetRow[]>("ironlog_table_workout_sets", []);
   const sessionSets = sets.filter(
     (s) => s.session_id === sessionId && (s.is_completed || s.completed_at) && s.set_type !== "warmup"
   );
@@ -930,7 +944,7 @@ function recalculateSessionVolume(sessionId: string): number {
     (sum, s) => sum + (Number(s.weight) || 0) * (Number(s.reps) || 0),
     0
   );
-  const sessions = getStored<any[]>("ironlog_table_workout_sessions", []);
+  const sessions = getStored<MockSessionRow[]>("ironlog_table_workout_sessions", []);
   const idx = sessions.findIndex((s) => s.id === sessionId);
   if (idx >= 0) {
     sessions[idx] = { ...sessions[idx], volume };
@@ -1061,24 +1075,24 @@ export async function handleMockRequest(
     const all = [...DEFAULT_EXERCISES, ...custom];
 
     if (method === "POST") {
-      let body: any = {};
+      let body: Record<string, unknown> = {};
       try {
         body = JSON.parse(typeof init?.body === "string" ? init.body : new TextDecoder().decode(init?.body as BufferSource));
       } catch {
         // ignore
       }
       const newEx = {
-        id: body.id || `custom-${Date.now()}`,
-        name: body.name || "Custom Exercise",
-        slug: body.slug || "custom-exercise",
-        primary_muscle: body.primary_muscle || "chest",
-        secondary_muscles: body.secondary_muscles || [],
-        equipment: body.equipment || "barbell",
-        mechanic: body.mechanic || "compound",
-        aliases: body.aliases || [],
-        image_urls: body.image_urls || [],
-        instructions: body.instructions || "",
-        tracking: body.tracking || "weight_reps",
+        id: (body.id as string) || `custom-${Date.now()}`,
+        name: (body.name as string) || "Custom Exercise",
+        slug: (body.slug as string) || "custom-exercise",
+        primary_muscle: (body.primary_muscle as string) || "chest",
+        secondary_muscles: (body.secondary_muscles as string[]) || [],
+        equipment: (body.equipment as string) || "barbell",
+        mechanic: (body.mechanic as string) || "compound",
+        aliases: (body.aliases as string[]) || [],
+        image_urls: (body.image_urls as string[]) || [],
+        instructions: (body.instructions as string) || "",
+        tracking: (body.tracking as string) || "weight_reps",
         unilateral: !!body.unilateral,
         created_by: USER_ID,
         created_at: new Date().toISOString(),
@@ -1108,16 +1122,16 @@ export async function handleMockRequest(
     const exMap = new Map(exercises.map((e) => [e.id, e]));
 
     if (method === "POST" || method === "PUT") {
-      let body: any = {};
+      let body: Record<string, unknown> | Record<string, unknown>[] = {};
       try {
         body = JSON.parse(typeof init?.body === "string" ? init.body : new TextDecoder().decode(init?.body as BufferSource));
       } catch {
         // ignore
       }
       const items = Array.isArray(body) ? body : [body];
-      const merged = [...routines];
+      const merged = [...routines] as Array<Record<string, unknown>>;
       for (const item of items) {
-        const id = item.id || `routine-${Date.now()}`;
+        const id = (item.id as string) || `routine-${Date.now()}`;
         const idx = merged.findIndex((r) => r.id === id);
         const row = { ...item, id, updated_at: new Date().toISOString() };
         if (idx >= 0) merged[idx] = row;
@@ -1131,12 +1145,12 @@ export async function handleMockRequest(
       });
     }
 
-    const routinesWithExercises = routines.map((r: any) => {
-      const reList = routineExercises
-        .filter((re: any) => re.routine_id === r.id)
-        .sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
-        .map((re: any) => {
-          const ex = exMap.get(re.exercise_id);
+    const routinesWithExercises = routines.map((r: { id?: string; [k: string]: unknown }) => {
+      const reList = (routineExercises as Array<{ routine_id?: string; position?: number; exercise_id?: string; [k: string]: unknown }>)
+        .filter((re) => re.routine_id === r.id)
+        .sort((a, b) => (a.position || 0) - (b.position || 0))
+        .map((re) => {
+          const ex = re.exercise_id ? exMap.get(re.exercise_id) : undefined;
           return {
             ...re,
             exercises: ex
@@ -1176,16 +1190,16 @@ export async function handleMockRequest(
   if (path.includes("/rest/v1/routine_exercises")) {
     const routineExercises = getStored("ironlog_routine_exercises", DEFAULT_ROUTINE_EXERCISES);
     if (method === "POST" || method === "PUT") {
-      let body: any = {};
+      let body: Record<string, unknown> | Record<string, unknown>[] = {};
       try {
         body = JSON.parse(typeof init?.body === "string" ? init.body : new TextDecoder().decode(init?.body as BufferSource));
       } catch {
         // ignore
       }
       const items = Array.isArray(body) ? body : [body];
-      const merged = [...routineExercises];
+      const merged = [...routineExercises] as Array<Record<string, unknown>>;
       for (const item of items) {
-        const id = item.id || `re-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const id = (item.id as string) || `re-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const idx = merged.findIndex((r) => r.id === id);
         const row = { ...item, id, updated_at: new Date().toISOString() };
         if (idx >= 0) merged[idx] = row;
@@ -1249,10 +1263,12 @@ export async function handleMockRequest(
         exId = parsed.p_exercise_id;
       } catch {}
     }
-    const sessions = getStored<any[]>("ironlog_table_workout_sessions", [])
+    interface PerfSession { id: string; end_time?: string | null; start_time: string; [k: string]: unknown }
+    interface PerfSet { session_id?: string; exercise_id?: string; is_completed?: boolean; completed_at?: string | null; exercise_order?: number; set_number?: number; [k: string]: unknown }
+    const sessions = getStored<PerfSession[]>("ironlog_table_workout_sessions", [])
       .filter((s) => s.end_time != null)
       .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
-    const allSets = getStored<any[]>("ironlog_table_workout_sets", []);
+    const allSets = getStored<PerfSet[]>("ironlog_table_workout_sets", []);
     for (const sess of sessions) {
       const matchSets = allSets.filter(
         (s) => s.session_id === sess.id && s.exercise_id === exId && (s.is_completed || s.completed_at)
@@ -1272,7 +1288,8 @@ export async function handleMockRequest(
   }
 
   if (path.includes("/rest/v1/rpc/get_logged_exercises")) {
-    const allSets = getStored<any[]>("ironlog_table_workout_sets", []);
+    interface LoggedExSet { exercise_id?: string; is_completed?: boolean; completed_at?: string | null; [k: string]: unknown }
+    const allSets = getStored<LoggedExSet[]>("ironlog_table_workout_sets", []);
     const completed = allSets.filter((s) => s.is_completed || s.completed_at);
     const exIds = [...new Set(completed.map((s) => s.exercise_id))];
     return new Response(JSON.stringify(exIds.map((exercise_id) => ({ exercise_id }))), {
@@ -1291,10 +1308,10 @@ export async function handleMockRequest(
       });
     }
     const storageKey = `ironlog_table_${rawTable}`;
-    let items = getStored<any[]>(storageKey, []);
+    const items = getStored<Record<string, unknown>[]>(storageKey, []);
 
     if (method === "POST" || method === "PUT") {
-      let body: any = {};
+      let body: Record<string, unknown> | Record<string, unknown>[] = {};
       try {
         body = JSON.parse(typeof init?.body === "string" ? init.body : new TextDecoder().decode(init?.body as BufferSource));
       } catch {
@@ -1303,7 +1320,7 @@ export async function handleMockRequest(
       const incoming = Array.isArray(body) ? body : [body];
       const merged = [...items];
       for (const item of incoming) {
-        const id = item.id || `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const id = (item.id as string) || `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const idx = merged.findIndex((r) => r.id === id);
         const row = { ...item, id, updated_at: new Date().toISOString() };
         if (idx >= 0) merged[idx] = { ...merged[idx], ...row };
@@ -1313,7 +1330,7 @@ export async function handleMockRequest(
 
       if (rawTable === "workout_sets") {
         for (const item of incoming) {
-          if (item.session_id) recalculateSessionVolume(item.session_id);
+          if (item.session_id) recalculateSessionVolume(item.session_id as string);
         }
       }
 
@@ -1325,14 +1342,14 @@ export async function handleMockRequest(
     }
 
     if (method === "PATCH") {
-      let patch: any = {};
+      let patch: Record<string, unknown> = {};
       try {
         patch = JSON.parse(typeof init?.body === "string" ? init.body : new TextDecoder().decode(init?.body as BufferSource));
       } catch {
         // ignore
       }
 
-      const updatedRows: any[] = [];
+      const updatedRows: Record<string, unknown>[] = [];
       const updatedAll = items.map((item) => {
         let matches = true;
         for (const [k, v] of url.searchParams.entries()) {
@@ -1354,12 +1371,12 @@ export async function handleMockRequest(
       if (rawTable === "workout_sessions") {
         for (const row of updatedRows) {
           if (row.end_time && row.volume == null) {
-            recalculateSessionVolume(row.id);
+            recalculateSessionVolume(row.id as string);
           }
         }
       } else if (rawTable === "workout_sets") {
         for (const row of updatedRows) {
-          if (row.session_id) recalculateSessionVolume(row.session_id);
+          if (row.session_id) recalculateSessionVolume(row.session_id as string);
         }
       }
 
@@ -1371,7 +1388,7 @@ export async function handleMockRequest(
     }
 
     if (method === "DELETE") {
-      const deletedRows: any[] = [];
+      const deletedRows: Record<string, unknown>[] = [];
       const remainingRows = items.filter((item) => {
         let matches = true;
         for (const [k, v] of url.searchParams.entries()) {
@@ -1390,13 +1407,13 @@ export async function handleMockRequest(
       setStored(storageKey, remainingRows);
 
       if (rawTable === "workout_sessions") {
-        const deletedIds = new Set(deletedRows.map((r) => r.id));
-        const sets = getStored<any[]>("ironlog_table_workout_sets", []);
-        const remainingSets = sets.filter((s) => !deletedIds.has(s.session_id));
+        const deletedIds = new Set(deletedRows.map((r) => r.id as string));
+        const sets = getStored<Array<{ session_id?: string; [k: string]: unknown }>>("ironlog_table_workout_sets", []);
+        const remainingSets = sets.filter((s) => !deletedIds.has(s.session_id as string));
         setStored("ironlog_table_workout_sets", remainingSets);
       } else if (rawTable === "workout_sets") {
         for (const row of deletedRows) {
-          if (row.session_id) recalculateSessionVolume(row.session_id);
+          if (typeof row.session_id === "string") recalculateSessionVolume(row.session_id);
         }
       }
 

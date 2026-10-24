@@ -6,8 +6,9 @@
 // back online. Inserts use ids made on the phone and are sent as
 // "insert unless it's already there", so a retry never makes duplicates.
 
-import { getSupabase } from "@/lib/supabase/client";
-import { kvGet, kvSet } from "@/lib/offline/kv";
+import { getSupabase } from "../supabase/client.ts";
+import { kvGet, kvSet } from "./kv.ts";
+import type { Database } from "../../types/database.ts";
 
 type Table = "workout_sessions" | "workout_sets";
 type Row = Record<string, unknown>;
@@ -124,15 +125,20 @@ async function sendOnce(op: Op): Promise<void> {
       return check(await db.from(op.table).update(op.patch as any).in("id", op.ids));
     case "delete":
       return check(await db.from(op.table).delete().in("id", op.ids));
-    case "finish":
+    case "finish": {
       check(await db.from("workout_sets").delete().eq("session_id", op.sessionId).eq("is_completed", false));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const patch = {
+        end_time: op.endTime,
+        ...(op.volume != null ? { volume: op.volume } : {}),
+      };
       return check(
-        await (db.from("workout_sessions") as any).update({
-          end_time: op.endTime,
-          ...(op.volume != null ? { volume: op.volume } : {}),
-        }).eq("id", op.sessionId).is("end_time", null)
+        await db
+          .from("workout_sessions")
+          .update(patch as unknown as Database["public"]["Tables"]["workout_sessions"]["Update"])
+          .eq("id", op.sessionId)
+          .is("end_time", null)
       );
+    }
     case "adjust": {
       const { error } = await db.functions.invoke("suggest-adjustments", { body: { session_id: op.sessionId } });
       // Suggestions are a bonus: only "no signal" is worth retrying.

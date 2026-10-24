@@ -290,7 +290,15 @@ export function useWorkout() {
   );
 
   useEffect(() => {
-    if (profile) load();
+    let ignore = false;
+    if (profile) {
+      void Promise.resolve().then(() => {
+        if (!ignore) load();
+      });
+    }
+    return () => {
+      ignore = true;
+    };
   }, [profile, load]);
 
   // The server refused a change made offline: show the workout as it really is.
@@ -432,7 +440,7 @@ export function useWorkout() {
       fail(e);
       return null;
     }
-  }, [session, profile, restTimer, fail, setBlocks]);
+  }, [session, profile, restTimer, fail, setBlocks, unit]);
 
   const resumeStale = useCallback(async () => {
     if (!staleSession) return;

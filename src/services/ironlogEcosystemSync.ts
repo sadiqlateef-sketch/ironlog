@@ -11,6 +11,39 @@ export interface CompletedWorkoutSummary {
   prsHit: string[];
 }
 
+interface IronLogEcosystemPlugin {
+  upsertWorkoutRecord?: (summary: CompletedWorkoutSummary) => Promise<void>;
+  completeBujoWorkoutAndWaterOak?: (data: {
+    date: string;
+    workoutTitle: string;
+    durationMinutes: number;
+    totalVolumeLb: number;
+    strain: number;
+    treeSpecies: string;
+    treeName: string;
+  }) => Promise<void>;
+  pushWorkoutContextToBraindump?: (data: { date: string; summaryText: string }) => Promise<void>;
+  syncRecoveryState?: (data: {
+    date: string;
+    recoveryScore: number;
+    dailyStrain: number;
+    recommendRestToken: boolean;
+  }) => Promise<void>;
+  queryBudgetFitnessSpend?: () => Promise<{ monthlyGymAndSupplements?: number }>;
+}
+
+function getEcosystemPlugin(): IronLogEcosystemPlugin | undefined {
+  if (typeof window === "undefined") return undefined;
+  const win = window as unknown as {
+    Capacitor?: {
+      Plugins?: {
+        IronLogEcosystem?: IronLogEcosystemPlugin;
+      };
+    };
+  };
+  return win.Capacitor?.Plugins?.IronLogEcosystem;
+}
+
 export const IronLogEcosystemSync = {
   /**
    * 1. IronLog -> Bujo Tasks + The Grove + Braindump:
@@ -21,7 +54,7 @@ export const IronLogEcosystemSync = {
    * - Sends PR & Volume summary to Braindump for evening reflection
    */
   async onWorkoutCompleted(summary: CompletedWorkoutSummary, todayIso: string) {
-    const plugin = (window as any).Capacitor?.Plugins?.IronLogEcosystem;
+    const plugin = getEcosystemPlugin();
     if (!plugin) return;
 
     // A. Mirror workout to native IronLogContentProvider
@@ -54,7 +87,7 @@ export const IronLogEcosystemSync = {
    * If Daily Strain >= 85 or Recovery < 35%, notify Bujo Tasks to protect recovery.
    */
   async syncRecoveryToBujo(recoveryScore: number, dailyStrain: number, todayIso: string) {
-    const plugin = (window as any).Capacitor?.Plugins?.IronLogEcosystem;
+    const plugin = getEcosystemPlugin();
     if (!plugin?.syncRecoveryState) return;
     await plugin.syncRecoveryState({
       date: todayIso,
@@ -70,7 +103,7 @@ export const IronLogEcosystemSync = {
    * a 90-minute post-workout fast-food impulse guard in Budget.
    */
   async syncFitnessROIWithBudget(workoutsThisMonth: number, totalTonnageThisMonth: number) {
-    const plugin = (window as any).Capacitor?.Plugins?.IronLogEcosystem;
+    const plugin = getEcosystemPlugin();
     if (!plugin?.queryBudgetFitnessSpend) return null;
     const { monthlyGymAndSupplements = 0 } = await plugin.queryBudgetFitnessSpend();
     const costPerWorkout = workoutsThisMonth > 0 ? monthlyGymAndSupplements / workoutsThisMonth : monthlyGymAndSupplements;

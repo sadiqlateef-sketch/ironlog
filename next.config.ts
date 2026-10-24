@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   // talks to Supabase from the browser. Secret work (the Claude API key in
   // Phase 4) lives in Supabase Edge Functions, never in this app.
   output: "export",
+  experimental: { agentUpgrade: "security" },
   images: { unoptimized: true },
   trailingSlash: true,
   turbopack: {

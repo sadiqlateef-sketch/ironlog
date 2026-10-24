@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
-import { handleMockRequest } from "./mock-backend";
+import type { Database } from "../../types/database.ts";
+import { handleMockRequest } from "./mock-backend.ts";
 
 let client: SupabaseClient<Database> | undefined;
 

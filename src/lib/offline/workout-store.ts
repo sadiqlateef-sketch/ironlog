@@ -4,11 +4,11 @@
 // sent straight away when there's signal. While anything is still waiting,
 // the local copy is the truth; once everything has synced, the server is.
 
-import { getSupabase } from "@/lib/supabase/client";
-import { kvGet, kvSet } from "@/lib/offline/kv";
-import { enqueue, flush, hasPending, isNetworkError, type Op } from "@/lib/offline/queue";
-import type { Database } from "@/types/database";
-import type { WorkoutSession, WorkoutSet } from "@/lib/workout-api";
+import { getSupabase } from "../supabase/client.ts";
+import { kvGet, kvSet } from "./kv.ts";
+import { enqueue, flush, hasPending, isNetworkError, type Op } from "./queue.ts";
+import type { Database } from "../../types/database.ts";
+import type { WorkoutSession, WorkoutSet } from "../workout-api.ts";
 
 type SetInsert = Database["public"]["Tables"]["workout_sets"]["Insert"];
 type SetUpdate = Database["public"]["Tables"]["workout_sets"]["Update"];
@@ -82,7 +82,7 @@ export function isToday(isoDateString: string | null | undefined): boolean {
 
 export function isSessionCompleted(session: WorkoutSession | null | undefined): boolean {
   if (!session) return false;
-  return session.end_time != null || (session as any).completed_at != null;
+  return session.end_time != null || ("completed_at" in session && (session as { completed_at?: unknown }).completed_at != null);
 }
 
 // ---------- Reading ----------
@@ -295,8 +295,8 @@ export async function finishSession(session: WorkoutSession): Promise<{ synced: 
       const sessKey = "ironlog_table_workout_sessions";
       const raw = window.localStorage.getItem(sessKey);
       if (raw) {
-        const list = JSON.parse(raw);
-        const idx = list.findIndex((s: any) => s.id === session.id);
+        const list = JSON.parse(raw) as Array<{ id?: string; [key: string]: unknown }>;
+        const idx = list.findIndex((s) => s.id === session.id);
         if (idx >= 0) {
           list[idx] = { ...list[idx], end_time: endTime, volume, updated_at: endTime };
           window.localStorage.setItem(sessKey, JSON.stringify(list));
@@ -305,8 +305,8 @@ export async function finishSession(session: WorkoutSession): Promise<{ synced: 
       const setsKey = "ironlog_table_workout_sets";
       const rawSets = window.localStorage.getItem(setsKey);
       if (rawSets) {
-        const setsList = JSON.parse(rawSets);
-        const kept = setsList.filter((s: any) => !(s.session_id === session.id && !s.is_completed));
+        const setsList = JSON.parse(rawSets) as Array<{ session_id?: string; is_completed?: boolean }>;
+        const kept = setsList.filter((s) => !(s.session_id === session.id && !s.is_completed));
         window.localStorage.setItem(setsKey, JSON.stringify(kept));
       }
     } catch {}
@@ -327,13 +327,13 @@ export async function discardSession(sessionId: string): Promise<void> {
       const sessKey = "ironlog_table_workout_sessions";
       const raw = window.localStorage.getItem(sessKey);
       if (raw) {
-        const list = JSON.parse(raw).filter((s: any) => s.id !== sessionId);
+        const list = (JSON.parse(raw) as Array<{ id?: string }>).filter((s) => s.id !== sessionId);
         window.localStorage.setItem(sessKey, JSON.stringify(list));
       }
       const setsKey = "ironlog_table_workout_sets";
       const rawSets = window.localStorage.getItem(setsKey);
       if (rawSets) {
-        const list = JSON.parse(rawSets).filter((s: any) => s.session_id !== sessionId);
+        const list = (JSON.parse(rawSets) as Array<{ session_id?: string }>).filter((s) => s.session_id !== sessionId);
         window.localStorage.setItem(setsKey, JSON.stringify(list));
       }
     } catch {}

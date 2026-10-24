@@ -15,16 +15,16 @@ test("isToday correctly identifies today vs previous days", () => {
 });
 
 test("isSessionCompleted identifies completed workouts", () => {
-  assert.equal(isSessionCompleted({ end_time: "2026-10-23T01:00:00Z" } as any), true);
-  assert.equal(isSessionCompleted({ end_time: null, completed_at: "2026-10-23T01:00:00Z" } as any), true);
-  assert.equal(isSessionCompleted({ end_time: null } as any), false);
+  assert.equal(isSessionCompleted({ end_time: "2026-10-23T01:00:00Z" } as unknown as Parameters<typeof isSessionCompleted>[0]), true);
+  assert.equal(isSessionCompleted({ end_time: null, completed_at: "2026-10-23T01:00:00Z" } as unknown as Parameters<typeof isSessionCompleted>[0]), true);
+  assert.equal(isSessionCompleted({ end_time: null } as unknown as Parameters<typeof isSessionCompleted>[0]), false);
   assert.equal(isSessionCompleted(null), false);
 });
 
 test("mock backend filters workout_sessions by end_time and handles PATCH and DELETE", async () => {
   // Setup a mock storage environment
   const mockStorage: Record<string, string> = {};
-  (globalThis as any).window = {
+  (globalThis as unknown as { window: unknown }).window = {
     localStorage: {
       getItem: (k: string) => mockStorage[k] ?? null,
       setItem: (k: string, v: string) => { mockStorage[k] = v; },
