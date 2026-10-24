@@ -108,3 +108,24 @@ This is an append-only log of approved and verified implementation phases.
   - Android Build: `cd android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 21s**.
   - Wear OS TypeScript & Tests: `cd watch && npm run typecheck && npm test` → **0 errors, 16/16 PASS**.
 - **Master Verification Decision:** **APPROVED** — Foldable dual-pane layout and cover screen ergonomics verified. Ready for Phase 5.
+
+---
+
+## Phase 5: Wear OS Companion Verification & Sync (P1.25, P2.26)
+- **Date:** 2026-10-24
+- **Objective:** Verify Wear OS companion architecture, secure out-of-band pairing protocol, real-time concurrent set completion between phone and watch, CAS guard race protection on session finish, and offline queue FIFO drain resilience.
+- **Files Changed:**
+  - `watch/tests/sync-contract.test.ts` (new automated test suite verifying: pairing code format, constant-time secret check, atomic token consumption / replay protection, concurrent set logging across phone and watch, monotonic set numbering with UUID stability, workout finish CAS guard `.is("end_time", null)`, and FIFO offline queue draining with transient 503 error resilience).
+  - `tests/watch-companion-contract.test.ts` (new root automated test suite verifying: voice set parsing parity between `src/lib/voice-set.ts` and `watch/src/voiceSet.ts`, 6-digit pairing code validation, rate-limiting with 10-attempt threshold per window, and concurrent session finish idempotency).
+  - `watch/android/local.properties` (configured Android SDK path for local Gradle builds).
+- **Independent Verification Outcomes:**
+  - Root App Unit Tests: `npm test` → **199/199 PASS (100%)** across 27 test suites.
+  - Wear OS Unit Tests: `cd watch && npm test` → **22/22 PASS (100%)** across 2 test suites.
+  - Root App Lint: `npm run lint` → **0 errors, 0 warnings**.
+  - Root App TypeScript: `npm run typecheck` → **0 errors**.
+  - Wear OS TypeScript: `cd watch && npm run typecheck` → **0 errors**.
+  - Root App Production Build: `npm run build` → **16/16 static pages generated in 17.7s**, clean export.
+  - Capacitor Android Sync: `npx cap sync android` → **Successful asset sync**.
+  - Mobile Android Build: `cd android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 20s** (`android/app/build/outputs/apk/debug/app-debug.apk`).
+  - Wear OS Android Build: `cd watch/android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 3m 53s** (`watch/android/app/build/outputs/apk/debug/app-debug.apk`).
+- **Master Verification Decision:** **APPROVED** — Wear OS synchronization contract, pairing handshake, concurrent set execution, and companion APK builds fully verified and green.

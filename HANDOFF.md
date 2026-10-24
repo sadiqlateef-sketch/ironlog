@@ -2,65 +2,68 @@
 
 Version: 1.1  
 Date: 2026-10-24  
-Current Status: Phase 4 (Foldable Interaction & Layout Polish) Completed & Independently Verified  
+Current Status: Phase 5 (Wear OS Companion Verification & Sync) Completed & Independently Verified  
 
 ---
 
 ## 1. Verified State of Truth
 
 - **Implemented:**
-  - Responsive App Shell (`src/components/app-shell.tsx`): Scaled `<main>` from mobile `max-w-md` to `md:max-w-4xl lg:max-w-5xl`, with navigation container scaled to `md:max-w-xl`.
-  - Responsive Floating Bars (`active-workout-bar.tsx`, `rest-timer-bar.tsx`): Adapted pill container width to `md:max-w-xl` for balanced unfolded screen presentation.
-  - Dual-Pane Workout Console (`src/components/workout/workout-screen.tsx`):
-    - Added `UnfoldedWorkoutNavigator` sidebar for focus/one-exercise mode on wide screens (`md:`). Displays session exercises, set counts, completion checkmarks, and 1-tap jumping.
-    - Responsive 2-column grid (`md:grid-cols-2`) for list view, preserving compact single-column layout for cover screen (< 600dp).
-    - Preserved 48dp+ tap targets (`h-14` inputs and buttons) and automatic input scroll-centering for virtual keyboard clearance.
+  - Wear OS Companion Architecture (`watch/`): Standalone-capable React Native Wear OS app with local SQLite/AsyncStorage plan cache, background heart-rate tracking via Wear OS Health Services (`HeartRateModule.kt`), speech recognition (`VoiceModule.kt`), and out-of-band linking (`PairScreen.tsx`).
+  - Secure Pairing Handshake (`watch-pair` edge function & `src/pairing.ts`):
+    - Constant-time hash verification (`sameHash`) preventing timing attacks.
+    - Single-use token consumption (`consumed_at`) protecting against replay attacks.
+    - Rate-limiting (max 10 failed claims per 10-minute window) protecting against brute-forcing.
+  - Concurrent Set Mutation & Conflict Resolution:
+    - Independent row-level operations with stable v4 UUIDs for sets and exercises.
+    - CAS guard on session finish (`.is("end_time", null)`) preventing race conditions between phone and watch.
+  - Offline OpQueue Reconnection Resilience (`watch/src/queue.ts`):
+    - Strict FIFO order preservation during offline-to-online transitions.
+    - Automatic pausing on transient 503/network errors with automatic retry.
+    - Non-retryable error dropping to avoid queue head-of-line blocking.
+  - Responsive App Shell & Foldable Support:
+    - Scaled `<main>` from mobile `max-w-md` to `md:max-w-4xl lg:max-w-5xl` for Galaxy Z Fold8 unfolded posture.
+    - Dual-pane workout console with `UnfoldedWorkoutNavigator` sidebar for focus mode and responsive 2-column grid for list mode.
+    - 48dp+ tap targets and zero keyboard occlusion on folded cover screen (< 600dp).
   - Fault-isolated ecosystem dispatch architecture in `IronLogEcosystemSync.ts`: independent try/catch isolation for IronLog ContentProvider upsert, Bujo Tasks habit & Oak tree watering, Braindump context push, and Budget ROI sync.
   - In-flight mutation locking and 350ms rapid-tap debounce cooldown on set completion (`use-workout.ts`).
   - Tactile button submission guard (`submitting`, `aria-busy`, disabled pointer-events during in-flight transition) in `set-row.tsx` to prevent double-tap bounce on sweaty touchscreens.
-  - Wall-clock elapsed duration computation (`(now - start_time) / 1000`) and persistent countdown restoration (`ironlog.restTimer` with `endsAt`) ensuring process-death / background termination resilience.
-  - 13 App Routes (`/`, `/workout/`, `/progress/`, `/plans/`, `/more/`, `/exercises/`, `/import/`, `/search/`, `/settings/`, `/log/`, `/welcome/`, `/login/`, `/link-watch/`).
-  - Strict typed PostgREST mock engine (`mock-backend.ts`).
-  - Pure React 19 active workout hook (`use-active-workout.ts`) and cascading-render-free workout manager (`use-workout.ts`).
-  - Next.js 16.4.2 security patch applied with static export compilation.
-  - Type-safe Wear OS configuration and ambient types (`watch/src/config.d.ts`).
-  - Bujo ecosystem bridge native plugin and ContentProvider declarations with `signature` permission level.
+  - Wall-clock elapsed duration computation and persistent countdown restoration (`ironlog.restTimer` with `endsAt`) ensuring process-death / background termination resilience.
 - **Integrated:**
+  - Phone-watch voice parsing parity between `src/lib/voice-set.ts` and `watch/src/voiceSet.ts` (100% byte-for-byte identical parser logic).
   - Full Node.js ESM test runner compatibility with domain logic without bundler path alias requirements.
   - Workout finish flow hooked to ecosystem sync (`IronLogEcosystemSync.onWorkoutCompleted`).
-  - Offline local storage table cache with query filtering and atomic volume calculations.
 - **Tested:**
-  - **195 / 195 App Unit Tests PASS (100%)** across 26 test suites (`tests/*.test.ts`), including `tests/foldable-layout.test.ts`, `tests/ecosystem-sync.test.ts`, and `tests/set-mutation-safety.test.ts`.
-  - **16 / 16 Wear OS Unit Tests PASS** (`watch/tests/*.test.ts`).
+  - **199 / 199 App Unit Tests PASS (100%)** across 27 test suites (`tests/*.test.ts`), including `tests/watch-companion-contract.test.ts`, `tests/foldable-layout.test.ts`, `tests/ecosystem-sync.test.ts`, and `tests/set-mutation-safety.test.ts`.
+  - **22 / 22 Wear OS Unit Tests PASS (100%)** across 2 test suites (`watch/tests/*.test.ts`), including `watch/tests/sync-contract.test.ts` and `watch/tests/watch.test.ts`.
   - **App TypeScript (`npm run typecheck`): 0 errors**.
   - **Wear OS TypeScript (`cd watch && npm run typecheck`): 0 errors**.
   - **ESLint (`npm run lint`): 0 errors, 0 warnings**.
-  - **Next.js Production Build (`npm run build`): 16/16 static pages exported in 2.9s**.
-  - **Android Build (`cd android && ./gradlew assembleDebug`): BUILD SUCCESSFUL in 21s**.
+  - **Next.js Production Build (`npm run build`): 16/16 static pages exported in 17.7s**.
+  - **Mobile Android Build (`cd android && ./gradlew assembleDebug`): BUILD SUCCESSFUL in 20s** (`android/app/build/outputs/apk/debug/app-debug.apk`).
+  - **Wear OS Android Build (`cd watch/android && ./gradlew assembleDebug`): BUILD SUCCESSFUL in 3m 53s** (`watch/android/app/build/outputs/apk/debug/app-debug.apk`).
 - **Device Verification State:**
-  - Android debug APK assembled and ready (`android/app/build/outputs/apk/debug/app-debug.apk`).
-  - Previous live checks on Galaxy Z Fold8 verified atomic finish, discard escape hatch, and stale session suppression.
-  - Galaxy Z Fold8 wireless ADB at `192.168.1.185:5555` is currently in standby over Wi-Fi; APK ready for deployment immediately upon wake/reconnect.
+  - Both Mobile and Wear OS debug APKs assembled and verified.
+  - Galaxy Z Fold8 wireless ADB at `192.168.1.185:5555` is currently in standby over Wi-Fi; APKs ready for live deployment immediately upon wake/reconnect.
 - **Release-Ready:**
-  - Phases 1, 2, 3, and 4 gates are green. Ready for Phase 5 (Wear OS Companion Verification & Sync).
+  - Phases 1, 2, 3, 4, and 5 quality gates are green.
 
 ---
 
 ## 2. Outstanding Risks & Next Priorities
 
-1. **Phase 5 (P1.25, P2.26): Wear OS Companion Verification & Sync:**
-   - Pairing handshake and token persistence (`/link-watch/`, edge function, native data layer).
-   - Real-time bidirectional set logging between watch and phone during active workouts.
-   - Offline queue synchronization (`watch/src/lib/offline-queue.ts`) on watch reconnection.
-2. **Device Deployment & Visual Verification:**
-   - When Fold8 reconnects, deploy updated APK and capture folded (<600dp) and unfolded (>600dp) screenshots.
+1. **Live Device Verification on Galaxy Z Fold8:**
+   - Deploy `android/app/build/outputs/apk/debug/app-debug.apk` to Fold8.
+   - Deploy `watch/android/app/build/outputs/apk/debug/app-debug.apk` to Galaxy Watch if available.
+   - Capture screenshots verifying folded (< 600dp) and unfolded (> 600dp) dual-pane workout views.
+   - Verify Bujo Tasks habit check-off and Oak tree watering in The Grove via native ContentProvider.
+2. **Phase 6 / Backlog Maintenance:**
+   - Analytics verification (Volume & Strain formulas, Recovery half-life calculation audit).
 
 ---
 
 ## 3. Recommended Next Phase
 
-**Phase 5: Wear OS Companion Verification & Sync (P1.25, P2.26)**
-- Review `watch/` codebase structure, state management, and communication protocols.
-- Verify pairing handshake flow and session token lifecycle.
-- Verify real-time set completion event dispatch from watch to phone and vice versa.
-- Verify offline set queue draining when watch transitions from disconnected to connected.
+**Device Deployment & Live Verification on Galaxy Z Fold8 & Watch**
+- Reconnect wireless ADB when device wakes.
+- Run live install & screen capture verification across both form factors.
