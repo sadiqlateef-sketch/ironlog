@@ -129,3 +129,21 @@ This is an append-only log of approved and verified implementation phases.
   - Mobile Android Build: `cd android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 20s** (`android/app/build/outputs/apk/debug/app-debug.apk`).
   - Wear OS Android Build: `cd watch/android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 3m 53s** (`watch/android/app/build/outputs/apk/debug/app-debug.apk`).
 - **Master Verification Decision:** **APPROVED** — Wear OS synchronization contract, pairing handshake, concurrent set execution, and companion APK builds fully verified and green.
+
+---
+
+## Phase 6: Analytics Reliability & Trust Verification (P1.15, P2.16, P2.17)
+- **Date:** 2026-10-24
+- **Objective:** Audit and harden strength analytics, estimated 1RM formula boundaries, distinguish actual tested single-rep max from estimated max, make endurance limitations visible for high rep counts (>12 reps), verify volume and muscle breakdown accounting, and audit physiological recovery decay and cardiovascular strain saturation models.
+- **Files Changed:**
+  - `src/components/exercise-overview.tsx` (distinguished actual single-rep "Tested 1RM" from "Best est. 1RM", added endurance range indicator for sets > 12 reps).
+  - `src/components/progress/overview.tsx` (added " · tested" and " · endurance" indicators to Top 1RMs list).
+  - `tests/analytics-reliability.test.ts` (new automated test suite verifying: single-rep exact tested max vs formula convergence at 2–10 reps, boundary handling for zero/negative numbers, warmup exclusion from volume and muscle breakdowns, direct vs indirect recovery fatigue allocation with 24h/16h half-life decay, TRIMP zone weighting, and monotonic strain saturation).
+- **Independent Verification Outcomes:**
+  - Root App Unit Tests: `npm test` → **204/204 PASS (100%)** across 28 test suites.
+  - Wear OS Unit Tests: `cd watch && npm test` → **22/22 PASS (100%)** across 2 test suites.
+  - Root App Lint: `npm run lint` → **0 errors, 0 warnings**.
+  - Root App TypeScript: `npm run typecheck` → **0 errors**.
+  - Wear OS TypeScript: `cd watch && npm run typecheck` → **0 errors**.
+  - Root App Production Build: `npm run build` → **16/16 static pages generated in 3.4s**, clean export.
+- **Master Verification Decision:** **APPROVED** — Analytics calculation contracts, tested max labeling, endurance boundary limits, and recovery fatigue models independently verified with 100% test pass rate.

@@ -353,7 +353,7 @@ export function TopLiftsCard({ data }: { data: StatsData }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{ex?.name ?? "Exercise"}</span>
                     <span className="text-muted-foreground text-xs">
-                      {roundHalf(t.weight)} {u} × {t.reps}
+                      {roundHalf(t.weight)} {u} × {t.reps}{t.reps === 1 ? " · tested" : t.reps > 12 ? " · endurance" : ""}
                     </span>
                   </span>
                   <span className="text-primary-text num text-xl font-bold">
