@@ -474,23 +474,53 @@ function ActiveWorkout({
         </Button>
       )}
 
+      {/* Galaxy Z Fold8 Dual-Pane Station */}
       {focusMode && focus && (
-        <FocusView
-          block={focus}
-          set={nextSet}
-          upNext={afterName}
-          onChange={(patch) => nextSet && w.patchSet(focus.order, nextSet.id, patch)}
-          onCommit={() => nextSet && w.commitSet(focus.order, nextSet.id)}
-          effort={
-            w.effortAsk && w.effortAsk.order === focus.order
-              ? {
-                  scale: w.effortScale,
-                  onPick: (rpe) => w.effortAsk && w.setEffort(w.effortAsk.order, w.effortAsk.id, rpe),
-                  onSkip: w.dismissEffort,
-                }
-              : null
-          }
-        />
+        <div className="flex flex-col md:grid md:grid-cols-2 md:gap-6 md:items-start">
+          <div className="w-full">
+            <FocusView
+              block={focus}
+              set={nextSet}
+              upNext={afterName}
+              onChange={(patch) => nextSet && w.patchSet(focus.order, nextSet.id, patch)}
+              onCommit={() => nextSet && w.commitSet(focus.order, nextSet.id)}
+              effort={
+                w.effortAsk && w.effortAsk.order === focus.order
+                  ? {
+                      scale: w.effortScale,
+                      onPick: (rpe) => w.effortAsk && w.setEffort(w.effortAsk.order, w.effortAsk.id, rpe),
+                      onSkip: w.dismissEffort,
+                    }
+                  : null
+              }
+            />
+          </div>
+          {/* Dual-Pane Right Rail: Routine Overview & Up Next Checklist */}
+          <div className="hidden md:flex flex-col gap-3 rounded-2xl bg-card p-4 border border-border">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Session Checklist</h2>
+            <div className="flex flex-col gap-2 max-h-[calc(100vh-22rem)] overflow-y-auto pr-1">
+              {blocks.map((b) => (
+                <div
+                  key={b.order}
+                  onClick={() => jumpTo(b.order)}
+                  className={cn(
+                    "flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-colors",
+                    b.order === focus.order ? "border-primary bg-primary/10 text-primary-text font-bold" : "border-border/60 hover:bg-muted/50"
+                  )}
+                >
+                  <span className="truncate text-sm">{b.exercise.name}</span>
+                  <span className="num text-xs text-muted-foreground">
+                    {b.sets.filter((s) => s.done).length}/{b.sets.length} sets
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+              <span>Rest countdown alerts</span>
+              <span className="text-primary-text font-semibold">{prefs.sounds ? "Sound & Haptic" : "Silent"}</span>
+            </div>
+          </div>
+        </div>
       )}
 
       {!focusMode && blocks.length > 0 && (

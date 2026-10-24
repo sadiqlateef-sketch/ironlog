@@ -6,15 +6,9 @@
     <permission
         android:name="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA"
         android:protectionLevel="signature" />
-    <permission
-        android:name="com.ironlog.app.permission.READ_WRITE_DATA"
-        android:protectionLevel="signature" />
-
     <uses-permission android:name="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA" />
     <uses-permission android:name="com.sadiqlateef.braindump.permission.READ_WRITE_DATA" />
     <uses-permission android:name="com.sadiqlateef.budget.permission.READ_WRITE_DATA" />
-    <uses-permission android:name="com.ironlog.app.permission.READ_WRITE_DATA" />
-
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -109,5 +103,16 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+    
+        <!-- Rest Timer Lockscreen & Notification Interactive Actions -->
+        <receiver
+            android:name="com.ironlog.app.RestActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ironlog.app.ACTION_EXTEND_REST_30" />
+                <action android:name="com.ironlog.app.ACTION_REDUCE_REST_15" />
+                <action android:name="com.ironlog.app.ACTION_SKIP_REST" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

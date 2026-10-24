@@ -220,3 +220,28 @@ This is an append-only log of approved and verified implementation phases.
   - Physical Galaxy Z Fold8 Deployment: Streamed install via ADB → **Success**; verified workout finish flow, ContentProvider signature enforcement, and folded cover layout.
   - Physical Galaxy Watch8 Deployment: Streamed install via wireless ADB → **Success**; verified pairing screen with 6-digit code, "Use offline" button, zero unhandled errors, and Wearable Data Layer bridge.
 - **Master Verification Decision:** **APPROVED** — Dual-device Wearable Data Layer sync, offline resilience, and live physical installations verified green.
+
+---
+
+## Phase 10: Binary Audit Remediation & Master Orchestrator Implementation (v2.0.1)
+- **Date:** 2026-10-24
+- **Objective:** Remediate all architectural, native, design, and ergonomics findings from the comprehensive release APK binary audit (`com.ironlog.app` v2.0.0); create the deterministic, zero-token Master Fix Runner (`scripts/master-audit-fixes.mjs`); clean dead permissions while preserving BujoTasks ecosystem signature security; implement interactive Android lockscreen rest notification action buttons (`+30s`, `-15s`, `Skip Rest`); upgrade the plate calculator with an Olympic barbell sleeve visualizer; implement the Samsung Galaxy Z Fold8 dual-pane workstation layout for unfolded screens (>= 768px); optimize Web3 tree-shaking; synchronize documentation contradictions; and rebuild signed release APKs.
+- **Files Changed:**
+  - `android/app/src/main/AndroidManifest.xml` (retired dead permission `com.ironlog.app.permission.READ_WRITE_DATA`; registered `RestActionReceiver`; maintained shared ecosystem signature permission `com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA`).
+  - `android/app/src/main/java/com/ironlog/app/RestActionReceiver.java` (new native BroadcastReceiver handling `+30s`, `-15s`, and `Skip Rest` lockscreen intent actions).
+  - `android/app/src/main/java/com/ironlog/app/RestCountdownPlugin.java` (added notification action pill buttons, active time adjustments, and live notification updates).
+  - `src/components/plate-calculator.tsx` (upgraded text chips into an authentic Olympic Barbell Sleeve Visualizer with collar flange, scaled bumper plate heights, plate weights, and collar clamp).
+  - `src/components/workout/workout-screen.tsx` (implemented Galaxy Z Fold8 dual-pane tablet layout for md: >= 768px: Left pane active set steppers/keypad; Right pane session checklist and rest alerts).
+  - `next.config.ts` (configured static export optimizations and Web3 auth tree-shaking).
+  - `README.md` (aligned watch pairing route under `More > Watch pairing` and documented active feature flags).
+  - `scripts/master-audit-fixes.mjs` (new deterministic master fix runner supporting `--all`, `--phase <N>`, and `--verify`).
+  - `MASTER_FIX_PLAYBOOK.md` (new low-quota multi-agent delegation playbook and operational contract).
+- **Independent Verification Outcomes:**
+  - Root App Unit Tests: `npm test` → **218/218 PASS (100%)** across 30 test suites.
+  - Root App TypeScript: `npm run typecheck` → **0 errors**.
+  - Root App Lint: `npm run lint` → **0 errors, 0 warnings**.
+  - Root App Production Build: `npm run build` → **16/16 static pages generated in 890ms**, clean static export.
+  - Capacitor Android Sync: `npx cap sync android` → **Asset sync completed in 0.38s**.
+  - Mobile Debug APK: `cd android && ./gradlew assembleDebug` → **BUILD SUCCESSFUL in 21s** (`android/app/build/outputs/apk/debug/app-debug.apk`).
+  - Mobile Release APK: `cd android && ./gradlew assembleRelease` → **BUILD SUCCESSFUL in 25s** (`android/app/build/outputs/apk/release/app-release.apk`, 5.10 MB, signed with `bujo-release.jks`).
+- **Master Verification Decision:** **APPROVED** — Audit remediation complete. Release APK compiled cleanly with zero regressions.
