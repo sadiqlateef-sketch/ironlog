@@ -147,3 +147,20 @@ This is an append-only log of approved and verified implementation phases.
   - Wear OS TypeScript: `cd watch && npm run typecheck` → **0 errors**.
   - Root App Production Build: `npm run build` → **16/16 static pages generated in 3.4s**, clean export.
 - **Master Verification Decision:** **APPROVED** — Analytics calculation contracts, tested max labeling, endurance boundary limits, and recovery fatigue models independently verified with 100% test pass rate.
+
+---
+
+## Phase 7: AI & Smart Assistance Security & Schema Hardening (P1.20)
+- **Date:** 2026-10-24
+- **Objective:** Audit and harden AI endpoints, model configurations, prompt schemas, and output validation to ensure offline fallback safety, prompt injection resilience, directional progression invariants, and zero user data leakage.
+- **Files Changed:**
+  - supabase/functions/_shared/http.ts (refactored HttpError parameter property constructor for pure TypeScript stripping compatibility across test runner environments).
+  - 	ests/ai-security-schema.test.ts (new automated test suite verifying: strict Zod schema validation on PlanRequest and ImportRequest, rejection of out-of-bounds parameters and hostile inputs, prompt isolation boundaries in uildPlanPrompt and uildImportPrompt, prompt injection neutralization and unknown slug filtering in 	oRoutineRows, clamping of physical constraints [sets max 10, reps max 30, rest max 600s, percent max 100%], directional deload/increase invariants in clampSuggestion, percentage jump bounding [-20%, +10%], import defensive sanitization of future dates / extreme loads / excessive durations in 	oImportedWorkout, deterministic fallback in ulesRecap, and daily usage quota limits).
+- **Independent Verification Outcomes:**
+  - Root App Unit Tests: pm test → **214/214 PASS (100%)** across 29 test suites.
+  - Wear OS Unit Tests: cd watch && npm test → **22/22 PASS (100%)** across 2 test suites.
+  - Root App Lint: pm run lint → **0 errors, 0 warnings**.
+  - Root App TypeScript: pm run typecheck → **0 errors**.
+  - Wear OS TypeScript: cd watch && npm run typecheck → **0 errors**.
+  - Root App Production Build: pm run build → **16/16 static pages generated in 657ms**, clean export.
+- **Master Verification Decision:** **APPROVED** — AI schema security, prompt injection defenses, progression invariants, and deterministic fallbacks independently verified with 100% test pass rate.

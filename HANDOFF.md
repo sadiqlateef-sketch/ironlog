@@ -2,13 +2,23 @@
 
 Version: 1.1  
 Date: 2026-10-24  
-Current Status: Phase 6 (Analytics Reliability & Trust Verification) Completed & Independently Verified  
+Current Status: Phase 7 (AI & Smart Assistance Security & Schema Hardening) Completed & Independently Verified  
 
 ---
 
 ## 1. Verified State of Truth
 
-- **Implemented:**
+- **Implemented & Hardened:**
+  - AI Security & Schema Validation Architecture:
+    - Strict Zod validation on `PlanRequest`, `ImportRequest`, `programSchema`, `AdjustmentOutput`, and `RecapOutput`.
+    - Hostile input rejection: out-of-bounds parameters (days_per_week [2, 6], weeks [1, 16], session_minutes [30, 150], equipment max 12 items, notes max 500 chars).
+    - Prompt injection isolation: explicit boundary directives in `buildPlanPrompt` isolating user notes, and triple-quote encapsulation in `buildImportPrompt`.
+    - Hallucinated exercise protection: `toRoutineRows` validates slugs against actual verified exercise database IDs; unrecognized or hallucinated slugs are strictly dropped.
+    - Physical safety clamping: sets [1, 10], reps [1, 30], warmup sets [0, 5], rest seconds [30, 600], percent 1RM max 100%.
+    - Suggestion directional invariants in `clampSuggestion`: deloads MUST reduce load (or fall back to deterministic rule), increases MUST raise load, percentage jumps bounded to [-20%, +10%], reps only modified for `adjust_reps`, and inverted rep ranges cleared.
+    - Defensive import sanitization: future dates and dates pre-1990 nullified for manual confirmation, loads capped at 1,000 kg, reps capped at 999, invalid RPE nullified, and non-workout inputs return 0 exercises.
+    - Deterministic rule fallback: offline or rate-limited requests fall back seamlessly to double-progression rules and rule-based weekly recap (`source: "rules"`).
+    - Zero data leakage & privacy: API keys strictly server-side (`ANTHROPIC_API_KEY`), `ai_usage` telemetry tracks only token counts and status without logging raw user notes or images.
   - Tested Max vs Estimated 1RM Transparency:
     - Distinguishes actual single-rep tested max (`"Tested 1RM"`) from estimated max (`"Best est. 1RM"`).
     - Added high-rep endurance range indicators (`" · endurance"`) when sets exceed `MAX_RELIABLE_REPS` (12 reps) to avoid misleading predictions.
@@ -38,19 +48,19 @@ Current Status: Phase 6 (Analytics Reliability & Trust Verification) Completed &
   - Full Node.js ESM test runner compatibility with domain logic without bundler path alias requirements.
   - Workout finish flow hooked to ecosystem sync (`IronLogEcosystemSync.onWorkoutCompleted`).
 - **Tested:**
-  - **204 / 204 App Unit Tests PASS (100%)** across 28 test suites (`tests/*.test.ts`), including `tests/analytics-reliability.test.ts`, `tests/watch-companion-contract.test.ts`, `tests/foldable-layout.test.ts`, `tests/ecosystem-sync.test.ts`, and `tests/set-mutation-safety.test.ts`.
+  - **214 / 214 App Unit Tests PASS (100%)** across 29 test suites (`tests/*.test.ts`), including `tests/ai-security-schema.test.ts`, `tests/analytics-reliability.test.ts`, `tests/watch-companion-contract.test.ts`, `tests/foldable-layout.test.ts`, `tests/ecosystem-sync.test.ts`, and `tests/set-mutation-safety.test.ts`.
   - **22 / 22 Wear OS Unit Tests PASS (100%)** across 2 test suites (`watch/tests/*.test.ts`), including `watch/tests/sync-contract.test.ts` and `watch/tests/watch.test.ts`.
   - **App TypeScript (`npm run typecheck`): 0 errors**.
   - **Wear OS TypeScript (`cd watch && npm run typecheck`): 0 errors**.
   - **ESLint (`npm run lint`): 0 errors, 0 warnings**.
-  - **Next.js Production Build (`npm run build`): 16/16 static pages exported in 3.4s**.
+  - **Next.js Production Build (`npm run build`): 16/16 static pages exported in 657ms**.
   - **Mobile Android Build (`cd android && ./gradlew assembleDebug`): BUILD SUCCESSFUL in 20s** (`android/app/build/outputs/apk/debug/app-debug.apk`).
   - **Wear OS Android Build (`cd watch/android && ./gradlew assembleDebug`): BUILD SUCCESSFUL in 3m 53s** (`watch/android/app/build/outputs/apk/debug/app-debug.apk`).
 - **Device Verification State:**
   - Both Mobile and Wear OS debug APKs assembled and verified.
   - Galaxy Z Fold8 wireless ADB at `192.168.1.185:5555` is currently in standby over Wi-Fi; APKs ready for live deployment immediately upon wake/reconnect.
 - **Release-Ready:**
-  - Phases 1, 2, 3, 4, 5, and 6 quality gates are green.
+  - Phases 1, 2, 3, 4, 5, 6, and 7 quality gates are green.
 
 ---
 
@@ -61,14 +71,14 @@ Current Status: Phase 6 (Analytics Reliability & Trust Verification) Completed &
    - Deploy `watch/android/app/build/outputs/apk/debug/app-debug.apk` to Galaxy Watch if available.
    - Capture screenshots verifying folded (< 600dp) and unfolded (> 600dp) dual-pane workout views.
    - Verify Bujo Tasks habit check-off and Oak tree watering in The Grove via native ContentProvider.
-2. **Next Backlog Focus: AI & Smart Assistance Security (P1.20):**
-   - Audit AI endpoints, prompt schemas, and output validation to ensure offline fallback safety and zero data leakage.
+2. **Next Backlog Focus: Phase 8 - Release Packaging, Versioning & Multi-Target Build Hardening:**
+   - Verify production release signing, bundle splitting, asset compression, and release readiness.
 
 ---
 
 ## 3. Recommended Next Phase
 
-**Phase 7: AI & Smart Assistance Security & Schema Hardening (P1.20)**
-- Audit Claude / Anthropic client integration in `src/lib/ai/` and `src/app/api/`.
-- Verify strict JSON schema validation on AI plan generation and progression suggestions.
-- Ensure prompt injection guards and fail-safe offline fallback when API key is missing or network is unavailable.
+**Phase 8: Release Packaging & Multi-Target Production Hardening**
+- Verify APK / AAB bundling across Phone and Wear OS.
+- Verify environment configuration, ProGuard / R8 rules, and asset integrity.
+- Conduct final ecosystem integration verification when device reconnects.
