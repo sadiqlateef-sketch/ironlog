@@ -5,10 +5,12 @@ import {
   doNextIndex,
   exerciseUnits,
   formatClock,
+  liveVolume,
   matchTargets,
   moveUnit,
   workingOn,
   nextSetType,
+  setLabel,
   parseNumber,
   shouldStartRest,
   workingSetNumbers,
@@ -38,7 +40,13 @@ test("plates: target at or below bar needs no plates", () => {
 
 test("set type cycles", () => {
   assert.equal(nextSetType("normal"), "warmup");
-  assert.equal(nextSetType("failure"), "normal");
+  assert.equal(nextSetType("failure"), "amrap");
+  assert.equal(nextSetType("amrap"), "normal");
+});
+
+test("an AMRAP set is labelled A and is not a working-set number", () => {
+  assert.equal(setLabel("amrap", 3), "A");
+  assert.deepEqual(workingSetNumbers(["normal", "amrap", "normal"]), [1, 1, 2]);
 });
 
 test("working set numbers skip warm-ups", () => {
@@ -258,4 +266,14 @@ test("reorder: routine targets follow a moved exercise", () => {
     [2, 0],
     [3, 1],
   ]);
+});
+
+test("liveVolume adds weight x reps for done working sets only", () => {
+  const set = (type: "normal" | "warmup", weight: string, reps: string, done: boolean) => ({ type, weight, reps, done });
+  const blocks = [
+    { sets: [set("warmup", "135", "5", true), set("normal", "225", "5", true), set("normal", "225", "5", true), set("normal", "225", "5", false)] },
+    { sets: [set("normal", "100", "10", true), set("normal", "", "", true)] },
+  ];
+  assert.equal(liveVolume(blocks), 225 * 5 * 2 + 100 * 10);
+  assert.equal(liveVolume([]), 0);
 });

@@ -37,49 +37,49 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
 
   return (
     <Card
-      className="relative overflow-hidden rounded-2xl border border-[var(--progress-purple-border)] bg-[#120F17] p-5 shadow-xl transition-all"
+      className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-xl transition-all"
       data-testid="progress-index-card"
     >
       {/* Soft Purple Ambient Radial Glow at Top Right matching user image */}
       <div
-        className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[var(--progress-purple)]/20 blur-3xl"
+        className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-primary/20 blur-3xl"
         aria-hidden
       />
 
       {/* Header Row */}
       <div className="relative z-10 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-bold tracking-wider uppercase text-zinc-400">
+          <span className="text-[11px] font-bold tracking-wider uppercase text-muted-foreground">
             PROGRESS INDEX
           </span>
           <button
             type="button"
             onClick={() => setShowExplanation((prev) => !prev)}
-            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             title="What is Progress Index?"
           >
             <Info className="size-3.5" />
           </button>
         </div>
-        <span className="text-zinc-400 text-xs font-semibold">
+        <span className="text-muted-foreground text-xs font-semibold">
           {overview.weeks[0]?.label} — {overview.weeks[5]?.label}
         </span>
       </div>
 
       {/* Main Status Headline matching image: 'Week Closed Empty 😪' or 'Strong Gains 🔥' */}
       <div className="relative z-10 mt-3 min-w-0">
-        <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+        <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
           {overview.currentStatus}
         </h2>
-        <p className="text-zinc-400 text-xs mt-1.5 leading-relaxed">
+        <p className="text-muted-foreground text-xs mt-1.5 leading-relaxed">
           {overview.statusMessage}
         </p>
       </div>
 
       {/* Educational Explanation Box (From Step 1 & Step 2 of user images) */}
       {showExplanation && (
-        <div className="relative z-10 mt-3 rounded-xl border border-purple-500/30 bg-purple-950/30 p-3 text-xs text-zinc-300">
-          <p className="font-semibold text-purple-300 mb-1">About Progress Index & Target Band:</p>
+        <div className="relative z-10 mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-muted-foreground">
+          <p className="font-semibold text-primary-text mb-1">About Progress Index & Target Band:</p>
           <p className="leading-relaxed">
             Tracks three things each week: whether your key lifts got stronger than last month, whether your muscle groups got enough work, and whether your training was balanced. Landing inside the target band means you&apos;re progressing at a sustainable, scientifically validated pace.
           </p>
@@ -87,17 +87,17 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
       )}
 
       {/* 6 WEEK OVERVIEW Section */}
-      <div className="relative z-10 mt-5 pt-4 border-t border-zinc-800/80">
+      <div className="relative z-10 mt-5 pt-4 border-t border-border">
         <div className="flex items-center justify-between text-xs mb-2.5">
-          <span className="text-zinc-400 text-[11px] font-bold tracking-wider uppercase">
+          <span className="text-muted-foreground text-[11px] font-bold tracking-wider uppercase">
             6 WEEK OVERVIEW
           </span>
-          <span className="text-zinc-400 text-xs font-medium">
+          <span className="text-muted-foreground text-xs font-medium">
             {overview.weeks[0]?.label} — {overview.weeks[5]?.label}
           </span>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border border-zinc-800/80 bg-[#16121C] p-2.5">
+        <div className="relative overflow-hidden rounded-xl border border-border bg-secondary/60 p-2.5">
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-24 overflow-visible" aria-hidden>
             {/* Shaded Target Band */}
             <rect
@@ -105,7 +105,7 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
               y={bandYTop}
               width={W}
               height={Math.max(4, bandHeight)}
-              className="fill-[var(--progress-purple)]/15 stroke-[var(--progress-purple)]/40"
+              className="fill-primary/15 stroke-primary/40"
               strokeDasharray="3 3"
               strokeWidth="1"
             />
@@ -113,7 +113,7 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
               x={W - 4}
               y={bandYTop + 9}
               textAnchor="end"
-              className="fill-zinc-400 text-[9px] font-semibold tracking-wide"
+              className="fill-muted-foreground text-[9px] font-semibold tracking-wide"
             >
               Target
             </text>
@@ -125,7 +125,7 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
                 y="0"
                 width="32"
                 height={H}
-                className="fill-zinc-700/25"
+                className="fill-muted-foreground/20"
               />
             )}
 
@@ -150,8 +150,8 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
                   r={isSelected ? "4.5" : "3"}
                   className={
                     isSelected
-                      ? "fill-white stroke-black"
-                      : "fill-[#16121C] stroke-zinc-400"
+                      ? "fill-foreground stroke-background"
+                      : "fill-secondary stroke-muted-foreground"
                   }
                   strokeWidth={isSelected ? "2" : "1.5"}
                 />
@@ -160,7 +160,7 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
           </svg>
 
           {/* Week Labels matching image format '9.20-26', '10.18-24' */}
-          <div className="mt-1 flex justify-between text-[10px] font-medium text-zinc-400 px-0.5">
+          <div className="mt-1 flex justify-between text-[10px] font-medium text-muted-foreground px-0.5">
             {overview.weeks.map((w, i) => (
               <button
                 key={i}
@@ -168,8 +168,8 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
                 onClick={() => setSelectedWeekIdx(i)}
                 className={`transition-colors ${
                   i === selectedWeekIdx
-                    ? "text-white font-bold underline underline-offset-4 decoration-[var(--progress-purple)]"
-                    : "hover:text-zinc-200"
+                    ? "text-foreground font-bold underline underline-offset-4 decoration-primary"
+                    : "hover:text-foreground"
                 }`}
               >
                 {w.label}
@@ -182,25 +182,29 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
       {/* Breakdown of Selected Week (7-Day Distribution Bars: Light, Target, Peak) */}
       <div className="relative z-10 mt-4 flex flex-col gap-2">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-zinc-400 font-semibold">
+          <span className="text-muted-foreground font-semibold">
             Breakdown of {selectedWeek?.label ?? "10.18-24"}
           </span>
-          <span className="text-zinc-400 text-[11px] font-medium">
-            Score: <strong className="text-white">{selectedWeek?.value ?? 100}</strong>
-          </span>
+          {selectedWeek?.hasData ? (
+            <span className="text-muted-foreground text-[11px] font-medium">
+              Score: <strong className="text-foreground">{selectedWeek.value}</strong>
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-[11px] font-medium">No workouts this week</span>
+          )}
         </div>
 
         {/* 7-Day Bar Grid with Light, Target, Peak levels from user image 5 */}
-        <div className="relative rounded-xl border border-zinc-800/80 bg-[#16121C] p-3">
+        <div className="relative rounded-xl border border-border bg-secondary/60 p-3">
           {/* Target dotted guide line */}
-          <div className="absolute inset-x-3 top-1/2 border-b border-dashed border-[var(--progress-purple)]/40 pointer-events-none" />
-          <span className="absolute right-3 top-1/2 -translate-y-4 text-[9px] font-bold text-zinc-500 pointer-events-none">
+          <div className="absolute inset-x-3 top-1/2 border-b border-dashed border-primary/40 pointer-events-none" />
+          <span className="absolute right-3 top-1/2 -translate-y-4 text-[9px] font-bold text-muted-foreground pointer-events-none">
             Target
           </span>
-          <span className="absolute right-3 top-2 text-[9px] font-bold text-zinc-500 pointer-events-none">
+          <span className="absolute right-3 top-2 text-[9px] font-bold text-muted-foreground pointer-events-none">
             Peak
           </span>
-          <span className="absolute right-3 bottom-2 text-[9px] font-bold text-zinc-500 pointer-events-none">
+          <span className="absolute right-3 bottom-2 text-[9px] font-bold text-muted-foreground pointer-events-none">
             Light
           </span>
 
@@ -209,14 +213,14 @@ export function ProgressIndexHeroCard({ data }: { data: StatsData }) {
               <div key={idx} className="flex h-full flex-col justify-end items-center">
                 <div
                   style={{ height: `${lvl * 100}%` }}
-                  className="w-full rounded-sm bg-[#221D2C] border border-zinc-700/30 transition-all hover:bg-[var(--progress-purple)]/40"
+                  className="w-full rounded-sm bg-secondary border border-border transition-all hover:bg-primary/40"
                 />
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex justify-between text-[10px] text-zinc-500 px-1 font-medium">
+        <div className="flex justify-between text-[10px] text-muted-foreground px-1 font-medium">
           <span>Day 1</span>
           <span>Day 2</span>
           <span>Day 3</span>

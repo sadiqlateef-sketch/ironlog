@@ -38,7 +38,7 @@ export function ProgressAnalyticsDeck({ data }: { data: StatsData }) {
     <div className="flex flex-col gap-3" data-testid="progress-analytics-deck">
       {/* Sub-tab Pill Switcher */}
       <div
-        className="flex items-center gap-1 overflow-x-auto rounded-2xl bg-[#140F1D] border border-purple-900/40 p-1.5 shadow-md no-scrollbar"
+        className="flex items-center gap-1 overflow-x-auto rounded-2xl bg-card border border-border p-1.5 shadow-md no-scrollbar"
         role="tablist"
         aria-label="Progress analytics sections"
       >
@@ -54,8 +54,8 @@ export function ProgressAnalyticsDeck({ data }: { data: StatsData }) {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold transition-all ${
                 isActive
-                  ? "bg-[var(--progress-purple)] text-white shadow-md shadow-purple-900/40"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
               }`}
             >
               <Icon className="size-3.5" />

@@ -92,7 +92,7 @@ export function ProfileHeader({ onSync, syncing }: { onSync: () => void; syncing
   const name = profile?.display_name || profile?.email?.split("@")[0] || "You";
   return (
     <header className="flex items-center gap-3">
-      <div className="from-primary grid size-14 to-[#6a4be0] shrink-0 place-items-center rounded-full bg-gradient-to-br text-2xl font-extrabold text-white">
+      <div className="from-primary grid size-14 to-[#6a4be0] shrink-0 place-items-center rounded-full bg-gradient-to-br text-2xl font-extrabold text-foreground">
         {name[0]?.toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">

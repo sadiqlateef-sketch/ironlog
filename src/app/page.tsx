@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  ChartLine,
   ChevronRight,
   Heart,
   History,
-  Menu,
   Search,
   Sparkles,
 } from "lucide-react";
@@ -66,32 +64,11 @@ function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Cockpit Top Navigation Header: Progress on Upper-Left, More on Upper-Right */}
-      <header className="flex items-center justify-between gap-3">
-        <Link
-          href="/progress/"
-          aria-label="Progress"
-          className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-secondary/80 px-3 py-2 text-xs font-semibold text-foreground transition-all hover:border-primary/50 hover:bg-secondary active:scale-95"
-        >
-          <ChartLine className="size-4 text-primary" />
-          <span>Progress</span>
-        </Link>
-
-        <div className="flex flex-col items-center text-center">
-          <span className="text-foreground text-sm font-extrabold tracking-tight uppercase">IronLog</span>
-          <span className="text-muted-foreground text-[11px] font-medium">
-            {greeting()}{name ? `, ${name}` : ""}
-          </span>
-        </div>
-
-        <Link
-          href="/more/"
-          aria-label="More menu"
-          className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-secondary/80 px-3 py-2 text-xs font-semibold text-foreground transition-all hover:border-primary/50 hover:bg-secondary active:scale-95"
-        >
-          <span>More</span>
-          <Menu className="size-4 text-muted-foreground" />
-        </Link>
+      <header className="flex flex-col items-center text-center">
+        <span className="text-foreground text-sm font-extrabold tracking-tight uppercase">IronLog</span>
+        <span className="text-muted-foreground text-[11px] font-medium">
+          {greeting()}{name ? `, ${name}` : ""}
+        </span>
       </header>
 
       {/* 1. LAST SESSION DEBRIEF */}

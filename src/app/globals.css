@@ -34,6 +34,7 @@
   --set-warmup: #FFD479;
   --set-drop: #E5BF4C;
   --set-failure: #FF2B46;
+  --set-amrap: #F59E0B;
   --record: #D4AF37;
   --chart-1: #D4AF37;
   --chart-grid: rgba(212, 175, 55, 0.12);
@@ -46,10 +47,6 @@
   --glow-3: rgba(184, 29, 45, 0.35);
   --glass-highlight: rgba(255, 255, 255, 0.07);
   --glass-shadow: rgb(0 0 0 / 0.35);
-  --progress-purple: #7C65C1;
-  --progress-purple-light: #9B82E8;
-  --progress-purple-bg: rgba(124, 101, 193, 0.14);
-  --progress-purple-border: rgba(124, 101, 193, 0.35);
   --progress-dark-bar: #2B213A;
 }
 
@@ -83,6 +80,7 @@
   --set-warmup: #8a5800;
   --set-drop: #0a6c78;
   --set-failure: #b42318;
+  --set-amrap: #a15c07;
   --record: #7a5200;
   --chart-1: #2f55d4;
   --chart-grid: rgb(14 17 36 / 0.08);
@@ -140,6 +138,7 @@
   --color-set-warmup: var(--set-warmup);
   --color-set-drop: var(--set-drop);
   --color-set-failure: var(--set-failure);
+  --color-set-amrap: var(--set-amrap);
   --color-record: var(--record);
   --color-chart-1: var(--chart-1);
 }

@@ -249,6 +249,7 @@ const setTone = {
   warmup: "text-set-warmup",
   drop: "text-set-drop",
   failure: "text-set-failure",
+  amrap: "text-set-amrap",
 } as const;
 
 /** Where the time went: lifting, resting and idle (estimated from when sets were ticked off). */

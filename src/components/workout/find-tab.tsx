@@ -164,7 +164,7 @@ export function FindTab({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-          {category ? CATEGORIES.find((c) => c.key === category)!.label : "Ready-made plans"}
+          {category ? CATEGORIES.find((c) => c.key === category)!.label : "Ready-made programs"}
         </h2>
         {shown.length === 0 && <p className="text-muted-foreground text-sm">Nothing matches. Try another category or filter.</p>}
         <div className="grid grid-cols-2 gap-3">
@@ -202,7 +202,7 @@ export function FindTab({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Filter</DialogTitle>
-            <DialogDescription>Narrow down the ready-made plans.</DialogDescription>
+            <DialogDescription>Narrow down the ready-made programs.</DialogDescription>
           </DialogHeader>
           <FilterRow
             label="Type"
@@ -277,7 +277,7 @@ function FilterRow({
   );
 }
 
-/** The big purple "Your Adaptive Plan" card: hands off to the AI program builder. */
+/** The big purple "Your Adaptive Program" card: hands off to the AI program builder. */
 function AdaptivePlanCard() {
   // Training load over a 6-week cycle: three build weeks, a peak, a lighter week, then a new high.
   const load = [0.35, 0.5, 0.65, 0.8, 0.45, 0.9];
@@ -296,7 +296,7 @@ function AdaptivePlanCard() {
       data-testid="adaptive-plan"
     >
       <p className="text-ai text-xs font-bold tracking-wide uppercase">New cycle</p>
-      <h2 className="text-2xl font-extrabold text-white">Your Adaptive Plan</h2>
+      <h2 className="text-2xl font-extrabold text-white">Your Adaptive Program</h2>
       <p className="text-sm text-white/80">The AI builds a multi-week program and adjusts it after every workout.</p>
       <svg viewBox={`-4 -4 ${W + 8} ${H + 8}`} className="my-3 h-20 w-full" aria-hidden preserveAspectRatio="none">
         <path d={`${path} L${W},${H} L0,${H} Z`} fill="rgb(179 154 255 / 0.18)" />
