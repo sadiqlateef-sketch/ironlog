@@ -11,7 +11,24 @@ export interface CompletedWorkoutSummary {
   prsHit: string[];
 }
 
+export interface TodayPlanExercise {
+  name: string;
+  sets: number;
+  reps: string;
+  weightLb: number | null;
+}
+
+export interface TodayPlan {
+  date: string;
+  routineName: string;
+  programName: string;
+  week: number;
+  day: number;
+  exercises: TodayPlanExercise[];
+}
+
 interface IronLogEcosystemPlugin {
+  upsertTodayPlan?: (plan: TodayPlan) => Promise<void>;
   upsertWorkoutRecord?: (summary: CompletedWorkoutSummary) => Promise<void>;
   completeBujoWorkoutAndWaterOak?: (data: {
     date: string;
@@ -91,6 +108,20 @@ export const IronLogEcosystemSync = {
       } catch (e) {
         console.warn("Ecosystem: Failed to push context to Braindump", e);
       }
+    }
+  },
+
+  /**
+   * IronLog -> Bujo Tasks: today's planned workout (read-only for Bujo, via today_plan).
+   * An empty exercise list means a rest day or no active program.
+   */
+  async syncTodayPlan(plan: TodayPlan) {
+    const plugin = getEcosystemPlugin();
+    if (!plugin?.upsertTodayPlan) return;
+    try {
+      await plugin.upsertTodayPlan(plan);
+    } catch (e) {
+      console.warn("Ecosystem: Failed to publish today's plan", e);
     }
   },
 

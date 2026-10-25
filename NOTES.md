@@ -26,9 +26,9 @@ Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project file
 - Phase 10 (keystore password out of the Gradle files) is skipped until Sadiq says go.
 - Phase 24 (below) waits for Sadiq's yes before anything is built.
 
-### Design: Bujo Tasks reads "today's plan" from IronLog (Phase 24, not built)
+### Bujo Tasks reads "today's plan" from IronLog (Phase 24, built)
 Today IronLog only pushes finished workouts out. This adds the reverse: Bujo Tasks can show what IronLog plans for today.
 - **Table:** a new `today_plan` table in `IronLogContentProvider` (one row per date): `date`, `routineName`, `programName`, `week`, `day`, `exercisesJson` (name, sets, reps, weight), `updatedAt`. The provider's `DB_VERSION` must be bumped, because `onUpgrade` only re-runs `CREATE TABLE IF NOT EXISTS`. New URI: `content://com.ironlog.app.provider/today_plan`.
 - **Writing:** Home pushes the plan whenever the active program changes (and when the app opens) through `IronLogEcosystemPlugin`, like `upsertWorkoutRecord`: a new plugin method `upsertTodayPlan` called from `src/services/ironlogEcosystemSync.ts`. It sends `program.next_routine_name`, the week and day, and the exercise list from `getRoutineTargets`. A rest day or no program writes a row with an empty list.
 - **Reading:** Bujo Tasks queries the URI (read-only, same signature permission as the other tables). It shows today's workout name on the Gym task and lists the exercises in the task's detail. Nothing is written back; finishing the workout still uses `completeBujoWorkoutAndWaterOak`.
-- **Open questions for Sadiq:** show weights in Bujo, or names only? Should a skipped day clear the row at midnight?
+- **Decisions (defaults, easy to change):** weights are included (`weightLb`, null when the routine has none). Older rows are deleted each time a new day is written, so a skipped day never shows up; Bujo should only read the row whose `date` is today. Needs an APK rebuild; `DB_VERSION` is now 2.

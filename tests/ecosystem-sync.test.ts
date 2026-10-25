@@ -207,3 +207,36 @@ test("ecosystem sync: tolerates plugin IPC rejections without throwing", async (
     await IronLogEcosystemSync.onWorkoutCompleted(summary, "2026-10-24");
   });
 });
+
+test("today plan: builds exercises with lb weights, and an empty list on a rest day", async () => {
+  const { buildTodayPlan } = await import("../src/lib/today-plan.ts");
+  const program = {
+    program_name: "PPL",
+    next_routine_id: "r1",
+    next_routine_name: "Push",
+    next_week: 2,
+    next_day: 1,
+  } as never;
+  const targets = [
+    { exercise_id: "e1", target_sets: 3, target_reps: 8, target_reps_max: 10, target_weight_kg: 100 },
+    { exercise_id: "e2", target_sets: 2, target_reps: 12, target_reps_max: null, target_weight_kg: null },
+  ] as never;
+  const names = new Map([["e1", { name: "Bench Press" }]]) as never;
+  const plan = buildTodayPlan("2026-10-26", program, targets, names);
+  assert.equal(plan.week, 2);
+  assert.deepEqual(plan.exercises[0], { name: "Bench Press", sets: 3, reps: "8-10", weightLb: 220.5 });
+  assert.deepEqual(plan.exercises[1], { name: "Exercise", sets: 2, reps: "12", weightLb: null });
+  assert.equal(buildTodayPlan("2026-10-26", null, [], new Map()).exercises.length, 0);
+});
+
+test("today plan: syncTodayPlan calls the plugin and tolerates its absence", async () => {
+  const plan = { date: "2026-10-26", routineName: "Push", programName: "PPL", week: 1, day: 1, exercises: [] };
+  (globalThis as unknown as { window: unknown }).window = {};
+  await assert.doesNotReject(() => IronLogEcosystemSync.syncTodayPlan(plan));
+  let got: unknown;
+  (globalThis as unknown as { window: unknown }).window = {
+    Capacitor: { Plugins: { IronLogEcosystem: { upsertTodayPlan: async (p: unknown) => void (got = p) } } },
+  };
+  await IronLogEcosystemSync.syncTodayPlan(plan);
+  assert.deepEqual(got, plan);
+});

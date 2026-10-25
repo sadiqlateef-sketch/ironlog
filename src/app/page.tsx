@@ -15,6 +15,7 @@ import { DeloadOffer, DeloadTag } from "@/components/deload-offer";
 import { CenterStartButton } from "@/components/home/center-start-button";
 import { LastSessionCard } from "@/components/home/last-session-card";
 import { NextSessionCard } from "@/components/home/next-session-card";
+import { TodayPlanSync } from "@/components/home/today-plan-sync";
 import { RecoveryChips } from "@/components/home/recovery-chips";
 import { WeekStrip } from "@/components/home/week-strip";
 import { SessionSheet } from "@/components/session-sheet";
@@ -92,6 +93,7 @@ function Dashboard() {
             </p>
           )}
           <NextSessionCard program={program} unit={unit} />
+          <TodayPlanSync program={program} />
           {program?.deload_suggestion && (
             <DeloadOffer programId={program.program_id} reason={program.deload_suggestion} onChange={() => setReload((r) => r + 1)} />
           )}

@@ -66,6 +66,39 @@ public class IronLogEcosystemPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void upsertTodayPlan(PluginCall call) {
+        String date = call.getString("date");
+        if (date == null || date.isEmpty()) {
+            call.reject("date is required");
+            return;
+        }
+        try {
+            ContentValues cv = new ContentValues();
+            cv.put("date", date);
+            cv.put("routineName", call.getString("routineName", ""));
+            cv.put("programName", call.getString("programName", ""));
+            cv.put("week", call.getInt("week", 0));
+            cv.put("day", call.getInt("day", 0));
+            JSArray exercises = call.getArray("exercises", new JSArray());
+            cv.put("exercisesJson", exercises.toString());
+            cv.put("updatedAt", getNowIso());
+
+            ContentResolver resolver = getContext().getContentResolver();
+            Uri uri = Uri.parse("content://com.ironlog.app.provider/today_plan");
+            resolver.insert(uri, cv);
+            // Only today's plan matters; drop earlier days so a skipped day never shows up.
+            resolver.delete(uri, "date < ?", new String[] { date });
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to upsert today's plan", e);
+            call.reject("Failed: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void completeBujoWorkoutAndWaterOak(PluginCall call) {
         String date = call.getString("date", getNowIso());
         String workoutTitle = call.getString("workoutTitle", "Strength Training");
