@@ -482,12 +482,24 @@ export function useWorkout() {
     await load();
   }, [staleSession, load]);
 
+  /** Save an old unfinished workout as it is (its logged sets count). */
+  const finishStale = useCallback(async () => {
+    if (!staleSession) return;
+    await resumeStaleSession(staleSession); // loads its sets, so the volume is right
+    await finishSession(staleSession);
+    setStaleSession(null);
+    await load();
+  }, [staleSession, load]);
+
   const discardStale = useCallback(async () => {
     if (!staleSession) return;
     await discardSession(staleSession.id);
     setStaleSession(null);
     await load();
   }, [staleSession, load]);
+
+  /** Close the prompt without touching the workout. */
+  const hideStale = useCallback(() => setStaleSession(null), []);
 
   const discard = useCallback(async () => {
     if (!session) return;
@@ -1227,7 +1239,9 @@ export function useWorkout() {
     discard,
     staleSession,
     resumeStale,
+    finishStale,
     discardStale,
+    hideStale,
     addExercise,
     reorder,
     /** The exercises as they are right now (after any change still settling into state). */

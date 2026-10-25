@@ -85,6 +85,22 @@ export function isSessionCompleted(session: WorkoutSession | null | undefined): 
   return session.end_time != null || ("completed_at" in session && (session as { completed_at?: unknown }).completed_at != null);
 }
 
+/** Workouts stay "in progress" for 12 hours, so one that runs past midnight isn't lost. */
+export const OPEN_HOURS = 12;
+export function isRecent(iso: string | null | undefined, now = Date.now()): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) && now - t < OPEN_HOURS * 3_600_000;
+}
+
+const RESUMED_KEY = "resumed-session";
+
+/** In progress: not finished, and either recent or one you chose to resume. */
+async function isOpen(s: WorkoutSession | null | undefined): Promise<boolean> {
+  if (!s || isSessionCompleted(s)) return false;
+  return isRecent(s.start_time) || (await kvGet<string>(RESUMED_KEY)) === s.id;
+}
+
 // ---------- Reading ----------
 
 /** The workout in progress as this phone last saw it. Instant: no network. */
@@ -96,8 +112,8 @@ export async function peekActiveWorkout(): Promise<{ session: WorkoutSession; se
     await writeMirror(null);
     return null;
   }
-  // Guard: If not from today, it's stale - never silently show as active
-  if (!isToday(m.session.start_time)) {
+  // Guard: an old workout you haven't chosen to resume is stale - never silently show as active
+  if (!(await isOpen(m.session))) {
     return null;
   }
   return { session: m.session, sets: m.sets.length, done: m.sets.filter((s) => s.completed_at || s.is_completed).length };
@@ -108,7 +124,7 @@ export async function getActiveSession(): Promise<WorkoutSession | null> {
   await flush();
   if (await hasPending()) {
     const s = (await readMirror())?.session ?? null;
-    if (s && (isSessionCompleted(s) || !isToday(s.start_time))) {
+    if (s && !(await isOpen(s))) {
       await writeMirror(null);
       return null;
     }
@@ -123,8 +139,8 @@ export async function getActiveSession(): Promise<WorkoutSession | null> {
       await writeMirror(null);
       return null;
     }
-    // Guard: Only restore as active if it is from today!
-    if (!isToday(active.start_time)) {
+    // Guard: Only restore as active if it is recent or one you chose to resume!
+    if (!(await isOpen(active))) {
       if (m?.session.id === active.id) await writeMirror(null);
       return null;
     }
@@ -134,7 +150,7 @@ export async function getActiveSession(): Promise<WorkoutSession | null> {
   } catch (e) {
     if (isNetworkError(e)) {
       const s = (await readMirror())?.session ?? null;
-      if (s && (isSessionCompleted(s) || !isToday(s.start_time))) {
+      if (s && !(await isOpen(s))) {
         await writeMirror(null);
         return null;
       }
@@ -148,7 +164,7 @@ export async function getActiveSession(): Promise<WorkoutSession | null> {
 export async function getStaleSession(): Promise<WorkoutSession | null> {
   try {
     const m = await readMirror();
-    if (m?.session && !isSessionCompleted(m.session) && !isToday(m.session.start_time)) {
+    if (m?.session && !isSessionCompleted(m.session) && !(await isOpen(m.session))) {
       return m.session;
     }
     const sessions: WorkoutSession[] = unwrap(
@@ -160,7 +176,7 @@ export async function getStaleSession(): Promise<WorkoutSession | null> {
         .limit(1)
     );
     const s = sessions[0] ?? null;
-    if (s && !isSessionCompleted(s) && !isToday(s.start_time)) {
+    if (s && !isSessionCompleted(s) && !(await isOpen(s))) {
       return s;
     }
     return null;
@@ -172,6 +188,7 @@ export async function getStaleSession(): Promise<WorkoutSession | null> {
 /** Resumes a stale session, making it the active session. */
 export async function resumeStaleSession(session: WorkoutSession): Promise<void> {
   const sets = await listActiveSets(session.id);
+  await kvSet(RESUMED_KEY, session.id);
   await writeMirror({ session, sets });
 }
 
@@ -281,6 +298,7 @@ export async function startPlannedSession(
 }
 
 export async function finishSession(session: WorkoutSession): Promise<{ synced: boolean }> {
+  await kvSet(RESUMED_KEY, null);
   const endTime = now();
   const m = await readMirror();
   const completedSets = (m?.sets ?? []).filter((s) => (s.is_completed || s.completed_at) && s.set_type !== "warmup");
@@ -319,6 +337,7 @@ export async function finishSession(session: WorkoutSession): Promise<{ synced: 
 }
 
 export async function discardSession(sessionId: string): Promise<void> {
+  await kvSet(RESUMED_KEY, null);
   await changeMirror((m) => (m.session.id === sessionId ? null : m));
   await writeMirror(null);
 

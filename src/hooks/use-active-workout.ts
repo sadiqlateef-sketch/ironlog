@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ACTIVE_WORKOUT_EVENT, getActiveSession, isSessionCompleted, isToday, peekActiveWorkout } from "@/lib/offline/workout-store";
+import { ACTIVE_WORKOUT_EVENT, getActiveSession, isRecent, isSessionCompleted, peekActiveWorkout } from "@/lib/offline/workout-store";
 
 export type ActiveWorkout = Awaited<ReturnType<typeof peekActiveWorkout>>;
 
@@ -17,13 +17,13 @@ let checkedServer = false;
  */
 export function useActiveWorkout(): ActiveWorkout | undefined {
   const [workout, setWorkout] = useState(() => {
-    if (last?.session && (isSessionCompleted(last.session) || !isToday(last.session.start_time))) {
+    if (last?.session && (isSessionCompleted(last.session) || !isRecent(last.session.start_time))) {
       return undefined;
     }
     return last;
   });
   useEffect(() => {
-    if (last?.session && (isSessionCompleted(last.session) || !isToday(last.session.start_time))) {
+    if (last?.session && (isSessionCompleted(last.session) || !isRecent(last.session.start_time))) {
       last = undefined;
     }
     let alive = true;

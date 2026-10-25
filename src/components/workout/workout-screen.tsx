@@ -71,6 +71,8 @@ export function WorkoutScreen() {
   const w = useWorkout();
   const router = useRouter();
   const [info, setInfo] = useState<Exercise | null>(null);
+  // Deleting an old workout takes two taps.
+  const [confirmDeleteStale, setConfirmDeleteStale] = useState(false);
   const [summary, setSummary] = useState<NonNullable<Awaited<ReturnType<Workout["finish"]>>> | null>(null);
 
   /** Close the "Workout saved" card; a home workout's calendar answer is saved then. */
@@ -106,33 +108,45 @@ export function WorkoutScreen() {
       <>
         <StartWorkout onStart={w.start} onStartWith={w.startWith} error={w.error} />
         {w.staleSession && (
-          <Dialog open={!!w.staleSession} onOpenChange={(o) => !o && w.discardStale()}>
+          <Dialog
+            open={!!w.staleSession}
+            onOpenChange={(o) => {
+              // Closing never deletes the workout.
+              if (!o) {
+                setConfirmDeleteStale(false);
+                w.hideStale();
+              }
+            }}
+          >
             <DialogContent data-testid="stale-workout-dialog">
               <DialogHeader>
-                <DialogTitle>Unfinished workout from previous day</DialogTitle>
+                <DialogTitle>You have a workout still open</DialogTitle>
                 <DialogDescription>
-                  You have an unfinished workout ({w.staleSession.name ?? "Workout"}) from{" "}
-                  {new Date(w.staleSession.start_time).toLocaleDateString(undefined, {
+                  {w.staleSession.name ?? "Workout"} · started{" "}
+                  {new Date(w.staleSession.start_time).toLocaleString(undefined, {
                     weekday: "short",
-                    month: "short",
-                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
                   })}
-                  . Would you like to resume it or discard it?
                 </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-2 pt-3">
                 <Button size="lg" onClick={w.resumeStale} data-testid="resume-stale">
-                  <Play className="size-4 mr-2" /> Resume workout
+                  <Play className="size-4 mr-2" /> Keep logging it
+                </Button>
+                <Button variant="outline" size="lg" onClick={w.finishStale} data-testid="finish-stale">
+                  <Flag className="size-4 mr-2" /> Finish it now
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="lg"
                   className="text-destructive hover:bg-destructive/10"
-                  onClick={w.discardStale}
+                  onClick={() => (confirmDeleteStale ? w.discardStale() : setConfirmDeleteStale(true))}
                   data-testid="discard-stale"
                 >
-                  <Trash2 className="size-4 mr-2" /> Discard workout
+                  <Trash2 className="size-4 mr-2" /> {confirmDeleteStale ? "Tap again to delete" : "Delete it…"}
                 </Button>
+                <p className="text-muted-foreground pt-1 text-center text-xs">Closing this keeps it.</p>
               </div>
             </DialogContent>
           </Dialog>

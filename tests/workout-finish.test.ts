@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isToday, isSessionCompleted } from "../src/lib/offline/workout-store.ts";
+import { isToday, isRecent, isSessionCompleted } from "../src/lib/offline/workout-store.ts";
 import { handleMockRequest } from "../src/lib/supabase/mock-backend.ts";
 
 test("isToday correctly identifies today vs previous days", () => {
@@ -12,6 +12,14 @@ test("isToday correctly identifies today vs previous days", () => {
 
   assert.equal(isToday(null), false);
   assert.equal(isToday(undefined), false);
+});
+
+test("isRecent keeps a workout open for 12 hours", () => {
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+  assert.equal(isRecent(hoursAgo(1)), true);
+  assert.equal(isRecent(hoursAgo(11)), true);
+  assert.equal(isRecent(hoursAgo(13)), false);
+  assert.equal(isRecent(null), false);
 });
 
 test("isSessionCompleted identifies completed workouts", () => {
