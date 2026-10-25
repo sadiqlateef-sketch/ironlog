@@ -41,7 +41,7 @@ import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { cueSetSaved } from "@/lib/cues";
-import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
+import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest, watchSetPatch } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import { PLATE_LOADED } from "@/lib/labels";
 import { matchPrevious, sideReps, suggestWeight, weightStep, getOverloadIncrement, type Suggestion } from "@/lib/set-logic";
@@ -1193,14 +1193,11 @@ export function useWorkout() {
       const targetSet = block.sets.find((s) => s.setNumber === data.setNumber) ?? block.sets.find((s) => !s.done);
       if (!targetSet) return;
 
-      const updates: Record<string, unknown> = {};
-      if (data.weightKg != null) updates.weight_kg = data.weightKg;
-      if (data.reps != null) updates.reps = data.reps;
-      if (data.rpe != null) updates.rpe = data.rpe;
-
-      if (Object.keys(updates).length > 0) {
-        patchSet(block.order, targetSet.id, updates);
-        await updateSet(targetSet.id, updates).catch(() => {});
+      // The rows show text in your unit; the database gets numbers (weight in kg).
+      const { ui, db } = watchSetPatch(data, unit);
+      if (Object.keys(db).length > 0) {
+        patchSet(block.order, targetSet.id, ui);
+        await updateSet(targetSet.id, db).catch(() => {});
       }
 
       if (data.isCompleted && !targetSet.done) {
@@ -1224,7 +1221,7 @@ export function useWorkout() {
       unsubFinish();
       unsubReq();
     };
-  }, [session, blocks, patchSet, toggleDone, finish]);
+  }, [session, blocks, patchSet, toggleDone, finish, unit]);
 
   return {
     startWith,
