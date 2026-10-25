@@ -1,3 +1,5 @@
+Archived 2026: outdated, see REVIEW.md / NOTES.md.
+
 # IronLog — Phase Execution History
 
 This is an append-only log of approved and verified implementation phases.

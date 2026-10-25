@@ -1,3 +1,4 @@
+// Archived 2026: outdated, see REVIEW.md / NOTES.md.
 #!/usr/bin/env node
 /**
  * Master Audit Fix Runner for IronLog

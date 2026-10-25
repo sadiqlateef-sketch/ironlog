@@ -14,12 +14,21 @@ Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project file
 ## Done (awaiting phone check)
 - D1 cloud-backed again, D2 previous-day workout, D3 one open workout, D8 lint/typecheck, D10 APK build.
 - D5 watch weight, D6 periodization off by default, D7 warm-up rows, D4 failed saves shown (in PR, not yet on the phone).
-- Batch 3 (Phases 11-18, in PR): logger dock, header volume, plates, set notes, AMRAP + tempo (needs Deploy database and functions), Home header, "Programs" naming, Progress colours. Phase 11 needs a one-handed phone check.
+- Batch 3 (Phases 11-18, merged): logger dock, header volume, plates, set notes, AMRAP + tempo (database deployed 2026-10-25), Home header, "Programs" naming, Progress colours. Phase 11 needs a one-handed phone check.
+- Batch 4 (merged): P1 two-column Home when unfolded (Phase 19), P2 Progress summary first (20), P3 two missed sessions drop the weight 10% (21), P4 circuit mode (23), P7 old agent files archived to `docs/archive/` (25). Check Home and Progress folded and unfolded on the Fold8.
 
 ## Known bugs / half-finished
 - Keystore password still written in the Gradle files (D9, FIX_PLAN Phase 10, needs Sadiq's OK).
-- Open PRs not on main: #18 reset email, #20 Health Connect, #22 deload weeks.
+- Open PRs not on main: #22 deload weeks (#18 reset email and #20 Health Connect are merged; they need the Supabase redirect URL and an APK rebuild).
 - Local PC builds need real Supabase settings in `.env.production.local` (placeholders cause "Failed to fetch").
 
 ## Next
-- Follow FIX_PLAN.md phase by phase (Phases 1-9 and 11-18 done; Phase 10 skipped for now). Test checkpoint after every phase: `node scripts/smoke-test.mjs`.
+- Phase 10 (keystore password out of the Gradle files) is skipped until Sadiq says go.
+- Phase 24 (below) waits for Sadiq's yes before anything is built.
+
+### Design: Bujo Tasks reads "today's plan" from IronLog (Phase 24, not built)
+Today IronLog only pushes finished workouts out. This adds the reverse: Bujo Tasks can show what IronLog plans for today.
+- **Table:** a new `today_plan` table in `IronLogContentProvider` (one row per date): `date`, `routineName`, `programName`, `week`, `day`, `exercisesJson` (name, sets, reps, weight), `updatedAt`. The provider's `DB_VERSION` must be bumped, because `onUpgrade` only re-runs `CREATE TABLE IF NOT EXISTS`. New URI: `content://com.ironlog.app.provider/today_plan`.
+- **Writing:** Home pushes the plan whenever the active program changes (and when the app opens) through `IronLogEcosystemPlugin`, like `upsertWorkoutRecord`: a new plugin method `upsertTodayPlan` called from `src/services/ironlogEcosystemSync.ts`. It sends `program.next_routine_name`, the week and day, and the exercise list from `getRoutineTargets`. A rest day or no program writes a row with an empty list.
+- **Reading:** Bujo Tasks queries the URI (read-only, same signature permission as the other tables). It shows today's workout name on the Gym task and lists the exercises in the task's detail. Nothing is written back; finishing the workout still uses `completeBujoWorkoutAndWaterOak`.
+- **Open questions for Sadiq:** show weights in Bujo, or names only? Should a skipped day clear the row at midnight?

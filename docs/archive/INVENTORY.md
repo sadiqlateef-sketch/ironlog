@@ -1,3 +1,5 @@
+Archived 2026: outdated, see REVIEW.md / NOTES.md.
+
 # IronLog — Evidence-Based Current Implementation Inventory & Audit Findings
 
 Version: 1.1  
