@@ -95,11 +95,12 @@ android {
         release {
             def keystorePath = System.getenv('IRONLOG_KEYSTORE') ?: 'C:/Users/sadiq/Projects/bujo-tasks/android/bujo-release.jks'
             def keystoreFile = file(keystorePath)
-            if (keystoreFile.exists()) {
+            // The passwords come only from the IRONLOG_* environment variables.
+            if (keystoreFile.exists() && System.getenv('IRONLOG_KEYSTORE_PASSWORD') != null) {
                 storeFile keystoreFile
-                storePassword System.getenv('IRONLOG_KEYSTORE_PASSWORD') ?: 'bujotasks123'
-                keyAlias System.getenv('IRONLOG_KEY_ALIAS') ?: 'bujotasks'
-                keyPassword System.getenv('IRONLOG_KEY_PASSWORD') ?: 'bujotasks123'
+                storePassword System.getenv('IRONLOG_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('IRONLOG_KEY_ALIAS')
+                keyPassword System.getenv('IRONLOG_KEY_PASSWORD')
                 v1SigningEnabled true
                 v2SigningEnabled true
             } else {

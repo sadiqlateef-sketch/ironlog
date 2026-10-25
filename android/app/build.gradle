@@ -21,15 +21,16 @@ android {
     // signature-protected ContentProvider works). Used for debug builds too, so
     // a debug APK can update an installed release one, but only when the key is
     // there: on GitHub's servers without it, debug builds use the normal debug key.
+    // The passwords come only from the IRONLOG_* environment variables.
     def releaseKeystore = file(System.getenv('IRONLOG_KEYSTORE') ?: 'C:/Users/sadiq/Projects/bujo-tasks/android/bujo-release.jks')
-    def hasReleaseKey = releaseKeystore.exists()
+    def hasReleaseKey = releaseKeystore.exists() && System.getenv('IRONLOG_KEYSTORE_PASSWORD') != null
     signingConfigs {
         release {
             if (hasReleaseKey) {
                 storeFile releaseKeystore
-                storePassword System.getenv('IRONLOG_KEYSTORE_PASSWORD') ?: 'bujotasks123'
-                keyAlias System.getenv('IRONLOG_KEY_ALIAS') ?: 'bujotasks'
-                keyPassword System.getenv('IRONLOG_KEY_PASSWORD') ?: 'bujotasks123'
+                storePassword System.getenv('IRONLOG_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('IRONLOG_KEY_ALIAS')
+                keyPassword System.getenv('IRONLOG_KEY_PASSWORD')
                 v1SigningEnabled true
                 v2SigningEnabled true
             }
