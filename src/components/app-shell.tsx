@@ -59,10 +59,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         <LegacyUploadBanner />
         <SyncBanner />
         {/* Mid-workout, every other screen shows the workout (and its rest countdown);
-            the workout screen has the full-size rest timer. */}
-        {workout && !onWorkout ? <ActiveWorkoutBar workout={workout} /> : <RestTimerBar />}
+            the workout screen has its own dock with the rest countdown inside. */}
+        {workout && !onWorkout ? <ActiveWorkoutBar workout={workout} /> : onWorkout ? null : <RestTimerBar />}
         {/* Pages can put a sticky action bar here (the workout's "Log Set"). */}
         <div id="bottom-bar-slot" />
+        {/* Tabs step aside during a workout: the logger's dock is the only thing at the bottom. */}
+        {!(onWorkout && workout) && (
         <nav className="mx-auto max-w-md md:max-w-xl px-3 pb-3 transition-all" aria-label="Main">
           <ul className="glass-strong grid grid-cols-4 rounded-3xl md:py-1">
             {TABS.map(({ href, label, icon: Icon }) => {
@@ -91,6 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </ul>
         </nav>
+        )}
       </div>
       {tour.open && <Tour onDone={tour.finish} />}
     </div>

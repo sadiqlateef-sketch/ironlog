@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpDown, ArrowUpToLine, Check, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { ArrowUpDown, ArrowUpToLine, Check, ChevronLeft, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { ExerciseDetail } from "@/components/exercise-detail";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { PlateCalculator } from "@/components/plate-calculator";
 import { EquipmentSheet, Switch } from "@/components/equipment-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useRestTimer } from "@/components/providers/rest-timer-provider";
 import { useKits } from "@/hooks/use-kits";
 import { kitAllows, kitFor } from "@/lib/kit";
 import { HOME_CALENDAR_KEY } from "@/lib/home-prefs";
@@ -251,6 +252,17 @@ function ActiveWorkout({
   const removedKey = useRef(0);
   const prefs = useLoggerPrefs();
   const slot = useSlot("bottom-bar-slot");
+  const rest = useRestTimer();
+  // How tall the dock is, so the last card never hides behind it.
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [dockHeight, setDockHeight] = useState(0);
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => setDockHeight(el.offsetHeight));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [slot]);
 
   // Suggestions the AI made after the last time you did this routine.
   useEffect(() => {
@@ -447,12 +459,20 @@ function ActiveWorkout({
   const focusMode = prefs.focus && !!focus;
   const afterName = after != null ? (blocks.find((b) => b.order === after)?.exercise.name ?? null) : null;
   const oneHanded = prefs.oneHanded && !focusMode && !!focus && !!nextSet;
+  // What the next set is, e.g. "230 × 5": shown on the Log button and while resting.
+  // (Empty reps fall back to the program's target, as they do when you tap Log.)
+  const nextReps = nextSet ? nextSet.reps || (focus?.repTarget?.split("-")[0] ?? "") : "";
+  const nextLoad = nextSet && nextSet.weight && nextReps ? `${nextSet.weight} × ${nextReps}` : null;
+  const resting = !!rest.timer && !rest.inline;
 
   return (
     <KeypadProvider>
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
+          <Link href="/" className="text-muted-foreground -ml-1 flex items-center text-xs font-semibold" data-testid="logger-home-link">
+            <ChevronLeft className="size-4" aria-hidden /> Home
+          </Link>
           <h1 className="truncate text-2xl font-bold">{session.name ?? "Workout"}</h1>
           <div className="flex items-center gap-2">
             <Elapsed since={session.start_time} />
@@ -672,8 +692,8 @@ function ActiveWorkout({
       >
         Discard workout
       </button>
-      {/* Room for the Log Set bar (and the one-handed controls above it) */}
-      <div className={oneHanded ? "h-52" : "h-20"} aria-hidden />
+      {/* Room for the dock (it grows when resting or in one-handed mode) */}
+      <div style={{ height: dockHeight ? dockHeight + 24 : 96 }} aria-hidden />
 
       {slot &&
         createPortal(
@@ -719,40 +739,80 @@ function ActiveWorkout({
                 </button>
               </div>
             )}
-            {oneHanded && focus && nextSet && (
-              <div className="glass-strong mb-2 flex flex-col gap-1.5 rounded-2xl p-2" data-testid="one-handed">
-                <p className="truncate px-1 text-sm">
-                  <span className="font-semibold">{focus.exercise.name}</span>
-                  <span className="text-muted-foreground"> · {setTitle(focus, nextSet)}</span>
-                </p>
-                <CurrentSetControls
-                  block={focus}
-                  set={nextSet}
-                  size="compact"
-                  onChange={(patch) => w.patchSet(focus.order, nextSet.id, patch)}
-                  onCommit={() => w.commitSet(focus.order, nextSet.id)}
-                />
+            {/* One solid dock: nothing shows through it. */}
+            <div
+              ref={dockRef}
+              className="bg-[var(--card-solid)] border-border flex flex-col gap-2 rounded-3xl border p-2 shadow-[0_-8px_24px_rgb(0_0_0/0.45)]"
+              data-testid="logger-dock"
+            >
+              {oneHanded && focus && nextSet && (
+                <div className="border-border flex flex-col gap-1.5 rounded-2xl border p-2" data-testid="one-handed">
+                  <p className="truncate px-1 text-sm">
+                    <span className="font-semibold">{focus.exercise.name}</span>
+                    <span className="text-muted-foreground"> · {setTitle(focus, nextSet)}</span>
+                  </p>
+                  <CurrentSetControls
+                    block={focus}
+                    set={nextSet}
+                    size="compact"
+                    onChange={(patch) => w.patchSet(focus.order, nextSet.id, patch)}
+                    onCommit={() => w.commitSet(focus.order, nextSet.id)}
+                  />
+                </div>
+              )}
+              {resting && rest.timer && (
+                <div role="timer" aria-live="polite" className="flex items-center gap-3 px-1" data-testid="dock-rest">
+                  <RestRing remaining={rest.remaining} duration={rest.timer.duration} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-muted-foreground truncate text-[11px] font-semibold tracking-wide uppercase">
+                      {rest.remaining <= 0 ? "Rest over · next" : "Resting · then"}
+                    </p>
+                    <p className="truncate text-sm font-semibold">
+                      {focus && nextSet ? `${setTitle(focus, nextSet)}${nextLoad ? ` · ${nextLoad}` : ""}` : rest.timer.label}
+                    </p>
+                  </div>
+                  {rest.remaining > 0 && (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => rest.adjust(-15)} aria-label="15 seconds less">
+                        −15
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => rest.adjust(15)} aria-label="15 seconds more">
+                        +15
+                      </Button>
+                    </>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={rest.stop} aria-label="Skip rest">
+                    Skip
+                  </Button>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNotes(true)}
+                  aria-label={session.notes ? "Workout notes (1 note)" : "Workout notes"}
+                  className="bg-muted relative grid size-14 shrink-0 place-items-center rounded-2xl"
+                >
+                  <NotebookPen className="size-6" />
+                  {session.notes && (
+                    <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 grid size-5 place-items-center rounded-full text-[11px] font-bold">
+                      1
+                    </span>
+                  )}
+                </button>
+                <VoiceLogButton w={w} current={focusOrder} onLogged={(order) => setFocus(focusAfterLog(order, w.blocksNow()))} />
+                <Button size="lg" className="h-14 flex-1 text-lg" onClick={logSet} data-testid="log-set" aria-label={logLabel}>
+                  {logLabel === "Next exercise" && <ChevronRight />}
+                  {logLabel === "Log Set" ? (
+                    <>
+                      Log <Check aria-hidden />
+                      {nextLoad && <span className="num font-semibold">· {nextLoad}</span>}
+                    </>
+                  ) : (
+                    logLabel
+                  )}
+                </Button>
               </div>
-            )}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setNotes(true)}
-                aria-label={session.notes ? "Workout notes (1 note)" : "Workout notes"}
-                className="glass-strong relative grid size-14 shrink-0 place-items-center rounded-2xl"
-              >
-                <NotebookPen className="size-6" />
-                {session.notes && (
-                  <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 grid size-5 place-items-center rounded-full text-[11px] font-bold">
-                    1
-                  </span>
-                )}
-              </button>
-              <VoiceLogButton w={w} current={focusOrder} onLogged={(order) => setFocus(focusAfterLog(order, w.blocksNow()))} />
-              <Button size="lg" className="h-14 flex-1 text-lg" onClick={logSet} data-testid="log-set">
-                {logLabel === "Next exercise" && <ChevronRight />}
-                {logLabel}
-              </Button>
             </div>
           </div>,
           slot,
@@ -1018,6 +1078,22 @@ function Elapsed({ since }: { since: string }) {
   }, []);
   return (
     <p className="text-muted-foreground num text-sm">{formatClock((now - new Date(since).getTime()) / 1000)}</p>
+  );
+}
+
+/** A small ring that empties as the rest runs out, with the time inside. */
+function RestRing({ remaining, duration }: { remaining: number; duration: number }) {
+  const r = 19;
+  const c = 2 * Math.PI * r;
+  const left = Math.max(0, Math.min(1, remaining / duration));
+  return (
+    <div className="relative grid size-12 shrink-0 place-items-center">
+      <svg viewBox="0 0 48 48" className="absolute inset-0 -rotate-90" aria-hidden>
+        <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted" />
+        <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" strokeLinecap="round" className="stroke-primary" strokeDasharray={c} strokeDashoffset={c * (1 - left)} />
+      </svg>
+      <span className="num text-xs font-bold">{remaining <= 0 ? "Go" : formatClock(remaining)}</span>
+    </div>
   );
 }
 
