@@ -81,6 +81,18 @@ jobs:
       # Same Google keys, for "Continue with Google" on the sign-in screen:
       # switches on Supabase's Google provider and allows the app's link back
       # (com.ironlog.app://auth-callback). Other auth settings are left alone.
+      # The "reset password" email link opens the app (com.ironlog.app://reset-password).
+      - name: Allow the password reset link
+        run: |
+          api="https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth"
+          current=$(curl -fsS "$api" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")
+          allow=$(jq -r --arg cb "com.ironlog.app://reset-password" '
+            (.uri_allow_list // "") | split(",") | map(select(. != "")) | (if index($cb) then . else . + [$cb] end) | join(",")
+          ' <<<"$current")
+          jq -n --arg allow "$allow" '{ uri_allow_list: $allow }' \
+            | curl -fsS -X PATCH "$api" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @- -o /dev/null
+          echo "Allowed return links: $allow"
+
       - name: Turn on Google sign-in
         if: ${{ env.GOOGLE_CLIENT_ID != '' && env.GOOGLE_CLIENT_SECRET != '' }}
         run: |

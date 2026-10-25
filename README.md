@@ -684,12 +684,9 @@ Code: `src/lib/offline/`.
 
 The sign-in screen has **Forgot password?**: enter your email and Supabase sends
 its standard reset email. Open it on your phone and tap **Reset password**:
-Ironlog opens and asks for a new password. One-time setup so the link can open
-the app:
-
-1. Open your project's [URL Configuration](https://supabase.com/dashboard/project/_/auth/url-configuration).
-2. Under **Redirect URLs**, click **Add URL**, enter `com.ironlog.app://reset-password`
-   and save.
+Ironlog opens and asks for a new password. The **Deploy database and
+functions** action allows that link (`com.ironlog.app://reset-password`) in
+Supabase's Redirect URLs for you; without it the link can't open the app.
 
 ## Sign in with Google
 
