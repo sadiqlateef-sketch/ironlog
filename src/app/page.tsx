@@ -14,6 +14,8 @@ import { AppShell } from "@/components/app-shell";
 import { CenterStartButton } from "@/components/home/center-start-button";
 import { LastSessionCard } from "@/components/home/last-session-card";
 import { NextSessionCard } from "@/components/home/next-session-card";
+import { RecoveryChips } from "@/components/home/recovery-chips";
+import { WeekStrip } from "@/components/home/week-strip";
 import { SessionSheet } from "@/components/session-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useActiveProgram } from "@/components/up-next";
@@ -52,9 +54,11 @@ function Dashboard() {
   // Bumped after a workout is edited or deleted, so the list refreshes.
   const [reload, setReload] = useState(0);
   const program = useActiveProgram(reload);
+  // Fixed at mount so the week strip stays pure during render.
+  const [now] = useState(() => new Date());
 
   useEffect(() => {
-    listRecentSessions().then(setRecent).catch(() => setRecent([]));
+    listRecentSessions(14).then(setRecent).catch(() => setRecent([]));
     listPendingAdjustments().then(setAdjustments).catch(() => {});
   }, [reload]);
 
@@ -71,14 +75,22 @@ function Dashboard() {
         </span>
       </header>
 
-      {/* 1. LAST SESSION DEBRIEF */}
-      <LastSessionCard session={lastSession} unit={unit} onOpen={(id) => setOpen(id)} />
-
-      {/* 2. CENTERPIECE ACTION BUTTON */}
-      <CenterStartButton workout={workout} program={program} />
-
-      {/* 3. NEXT SESSION BLUEPRINT */}
-      <NextSessionCard program={program} unit={unit} />
+      {/* Folded: one column, last session first. Unfolded: start on the left, last session and recovery on the right. */}
+      <div className="grid gap-4 md:grid-cols-[1.15fr_1fr] md:items-start">
+        <div className="flex flex-col gap-4 md:col-start-2 md:row-start-1">
+          <LastSessionCard session={lastSession} unit={unit} onOpen={(id) => setOpen(id)} />
+          <div className="hidden md:block">
+            <RecoveryChips />
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 md:col-start-1 md:row-start-1">
+          <CenterStartButton workout={workout} program={program} />
+          <NextSessionCard program={program} unit={unit} />
+          <div className="hidden md:block">
+            <WeekStrip sessions={recent} unit={unit} now={now} />
+          </div>
+        </div>
+      </div>
 
       {/* Suggested Adjustments */}
       {adjustments.length > 0 && (
