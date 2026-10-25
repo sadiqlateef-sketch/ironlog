@@ -8,8 +8,8 @@ android {
         applicationId "com.ironlog.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "2.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,26 +17,47 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Release signing comes from environment variables so the keystore and
-    // passwords never live in the project (see README, "Release build").
-    def keystore = System.getenv("IRONLOG_KEYSTORE")
+    // The shared Bujo ecosystem key (same signature as Bujo Tasks, so the
+    // signature-protected ContentProvider works). Used for debug builds too, so
+    // a debug APK can update an installed release one, but only when the key is
+    // there: on GitHub's servers without it, debug builds use the normal debug key.
+    def releaseKeystore = file(System.getenv('IRONLOG_KEYSTORE') ?: 'C:/Users/sadiq/Projects/bujo-tasks/android/bujo-release.jks')
+    def hasReleaseKey = releaseKeystore.exists()
     signingConfigs {
         release {
-            if (keystore) {
-                storeFile file(keystore)
-                storePassword System.getenv("IRONLOG_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("IRONLOG_KEY_ALIAS")
-                keyPassword System.getenv("IRONLOG_KEY_PASSWORD")
+            if (hasReleaseKey) {
+                storeFile releaseKeystore
+                storePassword System.getenv('IRONLOG_KEYSTORE_PASSWORD') ?: 'bujotasks123'
+                keyAlias System.getenv('IRONLOG_KEY_ALIAS') ?: 'bujotasks'
+                keyPassword System.getenv('IRONLOG_KEY_PASSWORD') ?: 'bujotasks123'
+                v1SigningEnabled true
+                v2SigningEnabled true
             }
         }
     }
     buildTypes {
         release {
-            if (keystore) signingConfig signingConfigs.release
+            if (hasReleaseKey) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+        debug {
+            if (hasReleaseKey) signingConfig signingConfigs.release
+        }
     }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.browser:browser:1.8.0'
+        force 'androidx.core:core:1.15.0'
+    }
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
 }
 
 kotlin {
@@ -56,6 +77,7 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "com.google.android.gms:play-services-wearable:18.2.0"
     implementation project(':capacitor-android')
     // Health Connect (send workouts, read heart rate and weight). Needs minSdk 26.
     implementation 'androidx.health.connect:connect-client:1.1.0'

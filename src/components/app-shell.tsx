@@ -6,11 +6,13 @@ import { useEffect, type ReactNode } from "react";
 import { ActiveWorkoutBar } from "@/components/active-workout-bar";
 import { useAuth } from "@/components/providers/auth-provider";
 import { RestTimerBar } from "@/components/rest-timer-bar";
+import { LegacyUploadBanner } from "@/components/legacy-upload-banner";
 import { SyncBanner } from "@/components/sync-banner";
 import { Tour, useTour } from "@/components/tour";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkout } from "@/hooks/use-active-workout";
 import { TABS, tabFor } from "@/lib/nav";
+import { isLocalBackend } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 /** Signed-in layout: page content, the workout bar, and the bottom tab bar. */
@@ -48,19 +50,23 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Keyed by screen so each one fades in as you switch. */}
-      <main key={pathname} className={cn("page-in mx-auto w-full max-w-md flex-1 px-4 pt-6", workout && !onWorkout ? "pb-48" : "pb-40")}>
+      {/* Keyed by screen so each one fades in as you switch. Responsively scales for foldable unfolded inner displays. */}
+      <main key={pathname} className={cn("page-in mx-auto w-full max-w-md md:max-w-4xl lg:max-w-5xl flex-1 px-4 pt-6 transition-all", workout && !onWorkout ? "pb-48" : "pb-40")}>
+        {isLocalBackend() && <p className="text-set-warmup mb-3 text-xs font-semibold">Test mode: not connected to your account</p>}
         {children}
       </main>
       <div className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
+        <LegacyUploadBanner />
         <SyncBanner />
         {/* Mid-workout, every other screen shows the workout (and its rest countdown);
-            the workout screen has the full-size rest timer. */}
-        {workout && !onWorkout ? <ActiveWorkoutBar workout={workout} /> : <RestTimerBar />}
+            the workout screen has its own dock with the rest countdown inside. */}
+        {workout && !onWorkout ? <ActiveWorkoutBar workout={workout} /> : onWorkout ? null : <RestTimerBar />}
         {/* Pages can put a sticky action bar here (the workout's "Log Set"). */}
         <div id="bottom-bar-slot" />
-        <nav className="mx-auto max-w-md px-3 pb-3" aria-label="Main">
-          <ul className="glass-strong grid grid-cols-4 rounded-3xl">
+        {/* Tabs step aside during a workout: the logger's dock is the only thing at the bottom. */}
+        {!(onWorkout && workout) && (
+        <nav className="mx-auto max-w-md md:max-w-xl px-3 pb-3 transition-all" aria-label="Main">
+          <ul className="glass-strong grid grid-cols-4 rounded-3xl md:py-1">
             {TABS.map(({ href, label, icon: Icon }) => {
               const active = current?.href === href;
               return (
@@ -87,6 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </ul>
         </nav>
+        )}
       </div>
       {tour.open && <Tour onDone={tour.finish} />}
     </div>

@@ -3,5 +3,5 @@
 // APK workflow, add a repository variable (Settings > Secrets and variables >
 // Actions > Variables), e.g. FEATURE_WATCH = 1.
 
-/** Linking a Wear OS watch (/link-watch/). On with NEXT_PUBLIC_FEATURE_WATCH=1. */
-export const WATCH_LINKING = process.env.NEXT_PUBLIC_FEATURE_WATCH === "1";
+/** Linking a Wear OS watch (/link-watch/). Enabled for Galaxy Watch / Wear OS companion sync. */
+export const WATCH_LINKING = true;

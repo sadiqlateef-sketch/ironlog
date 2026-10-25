@@ -39,7 +39,7 @@ export function ActiveWorkoutBar({ workout }: { workout: NonNullable<ActiveWorko
     <div
       data-testid="active-workout-bar"
       className={cn(
-        "relative mx-3 mb-2 overflow-hidden rounded-2xl sm:mx-auto sm:max-w-md",
+        "relative mx-3 mb-2 overflow-hidden rounded-2xl sm:mx-auto sm:max-w-md md:max-w-xl transition-all",
         restDone ? "bg-primary text-primary-foreground" : "glass-strong",
       )}
     >

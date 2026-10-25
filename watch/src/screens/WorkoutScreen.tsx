@@ -20,6 +20,7 @@ import {
 import { canListen, listen } from "../voice";
 import { parseSpokenSet } from "../voiceSet";
 import { uuid } from "../queue";
+import { watchBridge } from "../wearableBridge";
 import { Btn, C, Screen, Stepper, T, ZONE } from "../ui";
 
 type View_ = { kind: "log" } | { kind: "rest"; endsAt: number; duration: number; next: string } | { kind: "done" };
@@ -65,8 +66,46 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
     return () => sub.remove();
   }, [load]);
 
-  // ---- Screen on + heart rate while the workout is open ----
   const sessionId = w?.id;
+
+  useEffect(() => {
+    if (!sessionId) return;
+    return watchBridge.onPhoneSetLogged((raw) => {
+      try {
+        const data = JSON.parse(raw);
+        if (data && data.sessionId === sessionId) {
+          setW((cur) =>
+            cur
+              ? {
+                  ...cur,
+                  groups: cur.groups.map((g) =>
+                    g.exerciseId === data.exerciseId
+                      ? {
+                          ...g,
+                          sets: g.sets.map((s) =>
+                            s.set_number === data.setNumber
+                              ? {
+                                  ...s,
+                                  weight: data.weightKg ?? s.weight,
+                                  reps: data.reps ?? s.reps,
+                                  is_completed: data.isCompleted ?? s.is_completed,
+                                }
+                              : s
+                          ),
+                        }
+                      : g
+                  ),
+                }
+              : cur
+          );
+        }
+      } catch {
+        // ignore malformed payload
+      }
+    });
+  }, [sessionId]);
+
+  // ---- Screen on + heart rate while the workout is open ----
   useEffect(() => {
     if (!sessionId) return;
     keepScreenOn(true);
@@ -162,6 +201,14 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
     const at = new Date().toISOString();
     updateSet(target.id, { weight, reps, is_completed: true });
     queue.push({ kind: "complete", setId: target.id, weight, reps, at });
+    watchBridge.sendSetLogged({
+      sessionId: workout.id,
+      exerciseId: g.exerciseId,
+      setNumber: target.set_number,
+      weightKg: weight,
+      reps,
+      isCompleted: true,
+    }).catch(() => {});
     Vibration.vibrate(40);
     setFocus(null);
 
@@ -260,6 +307,7 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
 
   function finish() {
     finishWorkout(workout);
+    watchBridge.sendWorkoutFinished(workout.id).catch(() => {});
     keepScreenOn(false);
     setView({ kind: "done" });
   }

@@ -41,6 +41,23 @@ function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest)
   );
 }
 
+/** Like run(), but only says whether the write went through. Without IndexedDB the memory copy is all there is, which is the documented fallback. */
+function runOk(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest): Promise<boolean> {
+  return open().then(
+    (db) =>
+      new Promise<boolean>((resolve) => {
+        if (!db) return resolve(true);
+        try {
+          const req = fn(db.transaction(STORE, mode).objectStore(STORE));
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => resolve(false);
+        } catch {
+          resolve(false);
+        }
+      }),
+  );
+}
+
 export async function kvGet<T>(key: string): Promise<T | undefined> {
   if (memory.has(key)) return memory.get(key) as T;
   const v = await run<T>("readonly", (s) => s.get(key));
@@ -48,9 +65,10 @@ export async function kvGet<T>(key: string): Promise<T | undefined> {
   return v;
 }
 
-export async function kvSet(key: string, value: unknown): Promise<void> {
+/** False when the phone couldn't store it (storage full or blocked). The value is still kept in memory until the app closes. */
+export async function kvSet(key: string, value: unknown): Promise<boolean> {
   memory.set(key, value);
-  await run("readwrite", (s) => s.put(value, key));
+  return runOk("readwrite", (s) => s.put(value, key));
 }
 
 export async function kvDelete(key: string): Promise<void> {

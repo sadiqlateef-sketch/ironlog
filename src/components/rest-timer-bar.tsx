@@ -17,7 +17,7 @@ export function RestTimerBar() {
     <div
       role="timer"
       aria-live="polite"
-      className={`relative mx-3 mb-2 overflow-hidden rounded-2xl sm:mx-auto sm:max-w-md ${done ? "bg-primary text-primary-foreground shadow-[0_6px_24px_rgb(61_99_238/0.45)]" : "glass-strong"}`}
+      className={`relative mx-3 mb-2 overflow-hidden rounded-2xl sm:mx-auto sm:max-w-md md:max-w-xl transition-all ${done ? "bg-primary text-primary-foreground shadow-[0_6px_24px_rgb(61_99_238/0.45)]" : "glass-strong"}`}
     >
       {!done && (
         <div

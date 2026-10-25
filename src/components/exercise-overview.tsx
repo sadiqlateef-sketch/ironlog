@@ -156,7 +156,11 @@ export function OverviewTab({
         <section aria-label="Best sets">
           <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">Personal records</h3>
           <dl className="grid grid-cols-2 gap-2">
-            <Record label="Best est. 1RM" value={`${show(records.e1rm.value)} ${u}`} detail={`${show(records.e1rm.weight)} × ${records.e1rm.reps} · ${shortDate(records.e1rm.date)}`} />
+            <Record
+              label={records.e1rm.reps === 1 ? "Tested 1RM" : "Best est. 1RM"}
+              value={`${show(records.e1rm.value)} ${u}`}
+              detail={`${show(records.e1rm.weight)} × ${records.e1rm.reps}${records.e1rm.reps > 12 ? " (endurance)" : ""} · ${shortDate(records.e1rm.date)}`}
+            />
             {records.heaviest && <Record label="Heaviest set" value={`${show(records.heaviest.weight)} ${u}`} detail={`× ${records.heaviest.reps} · ${shortDate(records.heaviest.date)}`} />}
             {records.mostReps && <Record label="Most reps" value={`${records.mostReps.reps} reps`} detail={`at ${show(records.mostReps.weight)} ${u} · ${shortDate(records.mostReps.date)}`} />}
             {records.volume && <Record label="Best workout volume" value={`${Math.round(conv(records.volume.value)).toLocaleString("en-US")} ${u}`} detail={shortDate(records.volume.date)} />}

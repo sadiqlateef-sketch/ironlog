@@ -4,11 +4,12 @@
 // sent straight away when there's signal. While anything is still waiting,
 // the local copy is the truth; once everything has synced, the server is.
 
-import { getSupabase } from "@/lib/supabase/client";
-import { kvGet, kvSet } from "@/lib/offline/kv";
-import { enqueue, flush, hasPending, isNetworkError, type Op } from "@/lib/offline/queue";
-import type { Database } from "@/types/database";
-import type { WorkoutSession, WorkoutSet } from "@/lib/workout-api";
+import { getSupabase, isLocalBackend } from "../supabase/client.ts";
+import { kvGet, kvSet } from "./kv.ts";
+import { warmupWeightsKg } from "../set-logic.ts";
+import { enqueue, flush, hasPending, isNetworkError, type Op } from "./queue.ts";
+import type { Database } from "../../types/database.ts";
+import type { WorkoutSession, WorkoutSet } from "../workout-api.ts";
 
 type SetInsert = Database["public"]["Tables"]["workout_sets"]["Insert"];
 type SetUpdate = Database["public"]["Tables"]["workout_sets"]["Update"];
@@ -69,29 +70,127 @@ async function commit(...ops: Op[]): Promise<void> {
 
 const now = () => new Date().toISOString();
 
+export function isToday(isoDateString: string | null | undefined): boolean {
+  if (!isoDateString) return false;
+  const d = new Date(isoDateString);
+  const cur = new Date();
+  return (
+    d.getFullYear() === cur.getFullYear() &&
+    d.getMonth() === cur.getMonth() &&
+    d.getDate() === cur.getDate()
+  );
+}
+
+export function isSessionCompleted(session: WorkoutSession | null | undefined): boolean {
+  if (!session) return false;
+  return session.end_time != null || ("completed_at" in session && (session as { completed_at?: unknown }).completed_at != null);
+}
+
+/** Workouts stay "in progress" for 12 hours, so one that runs past midnight isn't lost. */
+export const OPEN_HOURS = 12;
+export function isRecent(iso: string | null | undefined, now = Date.now()): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) && now - t < OPEN_HOURS * 3_600_000;
+}
+
+const RESUMED_KEY = "resumed-session";
+
+/** In progress: not finished, and either recent or one you chose to resume. */
+async function isOpen(s: WorkoutSession | null | undefined): Promise<boolean> {
+  if (!s || isSessionCompleted(s)) return false;
+  return isRecent(s.start_time) || (await kvGet<string>(RESUMED_KEY)) === s.id;
+}
+
 // ---------- Reading ----------
 
 /** The workout in progress as this phone last saw it. Instant: no network. */
 export async function peekActiveWorkout(): Promise<{ session: WorkoutSession; sets: number; done: number } | null> {
   const m = await readMirror();
-  return m ? { session: m.session, sets: m.sets.length, done: m.sets.filter((s) => s.completed_at).length } : null;
+  if (!m) return null;
+  // If completed, clear mirror and return null
+  if (isSessionCompleted(m.session)) {
+    await writeMirror(null);
+    return null;
+  }
+  // Guard: an old workout you haven't chosen to resume is stale - never silently show as active
+  if (!(await isOpen(m.session))) {
+    return null;
+  }
+  return { session: m.session, sets: m.sets.length, done: m.sets.filter((s) => s.completed_at || s.is_completed).length };
 }
 
 /** The unfinished workout, from the server when it's reachable and caught up. */
 export async function getActiveSession(): Promise<WorkoutSession | null> {
   await flush();
-  if (await hasPending()) return (await readMirror())?.session ?? null;
+  if (await hasPending()) {
+    const s = (await readMirror())?.session ?? null;
+    if (s && !(await isOpen(s))) {
+      await writeMirror(null);
+      return null;
+    }
+    return s;
+  }
   try {
-    const active: WorkoutSession | null = unwrap(await getSupabase().from("workout_sessions").select("*").is("end_time", null).maybeSingle());
+    const active: WorkoutSession | null = unwrap(
+      await getSupabase().from("workout_sessions").select("*").is("end_time", null).maybeSingle()
+    );
     const m = await readMirror();
-    if (!active) await writeMirror(null);
-    else if (m?.session.id !== active.id) await writeMirror({ session: active, sets: [] });
+    if (!active || isSessionCompleted(active)) {
+      await writeMirror(null);
+      return null;
+    }
+    // Guard: Only restore as active if it is recent or one you chose to resume!
+    if (!(await isOpen(active))) {
+      if (m?.session.id === active.id) await writeMirror(null);
+      return null;
+    }
+    if (m?.session.id !== active.id) await writeMirror({ session: active, sets: [] });
     else await writeMirror({ sets: m.sets, session: active });
     return active;
   } catch (e) {
-    if (isNetworkError(e)) return (await readMirror())?.session ?? null;
+    if (isNetworkError(e)) {
+      const s = (await readMirror())?.session ?? null;
+      if (s && !(await isOpen(s))) {
+        await writeMirror(null);
+        return null;
+      }
+      return s;
+    }
     throw e;
   }
+}
+
+/** Check if there is an unfinished workout session from a prior day (stale). */
+export async function getStaleSession(): Promise<WorkoutSession | null> {
+  try {
+    const m = await readMirror();
+    if (m?.session && !isSessionCompleted(m.session) && !(await isOpen(m.session))) {
+      return m.session;
+    }
+    const sessions: WorkoutSession[] = unwrap(
+      await getSupabase()
+        .from("workout_sessions")
+        .select("*")
+        .is("end_time", null)
+        .order("start_time", { ascending: false })
+        .limit(1)
+    );
+    const s = sessions[0] ?? null;
+    if (s && !isSessionCompleted(s) && !(await isOpen(s))) {
+      return s;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Resumes a stale session, making it the active session. */
+export async function resumeStaleSession(session: WorkoutSession): Promise<void> {
+  const sets = await listActiveSets(session.id);
+  await kvSet(RESUMED_KEY, session.id);
+  await writeMirror({ session, sets });
 }
 
 /** The active workout's sets (falls back to the phone's copy without signal). */
@@ -128,6 +227,15 @@ export async function startPlannedSession(
   info: { name: string; routineId?: string | null; kitId?: string | null; addToCalendar?: boolean | null },
   items: PlannedExercise[],
 ): Promise<WorkoutSession> {
+  // One workout at a time: starting a second would make finishing one pop the other open.
+  const open = await readMirror();
+  if (open && !isSessionCompleted(open.session)) throw new Error("one_active: finish or discard the workout you have open first");
+  try {
+    const { data } = await getSupabase().from("workout_sessions").select("id").is("end_time", null).limit(1);
+    if (data?.length) throw new Error("one_active: finish or discard the workout you have open first");
+  } catch (e) {
+    if (!isNetworkError(e)) throw e; // no signal: the phone's copy above is the best we know
+  }
   const uid = await userId();
   const t = now();
   const session: WorkoutSession = {
@@ -154,12 +262,29 @@ export async function startPlannedSession(
   items.forEach((item, i) => {
     let n = 1;
     const base = { session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, superset_group: item.superset_group ?? null, reps: 0 };
-    for (let w = 0; w < (item.warmups ?? 0); w++) inserts.push({ ...base, set_number: n++, set_type: "warmup", weight: 0 });
+    const warmupKg = warmupWeightsKg(item.weight_kg ?? 0, item.warmups ?? 0);
+    for (let w = 0; w < (item.warmups ?? 0); w++) inserts.push({ ...base, set_number: n++, set_type: "warmup", weight: warmupKg[w] });
     for (let s = 0; s < item.sets; s++) inserts.push({ ...base, set_number: n++, set_type: "normal", weight: item.weight_kg ?? 0 });
   });
   const sets = inserts.map((s) => toRow(s, uid));
 
   await writeMirror({ session, sets });
+
+  // Direct write to mock local storage if active so session is instantly present
+  if (isLocalBackend() && typeof window !== "undefined" && window.localStorage) {
+    try {
+      const sessKey = "ironlog_table_workout_sessions";
+      const raw = window.localStorage.getItem(sessKey);
+      const list = raw ? JSON.parse(raw) : [];
+      list.push(session);
+      window.localStorage.setItem(sessKey, JSON.stringify(list));
+      const setsKey = "ironlog_table_workout_sets";
+      const rawSets = window.localStorage.getItem(setsKey);
+      const sList = rawSets ? JSON.parse(rawSets) : [];
+      window.localStorage.setItem(setsKey, JSON.stringify([...sList, ...sets]));
+    } catch {}
+  }
+
   const ops: Op[] = [
     {
       kind: "insert",
@@ -184,16 +309,66 @@ export async function startPlannedSession(
 }
 
 export async function finishSession(session: WorkoutSession): Promise<{ synced: boolean }> {
+  await kvSet(RESUMED_KEY, null);
   const endTime = now();
+  const m = await readMirror();
+  const completedSets = (m?.sets ?? []).filter((s) => (s.is_completed || s.completed_at) && s.set_type !== "warmup");
+  const volume = completedSets.reduce((sum, s) => sum + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0);
+
+  // Clear active workout mirror atomically
   await writeMirror(null);
-  const ops: Op[] = [{ kind: "finish", sessionId: session.id, endTime }];
+
+  // Synchronously update local mock storage if present
+  if (isLocalBackend() && typeof window !== "undefined" && window.localStorage) {
+    try {
+      const sessKey = "ironlog_table_workout_sessions";
+      const raw = window.localStorage.getItem(sessKey);
+      if (raw) {
+        const list = JSON.parse(raw) as Array<{ id?: string; [key: string]: unknown }>;
+        const idx = list.findIndex((s) => s.id === session.id);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], end_time: endTime, volume, updated_at: endTime };
+          window.localStorage.setItem(sessKey, JSON.stringify(list));
+        }
+      }
+      const setsKey = "ironlog_table_workout_sets";
+      const rawSets = window.localStorage.getItem(setsKey);
+      if (rawSets) {
+        const setsList = JSON.parse(rawSets) as Array<{ session_id?: string; is_completed?: boolean }>;
+        const kept = setsList.filter((s) => !(s.session_id === session.id && !s.is_completed));
+        window.localStorage.setItem(setsKey, JSON.stringify(kept));
+      }
+    } catch {}
+  }
+
+  const ops: Op[] = [{ kind: "finish", sessionId: session.id, endTime, volume }];
   if (session.routine_id) ops.push({ kind: "adjust", sessionId: session.id });
   await enqueue(...ops);
   return { synced: await flush() };
 }
 
 export async function discardSession(sessionId: string): Promise<void> {
+  await kvSet(RESUMED_KEY, null);
   await changeMirror((m) => (m.session.id === sessionId ? null : m));
+  await writeMirror(null);
+
+  if (isLocalBackend() && typeof window !== "undefined" && window.localStorage) {
+    try {
+      const sessKey = "ironlog_table_workout_sessions";
+      const raw = window.localStorage.getItem(sessKey);
+      if (raw) {
+        const list = (JSON.parse(raw) as Array<{ id?: string }>).filter((s) => s.id !== sessionId);
+        window.localStorage.setItem(sessKey, JSON.stringify(list));
+      }
+      const setsKey = "ironlog_table_workout_sets";
+      const rawSets = window.localStorage.getItem(setsKey);
+      if (rawSets) {
+        const list = (JSON.parse(rawSets) as Array<{ session_id?: string }>).filter((s) => s.session_id !== sessionId);
+        window.localStorage.setItem(setsKey, JSON.stringify(list));
+      }
+    } catch {}
+  }
+
   await commit({ kind: "delete", table: "workout_sessions", ids: [sessionId] });
 }
 

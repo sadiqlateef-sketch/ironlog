@@ -18,7 +18,7 @@ A standalone watch app in `watch/` (React Native). It talks to the same
 Supabase database as the phone, so a workout started on either shows up on both.
 
 - **Link once, no typing on the watch.** The watch shows a 6-digit code. On
-  your phone, go to Home > **Link watch** and enter it. That button is hidden
+  your phone, go to More > **Watch pairing** (`/link-watch/`) and enter it. That button is hidden
   until you turn it on: add a repository variable `FEATURE_WATCH` = `1`
   (Settings > Secrets and variables > Actions > Variables) and rebuild the APK. Codes last 10 minutes
   and work once, and 10 wrong tries locks code entry for a while.
@@ -702,15 +702,11 @@ Code: `src/lib/offline/`.
 
 ## Forgot password
 
-The sign-in screen has **Forgot password?**: enter your email, then type the
-code from the email and a new password. Supabase's standard reset email only
-has a link, so make it show the code (one time):
-
-1. Open your project's [email templates](https://supabase.com/dashboard/project/_/auth/templates)
-   and pick **Reset Password**.
-2. Set the subject to `Your Ironlog password reset code`.
-3. Replace the message body with the contents of `supabase/templates/recovery.html`
-   and save.
+The sign-in screen has **Forgot password?**: enter your email and Supabase sends
+its standard reset email. Open it on your phone and tap **Reset password**:
+Ironlog opens and asks for a new password. The **Deploy database and
+functions** action allows that link (`com.ironlog.app://reset-password`) in
+Supabase's Redirect URLs for you; without it the link can't open the app.
 
 ## Sign in with Google
 

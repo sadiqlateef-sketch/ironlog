@@ -12,6 +12,7 @@ const typeStyles = {
   warmup: "bg-set-warmup/20 text-set-warmup",
   drop: "bg-set-drop/20 text-set-drop",
   failure: "bg-set-failure/20 text-set-failure",
+  amrap: "bg-set-amrap/20 text-set-amrap",
 } as const;
 
 const numInput =

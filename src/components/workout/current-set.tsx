@@ -39,7 +39,7 @@ function fieldsFor(block: Block, index: number, unit: "metric" | "imperial"): Fi
     return [{ kind: "distance", field: "distance", label: distanceUnit(unit), placeholder: prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "0" }, time];
   }
   // Working sets fill in today's suggested weight when there is one.
-  const suggested = tracking === "weight_reps" && block.suggestion && set && (set.type === "normal" || set.type === "failure");
+  const suggested = tracking === "weight_reps" && block.suggestion && set && (set.type === "normal" || set.type === "failure" || set.type === "amrap");
   const weight: FieldSpec = {
     kind: "weight",
     field: "weight",
@@ -161,6 +161,7 @@ export function setTitle(block: Block, set: UiSet): string {
   if (set.type === "warmup") return "Warm-up set";
   if (set.type === "drop") return "Drop set";
   if (set.type === "failure") return "To failure";
+  if (set.type === "amrap") return "AMRAP: as many reps as you can";
   return `Set ${label} of ${working}`;
 }
 
