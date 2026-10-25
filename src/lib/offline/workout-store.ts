@@ -226,6 +226,15 @@ export async function startPlannedSession(
   info: { name: string; routineId?: string | null; kitId?: string | null; addToCalendar?: boolean | null },
   items: PlannedExercise[],
 ): Promise<WorkoutSession> {
+  // One workout at a time: starting a second would make finishing one pop the other open.
+  const open = await readMirror();
+  if (open && !isSessionCompleted(open.session)) throw new Error("one_active: finish or discard the workout you have open first");
+  try {
+    const { data } = await getSupabase().from("workout_sessions").select("id").is("end_time", null).limit(1);
+    if (data?.length) throw new Error("one_active: finish or discard the workout you have open first");
+  } catch (e) {
+    if (!isNetworkError(e)) throw e; // no signal: the phone's copy above is the best we know
+  }
   const uid = await userId();
   const t = now();
   const session: WorkoutSession = {

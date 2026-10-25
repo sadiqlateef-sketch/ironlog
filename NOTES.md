@@ -11,15 +11,15 @@ Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project file
 ## Verified on my phone
 - (Nothing verified from this review yet. Add items here after testing on the Fold8.)
 
+## Done (awaiting phone check)
+- D1 cloud-backed again, D2 previous-day workout, D3 one open workout, D8 lint/typecheck, D10 APK build.
+
 ## Known bugs / half-finished
-- All sign-in, data and AI calls are answered by `src/lib/supabase/mock-backend.ts`; cloud history not shown.
-- Previous-day workout: Resume does nothing; closing the prompt deletes it; workouts vanish at midnight.
-- Two open workouts: finishing one opens the other (no one-active rule locally).
 - Watch-logged weight dropped on the phone (`weight_kg` vs `weight`).
 - Periodization auto-apply on by default, rewrites program targets.
-- Planned warm-up rows prefill 0 weight. Lint has 4 errors.
-- Phone APK build on GitHub Actions is red: debug build signs with a release key path on the PC.
+- Planned warm-up rows prefill 0 weight.
 - Open PRs not on main: #18 reset email, #20 Health Connect, #22 deload weeks.
+- Local PC builds need real Supabase settings in `.env.production.local` (placeholders cause "Failed to fetch").
 
 ## Next
-- Follow FIX_PLAN.md phase by phase (Phase 1 D10 done in 6fa4408). Test checkpoint after every phase: `node scripts/smoke-test.mjs`.
+- Follow FIX_PLAN.md phase by phase (Phases 1-5 done). Test checkpoint after every phase: `node scripts/smoke-test.mjs`.
