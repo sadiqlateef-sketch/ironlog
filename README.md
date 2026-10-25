@@ -146,8 +146,7 @@ Home > **Programs** (or Workout > Programs & routines) opens the Programs screen
   session length, experience, your equipment, and any notes ("bad left
   shoulder"). Claude designs the program from the app's exercise library and
   maps out every workout: each day keeps the same exercises every week, while
-  the weight, sets and reps move week to week (with deload weeks where the
-  style uses them). For main lifts it uses a
+  the weight, sets and reps move week to week. For main lifts it uses a
   **percent of your estimated max**, which the app turns into a real weight
   rounded to plates you can load (5 lb or 2.5 kg). If you have no history for
   a lift, it uses an effort target (RPE) instead.
@@ -167,6 +166,29 @@ Home > **Programs** (or Workout > Programs & routines) opens the Programs screen
   add weight, repeat, deload, or change the rep target. **Apply** updates the
   plan (in a program, that day in every later week too); **Dismiss** leaves it alone. Suggestions you haven't answered also show
   on the Plans screen.
+
+### Deload weeks
+
+A deload week is a planned easy week: about half the sets and about 10% less
+weight, with nothing taken to failure, so your body catches up on recovery.
+
+- **Planned.** New programs get one automatically: every 4th week for 5/3/1,
+  Sheiko and advanced lifters, every 5th week for RP blocks and intermediates,
+  every 6th week for linear progression and beginners. Programs shorter than
+  that have none. Pick **Deload weeks: None** in the builder to turn them off.
+  Deload weeks are tagged on the week tabs, the day cards and **Up next**. The
+  app checks Claude's numbers, so a deload is always lighter than the week
+  before it.
+- **Early, when you need it.** If you fall short of your targets on at least
+  half of your exercises in 2 of your last 3 program workouts (from week 2 on),
+  the app offers **Take a deload week** after the workout, on Home and on the
+  Programs screen. Taking it makes your next week a lighter copy of the week
+  you just did. If a planned deload was coming within 3 weeks, it moves up
+  (the program stays the same length); otherwise the later weeks move back one
+  and the program gets a week longer. **Not now** hides it, and only misses
+  after that count toward the next offer.
+- Deload workouts don't produce "next time" suggestions, and applied
+  suggestions skip deload weeks so they stay light.
 
 ### Safety rails
 

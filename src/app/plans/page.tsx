@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Play, RotateCcw, Sparkles, Square, Trash2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
+import { DeloadOffer, DeloadTag } from "@/components/deload-offer";
 import { AppShell } from "@/components/app-shell";
 import { UnmarkDay } from "@/components/unmark-day";
 import { WorkoutEditor } from "@/components/workout-editor";
@@ -376,6 +377,20 @@ function Generator({
           </label>
         </div>
         <fieldset>
+          <legend className="mb-2 text-sm font-medium">Deload weeks</legend>
+          <div className="flex flex-wrap gap-2">
+            <Chip on={(form.deload ?? "auto") === "auto"} onClick={() => set("deload", "auto")}>
+              Every few weeks
+            </Chip>
+            <Chip on={form.deload === "off"} onClick={() => set("deload", "off")}>
+              None
+            </Chip>
+          </div>
+          <p className="text-muted-foreground mt-1.5 text-xs">
+            A lighter week (half the sets, about 10% less weight) every 4 to 6 weeks, depending on your style and experience.
+          </p>
+        </fieldset>
+        <fieldset>
           <legend className="mb-2 text-sm font-medium">Experience</legend>
           <div className="flex flex-wrap gap-2">
             {(["beginner", "intermediate", "advanced"] as const).map((x) => (
@@ -529,6 +544,10 @@ function ProgramCard({
         </div>
       )}
 
+      {active && !finished && program.deload_suggestion && (
+        <DeloadOffer programId={program.id} reason={program.deload_suggestion} onChange={onChange} />
+      )}
+
       {program.summary && <p className="text-sm leading-relaxed">{program.summary}</p>}
       {program.progression_rule && (
         <p className="text-muted-foreground text-sm">
@@ -563,7 +582,9 @@ function ProgramCard({
 
       {program.weeks > 1 && (
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Week">
-          {Array.from({ length: program.weeks }, (_, i) => i + 1).map((w) => (
+          {Array.from({ length: program.weeks }, (_, i) => i + 1).map((w) => {
+            const deload = program.routines.some((r) => r.program_week === w && r.is_deload);
+            return (
             <button
               key={w}
               role="tab"
@@ -575,8 +596,10 @@ function ProgramCard({
               )}
             >
               Week {w}
+              {deload && <span className={cn("ml-1 font-semibold", week !== w && "text-set-warmup")}>· Deload</span>}
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
       <div className="flex flex-col gap-2">
@@ -627,7 +650,10 @@ function DayRow({
       <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5">
         {done && <Check className="text-primary-text size-4 shrink-0" aria-label="Done" />}
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-semibold">{routine.program_day ? `Day ${routine.program_day}` : routine.name}</span>
+          <span className="flex items-center gap-2 truncate font-semibold">
+            {routine.program_day ? `Day ${routine.program_day}` : routine.name}
+            {routine.is_deload && <DeloadTag />}
+          </span>
           <span className="text-muted-foreground block truncate text-xs">
             {routine.program_day ? workoutTitle(routine.name) : routine.description}
           </span>

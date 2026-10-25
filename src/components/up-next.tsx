@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DeloadOffer, DeloadTag } from "@/components/deload-offer";
 import { workoutTitle } from "@/lib/labels";
 import { getProgramProgress, getRoutine, startSession, type ProgramProgress } from "@/lib/workout-api";
 
@@ -21,7 +22,7 @@ export function useActiveProgram(reloadKey = 0) {
 }
 
 /** The big "do this next" card for the active program (`embedded`: just its contents, for Home's Today card). */
-export function UpNext({ progress, embedded }: { progress: ProgramProgress; embedded?: boolean }) {
+export function UpNext({ progress, embedded, onChange }: { progress: ProgramProgress; embedded?: boolean; onChange?: () => void }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +46,9 @@ export function UpNext({ progress, embedded }: { progress: ProgramProgress; embe
   return (
     <Wrap className={embedded ? "flex flex-col gap-3" : "border-primary gap-3 p-4"} data-testid="up-next">
       <div className="min-w-0">
-        <p className="text-primary-text text-xs font-bold tracking-wide uppercase">
+        <p className="text-primary-text flex items-center gap-2 text-xs font-bold tracking-wide uppercase">
           {finished ? "Program complete" : `Up next · Week ${progress.next_week} of ${progress.weeks}`}
+          {!finished && progress.next_is_deload && <DeloadTag />}
         </p>
         <p className="truncate text-lg font-bold">
           {finished ? progress.program_name : `Day ${progress.next_day}: ${workoutTitle(progress.next_routine_name ?? "")}`}
@@ -65,6 +67,9 @@ export function UpNext({ progress, embedded }: { progress: ProgramProgress; embe
         </Button>
       )}
       {error && <p className="text-destructive text-sm">{error}</p>}
+      {!finished && progress.deload_suggestion && (
+        <DeloadOffer programId={progress.program_id} reason={progress.deload_suggestion} onChange={onChange} />
+      )}
     </Wrap>
   );
 }

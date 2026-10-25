@@ -150,6 +150,7 @@ test("AI Security: buildPlanPrompt cleanly isolates untrusted lifter notes from 
     physicalStats: { weight_kg: 85 },
     lifts: [{ slug: "deadlift", name: "Deadlift", e1rm_kg: 200 }],
     library: [{ slug: "deadlift", name: "Deadlift", primary_muscle: "lower_back", equipment: "barbell" }],
+    deloads: [],
   });
 
   // Verify explicit boundary notice is prefixed to untrusted input
