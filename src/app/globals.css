@@ -46,6 +46,11 @@
   --glow-3: rgba(184, 29, 45, 0.35);
   --glass-highlight: rgba(255, 255, 255, 0.07);
   --glass-shadow: rgb(0 0 0 / 0.35);
+  --progress-purple: #7C65C1;
+  --progress-purple-light: #9B82E8;
+  --progress-purple-bg: rgba(124, 101, 193, 0.14);
+  --progress-purple-border: rgba(124, 101, 193, 0.35);
+  --progress-dark-bar: #2B213A;
 }
 
 /* Light mode (Settings > Appearance). Same layout and accents, on a pale

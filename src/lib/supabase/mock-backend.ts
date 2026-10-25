@@ -1222,7 +1222,99 @@ export async function handleMockRequest(
 
   // REST API: programs
   if (path.includes("/rest/v1/programs")) {
-    return new Response(JSON.stringify([]), {
+    const programs = getStored<Array<Record<string, unknown>>>("ironlog_programs", []);
+    const routines = getStored<Array<Record<string, unknown>>>("ironlog_routines", DEFAULT_ROUTINES);
+    const routineExercises = getStored<Array<Record<string, unknown>>>("ironlog_routine_exercises", DEFAULT_ROUTINE_EXERCISES);
+    const custom = getStored<typeof DEFAULT_EXERCISES>("ironlog_custom_exercises", []);
+    const exercises = [...DEFAULT_EXERCISES, ...custom];
+    const exMap = new Map(exercises.map((e) => [e.id, e]));
+
+    if (method === "POST" || method === "PUT") {
+      let body: Record<string, unknown> | Record<string, unknown>[] = {};
+      try {
+        body = JSON.parse(typeof init?.body === "string" ? init.body : new TextDecoder().decode(init?.body as BufferSource));
+      } catch {
+        // ignore
+      }
+      const items = Array.isArray(body) ? body : [body];
+      const merged = [...programs];
+      for (const item of items) {
+        const id = (item.id as string) || `prog-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const idx = merged.findIndex((p) => p.id === id);
+        const row = {
+          ...item,
+          id,
+          is_active: item.is_active ?? false,
+          created_at: item.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        if (idx >= 0) merged[idx] = row;
+        else merged.push(row);
+      }
+      setStored("ironlog_programs", merged);
+      const res = accept.includes("vnd.pgrst.object+json") ? items[0] : items;
+      return new Response(JSON.stringify(res), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (method === "DELETE") {
+      const remaining = programs.filter((p) => {
+        for (const [k, v] of url.searchParams.entries()) {
+          if (!evaluateFilter(p, k, v)) return true;
+        }
+        return false;
+      });
+      setStored("ironlog_programs", remaining);
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const fullPrograms = programs.map((p) => {
+      const pRoutines = routines
+        .filter((r) => r.program_id === p.id)
+        .sort((a, b) => ((a.program_week as number) || 0) - ((b.program_week as number) || 0) || ((a.program_day as number) || 0) - ((b.program_day as number) || 0))
+        .map((r) => {
+          const reList = routineExercises
+            .filter((re) => re.routine_id === r.id)
+            .sort((a, b) => ((a.position as number) || 0) - ((b.position as number) || 0))
+            .map((re) => {
+              const ex = re.exercise_id ? exMap.get(re.exercise_id as string) : undefined;
+              return {
+                ...re,
+                exercises: ex
+                  ? {
+                      name: ex.name,
+                      equipment: ex.equipment,
+                      primary_muscle: ex.primary_muscle,
+                      image_urls: ex.image_urls || [],
+                    }
+                  : null,
+              };
+            });
+          return {
+            ...r,
+            routine_exercises: reList,
+          };
+        });
+      return {
+        ...p,
+        routines: pRoutines,
+      };
+    });
+
+    const matched = applyQuery(fullPrograms, url);
+    if (accept.includes("vnd.pgrst.object+json")) {
+      return new Response(JSON.stringify(matched[0] || null), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify(matched), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -1293,6 +1385,96 @@ export async function handleMockRequest(
     const completed = allSets.filter((s) => s.is_completed || s.completed_at);
     const exIds = [...new Set(completed.map((s) => s.exercise_id))];
     return new Response(JSON.stringify(exIds.map((exercise_id) => ({ exercise_id }))), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (path.includes("/rest/v1/rpc/start_program")) {
+    let pId = url.searchParams.get("p_id");
+    if (!pId && init?.body) {
+      try {
+        const parsed = JSON.parse(typeof init.body === "string" ? init.body : new TextDecoder().decode(init.body as BufferSource));
+        pId = parsed.p_id;
+      } catch {}
+    }
+    const programs = getStored<Array<Record<string, unknown>>>("ironlog_programs", []);
+    const updated = programs.map((p) => ({
+      ...p,
+      is_active: p.id === pId,
+      started_at: p.id === pId ? new Date().toISOString() : p.started_at,
+    }));
+    setStored("ironlog_programs", updated);
+    return new Response(JSON.stringify(null), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (path.includes("/rest/v1/rpc/stop_program")) {
+    let pId = url.searchParams.get("p_id");
+    if (!pId && init?.body) {
+      try {
+        const parsed = JSON.parse(typeof init.body === "string" ? init.body : new TextDecoder().decode(init.body as BufferSource));
+        pId = parsed.p_id;
+      } catch {}
+    }
+    const programs = getStored<Array<Record<string, unknown>>>("ironlog_programs", []);
+    const updated = programs.map((p) => ({
+      ...p,
+      is_active: p.id === pId ? false : (p.is_active ?? false),
+    }));
+    setStored("ironlog_programs", updated);
+    return new Response(JSON.stringify(null), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (path.includes("/rest/v1/rpc/program_progress")) {
+    let pId = url.searchParams.get("p_program_id");
+    if (!pId && init?.body) {
+      try {
+        const parsed = JSON.parse(typeof init.body === "string" ? init.body : new TextDecoder().decode(init.body as BufferSource));
+        pId = parsed.p_program_id;
+      } catch {}
+    }
+    const programs = getStored<Array<Record<string, unknown>>>("ironlog_programs", []);
+    const prog = pId ? programs.find((p) => p.id === pId) : programs.find((p) => p.is_active);
+    if (!prog) {
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const routines = getStored<Array<Record<string, unknown>>>("ironlog_routines", DEFAULT_ROUTINES)
+      .filter((r) => r.program_id === prog.id)
+      .sort((a, b) => ((a.program_week as number) || 0) - ((b.program_week as number) || 0) || ((a.program_day as number) || 0) - ((b.program_day as number) || 0));
+
+    const sessions = getStored<Array<Record<string, unknown>>>("ironlog_table_workout_sessions", [])
+      .filter((s) => s.end_time != null);
+    const doneRoutineIds = routines
+      .filter((r) => sessions.some((s) => s.routine_id === r.id))
+      .map((r) => r.id as string);
+    const nextRoutine = routines.find((r) => !doneRoutineIds.includes(r.id as string)) || routines[0];
+    const total = routines.length;
+    const done = doneRoutineIds.length;
+
+    const row = {
+      program_id: prog.id,
+      program_name: prog.name,
+      weeks: prog.weeks,
+      days_per_week: prog.days_per_week,
+      is_active: prog.is_active ?? false,
+      total,
+      done,
+      done_routine_ids: doneRoutineIds,
+      next_routine_id: nextRoutine?.id ?? null,
+      next_routine_name: nextRoutine?.name ?? null,
+      next_week: (nextRoutine?.program_week as number) ?? 1,
+      next_day: (nextRoutine?.program_day as number) ?? 1,
+    };
+    return new Response(JSON.stringify([row]), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -1440,7 +1622,108 @@ export async function handleMockRequest(
     });
   }
 
-  // Edge functions
+  // Edge functions: generate-plan
+  if (path.includes("/functions/v1/generate-plan")) {
+    let body: Record<string, unknown> = {};
+    try {
+      body = JSON.parse(typeof init?.body === "string" ? init.body : new TextDecoder().decode(init?.body as BufferSource));
+    } catch {
+      // ignore
+    }
+
+    const provider = (body.provider as string) === "claude" ? "Claude" : "Gemini";
+    const goal = (body.goal as string) || "strength";
+    const weeks = Number(body.weeks) || 8;
+    const daysPerWeek = Number(body.days_per_week) || 4;
+    const methodology = (body.methodology as string) || "auto";
+
+    const custom = getStored<typeof DEFAULT_EXERCISES>("ironlog_custom_exercises", []);
+    const exercises = [...DEFAULT_EXERCISES, ...custom];
+
+    const programId = `prog-${Date.now()}`;
+    const capitalizedGoal = goal.charAt(0).toUpperCase() + goal.slice(1);
+    const programName = `${provider} ${capitalizedGoal} (${weeks}w · ${daysPerWeek}d)`;
+    const summary = `${provider}-designed ${weeks}-week ${methodology} plan focusing on ${goal} across ${daysPerWeek} training days per week.`;
+
+    const newProgram = {
+      id: programId,
+      name: programName,
+      methodology,
+      summary,
+      progression_rule: "Progressive overload: Add 5 lb / 2.5 kg on primary lifts when all reps in target range are completed with good form.",
+      weeks,
+      days_per_week: daysPerWeek,
+      is_active: false,
+      ai_generated: true,
+      ai_metadata: { request: body, model: provider === "Gemini" ? "gemini-3.8-flash" : "claude-opus-5-5" },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const storedPrograms = getStored<Array<Record<string, unknown>>>("ironlog_programs", []);
+    setStored("ironlog_programs", [newProgram, ...storedPrograms]);
+
+    const storedRoutines = getStored<Array<Record<string, unknown>>>("ironlog_routines", DEFAULT_ROUTINES);
+    const storedRoutineExercises = getStored<Array<Record<string, unknown>>>("ironlog_routine_exercises", DEFAULT_ROUTINE_EXERCISES);
+
+    const newRoutines: Array<Record<string, unknown>> = [];
+    const newRoutineExercises: Array<Record<string, unknown>> = [];
+
+    const dayFocuses = [
+      { name: "Upper Body Power", exSlugs: ["barbell-bench-press", "barbell-overhead-press", "pull-up", "incline-dumbbell-press"] },
+      { name: "Lower Body Strength", exSlugs: ["back-squat", "conventional-deadlift", "romanian-deadlift", "standing-calf-raise"] },
+      { name: "Push Hypertrophy", exSlugs: ["dumbbell-shoulder-press", "cable-chest-fly", "triceps-pushdown", "lateral-raise"] },
+      { name: "Pull & Legs", exSlugs: ["barbell-bent-over-row", "front-squat", "barbell-curl", "face-pull"] },
+      { name: "Full Body Density", exSlugs: ["back-squat", "barbell-bench-press", "pull-up", "hanging-leg-raise"] },
+      { name: "Conditioning & Weak Points", exSlugs: ["romanian-deadlift", "dumbbell-curl", "push-up", "cable-crunch"] },
+    ];
+
+    for (let w = 1; w <= weeks; w++) {
+      for (let d = 1; d <= daysPerWeek; d++) {
+        const focus = dayFocuses[(d - 1) % dayFocuses.length];
+        const routineId = `routine-${programId}-w${w}-d${d}`;
+        newRoutines.push({
+          id: routineId,
+          name: `Week ${w} · Day ${d}: ${focus.name}`,
+          description: `${provider} training session targeting ${focus.name.toLowerCase()}`,
+          program_id: programId,
+          program_week: w,
+          program_day: d,
+          archived: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+        focus.exSlugs.forEach((slug, idx) => {
+          const ex = exercises.find((e) => e.slug === slug) || exercises[idx % exercises.length];
+          newRoutineExercises.push({
+            id: `re-${routineId}-${idx + 1}`,
+            routine_id: routineId,
+            exercise_id: ex.id,
+            position: idx + 1,
+            target_sets: 3 + (w > 4 ? 1 : 0),
+            target_reps: 8,
+            target_reps_max: 10,
+            warmup_sets: idx === 0 ? 2 : 0,
+            rest_seconds: 90,
+            notes: idx === 0 ? "Main compound: keep tight core" : "",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        });
+      }
+    }
+
+    setStored("ironlog_routines", [...storedRoutines, ...newRoutines]);
+    setStored("ironlog_routine_exercises", [...storedRoutineExercises, ...newRoutineExercises]);
+
+    return new Response(JSON.stringify({ program_id: programId, program_name: programName, workouts: newRoutines.length }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Edge functions fallback
   if (path.includes("/functions/v1/")) {
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

@@ -140,7 +140,12 @@ export interface Suggestion {
  */
 export function suggestWeight(
   previous: PrevSet[],
-  o: { repMax: number | null; step: number },
+  o: {
+    repMax: number | null;
+    step: number;
+    trigger?: "all_sets_top" | "first_set_top" | "two_thirds_top";
+    targetSets?: number;
+  },
 ): Suggestion | null {
   const working = previous.filter((p) => p.set_type !== "warmup" && p.set_type !== "drop" && p.reps > 0 && p.weight > 0);
   if (!working.length) return null;
@@ -150,14 +155,64 @@ export function suggestWeight(
   const hardest = rated ? Math.max(...atTop.map((p) => p.rpe!)) : null;
   const next = round(top + o.step);
 
-  if (o.repMax != null && atTop.every((p) => p.reps >= o.repMax!)) {
-    if (hardest != null && hardest >= 10) return null;
-    return { weight: next, from: top, why: `You hit ${o.repMax} reps on every set last time` };
+  const trigger = o.trigger ?? "all_sets_top";
+  const repMax = o.repMax;
+
+  if (repMax != null) {
+    let metTrigger = false;
+    if (trigger === "all_sets_top") {
+      metTrigger = atTop.every((p) => p.reps >= repMax);
+    } else if (trigger === "first_set_top") {
+      metTrigger = atTop.length > 0 && atTop[0].reps >= repMax;
+    } else if (trigger === "two_thirds_top") {
+      const needed = Math.ceil(((o.targetSets ?? atTop.length) * 2) / 3);
+      metTrigger = atTop.filter((p) => p.reps >= repMax).length >= needed;
+    }
+
+    if (metTrigger) {
+      if (hardest != null && hardest >= 10) return null;
+      return {
+        weight: next,
+        from: top,
+        why:
+          trigger === "first_set_top"
+            ? `Top set reached ${repMax} reps last time`
+            : trigger === "two_thirds_top"
+            ? `Hit ${repMax} reps on 2/3+ sets last time`
+            : `You hit ${repMax} reps on every set last time`,
+      };
+    }
   }
+
   if (hardest != null && hardest <= 7) {
     return { weight: next, from: top, why: "Last time felt easy (3+ reps left)" };
   }
   return null;
+}
+
+/**
+ * Calculates custom progressive overload increment based on user settings and biomechanics.
+ */
+export function getOverloadIncrement(
+  unit: "metric" | "imperial",
+  isCompound: boolean,
+  isLowerBody: boolean,
+  customSettings?: {
+    upperCompoundIncLb?: number;
+    lowerCompoundIncLb?: number;
+    isolationIncLb?: number;
+    upperCompoundIncKg?: number;
+    lowerCompoundIncKg?: number;
+    isolationIncKg?: number;
+  },
+): number {
+  if (unit === "imperial") {
+    if (!isCompound) return customSettings?.isolationIncLb ?? 2.5;
+    return isLowerBody ? customSettings?.lowerCompoundIncLb ?? 10 : customSettings?.upperCompoundIncLb ?? 5;
+  } else {
+    if (!isCompound) return customSettings?.isolationIncKg ?? 1.25;
+    return isLowerBody ? customSettings?.lowerCompoundIncKg ?? 5 : customSettings?.upperCompoundIncKg ?? 2.5;
+  }
 }
 
 /** Weight step for "go up": 10 lb / 5 kg for big lower-body barbell lifts, else 5 lb / 2.5 kg. */

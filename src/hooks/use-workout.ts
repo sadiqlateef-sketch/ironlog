@@ -44,7 +44,9 @@ import { cueSetSaved } from "@/lib/cues";
 import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import { PLATE_LOADED } from "@/lib/labels";
-import { matchPrevious, sideReps, suggestWeight, weightStep, type Suggestion } from "@/lib/set-logic";
+import { matchPrevious, sideReps, suggestWeight, weightStep, getOverloadIncrement, type Suggestion } from "@/lib/set-logic";
+import { getStoredOverloadSettings } from "@/lib/overload-settings";
+import { getPhaseForWeek, classifyExerciseBiomechanics } from "@/lib/periodization";
 import type { SetType } from "@/types/database";
 
 /** A set that just beat your best estimated 1RM for that exercise. */
@@ -198,14 +200,21 @@ export function useWorkout() {
     (ex: Exercise, previous: LastPerformance, repMax: number | null): Pick<Block, "note" | "unilateral" | "suggestion"> => {
       const p = prefsRef.current.get(ex.id);
       const reps = (ex.tracking ?? "weight_reps") === "weight_reps";
-      const bigLower = ex.mechanic === "compound" && LOWER_BODY.includes(ex.primary_muscle) && PLATE_LOADED.includes(ex.equipment);
+      const overloadSettings = getStoredOverloadSettings();
+      const biomech = classifyExerciseBiomechanics({ name: ex.name, primary_muscle: ex.primary_muscle });
+      const customStep = getOverloadIncrement(unit, biomech.isCompound, biomech.isLowerBody, overloadSettings);
+
       return {
         note: p?.notes?.trim() || null,
         unilateral: reps && (p?.unilateral ?? ex.unilateral ?? false),
         suggestion: reps
           ? suggestWeight(
               previous.map((x) => ({ set_type: x.set_type, weight: inUnit(Number(x.weight), unit), reps: x.reps, rpe: x.rpe == null ? null : Number(x.rpe) })),
-              { repMax, step: weightStep(unit, bigLower) },
+              {
+                repMax,
+                step: customStep,
+                trigger: overloadSettings.progressionTrigger,
+              },
             )
           : null,
       };
@@ -246,22 +255,43 @@ export function useWorkout() {
         const t = planned.get(order);
         const target = t == null ? undefined : targets[t];
         const previous = await getLastPerformance(exercise.id);
-        const repMax = target?.target_reps_max ?? target?.target_reps ?? null;
+        
+        // Auto-Apply Periodization adjustments to targets when enabled
+        const overloadSettings = getStoredOverloadSettings();
+        const activePhase = overloadSettings.autoApplyPeriodization
+          ? getPhaseForWeek(overloadSettings.currentMesocycleWeek, overloadSettings.totalMesocycleWeeks)
+          : null;
+
+        let effectiveRepMin = target?.target_reps ?? null;
+        let effectiveRepMax = target?.target_reps_max ?? null;
+        let periodizedTargetNote = target ? targetNoteFor(target) : null;
+
+        if (activePhase && target) {
+          const biomech = classifyExerciseBiomechanics({ name: exercise.name, primary_muscle: exercise.primary_muscle });
+          effectiveRepMin = Math.max(biomech.isCompound ? 4 : 8, target.target_reps + activePhase.repAdjustment);
+          effectiveRepMax = target.target_reps_max
+            ? Math.max(effectiveRepMin, target.target_reps_max + activePhase.repAdjustment)
+            : null;
+          const phaseNote = `${activePhase.label} (${activePhase.targetRpe}, ${activePhase.rirTarget})`;
+          periodizedTargetNote = periodizedTargetNote ? `${phaseNote} · ${periodizedTargetNote}` : phaseNote;
+        }
+
+        const repMax = effectiveRepMax ?? effectiveRepMin;
         return {
           order,
           exercise,
           supersetGroup: rows[0].superset_group,
           restSeconds: myRest(exercise) ?? target?.rest_seconds ?? defaultRest(exercise),
-          repTarget: target
-            ? target.target_reps_max
-              ? `${target.target_reps}-${target.target_reps_max}`
-              : String(target.target_reps)
+          repTarget: effectiveRepMin != null
+            ? effectiveRepMax != null
+              ? `${effectiveRepMin}-${effectiveRepMax}`
+              : String(effectiveRepMin)
             : null,
-          targetNote: target ? targetNoteFor(target) : null,
+          targetNote: periodizedTargetNote,
           previous,
           sets: rows.map((r) => toUiSet(r, unit)),
           routineExerciseId: target?.id ?? null,
-          repMin: target?.target_reps ?? null,
+          repMin: effectiveRepMin,
           repMax,
           ...extras(exercise, previous, repMax),
         };

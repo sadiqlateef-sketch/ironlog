@@ -3,11 +3,13 @@
 // Every setting in one place: you, units, body details, training answers,
 // equipment, gym and calendar, the Claude connector, alerts, and sign out.
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BriefcaseMedical, ChevronRight, Dumbbell, FileDown, FileUp, LogOut, MapPin, MessageCircle } from "lucide-react";
+import { Bell, BriefcaseMedical, ChevronRight, Dumbbell, FileDown, FileUp, LogOut, MapPin, MessageCircle, Sliders, Sparkles } from "lucide-react";
 import { AppearanceSettings } from "@/components/appearance-settings";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
+import { ModifyProgramSheet } from "@/components/modify-program-sheet";
+import { OverloadSettingsSheet } from "@/components/overload-settings-sheet";
 import { BackupButton } from "@/components/import/backup-button";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
@@ -22,7 +24,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Input } from "@/components/ui/input";
 import { toCsv } from "@/lib/export-csv";
 import { isNative, recoveryReminderOn, setRecoveryReminder, shareImage } from "@/lib/native";
-import { listSetsForExport } from "@/lib/workout-api";
+import { listPrograms, listSetsForExport, type ProgramWithWorkouts } from "@/lib/workout-api";
 import { GOALS } from "@/lib/plan-options";
 import { cn } from "@/lib/utils";
 
@@ -62,8 +64,19 @@ export function SettingsScreen() {
   const router = useRouter();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [note, setNote] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | "shifts" | null>(null);
+  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | "shifts" | "modify_program" | "overload" | null>(null);
+  const [programs, setPrograms] = useState<ProgramWithWorkouts[] | null>(null);
   const { kits } = useKits();
+
+  const loadPrograms = useCallback(() => {
+    listPrograms().then(setPrograms).catch(() => setPrograms([]));
+  }, []);
+
+  useEffect(() => {
+    loadPrograms();
+  }, [loadPrograms]);
+
+  const activeProgram = programs?.find((p) => p.is_active);
   const upcomingShifts = normalizeShifts(profile?.work_shifts).filter((x) => x.date >= new Date().toISOString().slice(0, 10)).length;
 
   async function save(patch: Parameters<typeof updateProfile>[0], message = "Saved.") {
@@ -126,6 +139,34 @@ export function SettingsScreen() {
       </Section>
 
       <Section title="Training" description="The program builder and your week plan start from these.">
+        {activeProgram ? (
+          <div className="bg-secondary/40 border-border/50 flex flex-col gap-2 rounded-xl border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-primary-text text-xs font-bold tracking-wider uppercase">Active program</span>
+              <span className="text-muted-foreground text-xs">
+                {activeProgram.weeks}w · {activeProgram.days_per_week}d / week
+              </span>
+            </div>
+            <p className="text-base font-semibold">{activeProgram.name}</p>
+            {activeProgram.summary && <p className="text-muted-foreground line-clamp-2 text-xs">{activeProgram.summary}</p>}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSheet("modify_program")}
+              className="mt-1 w-full gap-1.5"
+              data-testid="settings-modify-program-btn"
+            >
+              <Sparkles className="size-4 text-primary" /> Modify my program
+            </Button>
+          </div>
+        ) : (
+          <Row
+            icon={Sparkles}
+            label="Build a program"
+            detail="Design your training plan with Gemini or Claude"
+            onClick={() => router.push("/plans/?build=1")}
+          />
+        )}
         <div className="flex flex-col gap-2 text-sm">
           Goal
           <div className="flex flex-wrap gap-2">
@@ -137,6 +178,12 @@ export function SettingsScreen() {
           </div>
         </div>
         <Row icon={Dumbbell} label="Equipment" detail={kits.map((k) => k.name).join(" · ")} onClick={() => setSheet("weights")} />
+        <Row
+          icon={Sliders}
+          label="Progressive overload & periodization"
+          detail="Double-progression increments, triggers & mesocycle wave phases"
+          onClick={() => setSheet("overload")}
+        />
         <Row
           icon={BriefcaseMedical}
           label="Work shifts"
@@ -221,6 +268,13 @@ export function SettingsScreen() {
       <ShiftsSheet open={sheet === "shifts"} onOpenChange={(o) => !o && setSheet(null)} />
       <GymSheet open={sheet === "gym"} onOpenChange={(o) => !o && setSheet(null)} />
       <ClaudeConnectSheet open={sheet === "claude"} onOpenChange={(o) => !o && setSheet(null)} />
+      <ModifyProgramSheet
+        open={sheet === "modify_program"}
+        onOpenChange={(o) => !o && setSheet(null)}
+        activeProgram={activeProgram}
+        onModified={loadPrograms}
+      />
+      <OverloadSettingsSheet open={sheet === "overload"} onOpenChange={(o) => !o && setSheet(null)} />
     </div>
   );
 }

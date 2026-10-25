@@ -48,3 +48,7 @@ supabase/.branches
 # android signing keys: never commit
 *.jks
 *.keystore
+
+# binaries and release builds
+*.apk
+*.aab
