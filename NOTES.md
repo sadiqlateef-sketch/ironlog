@@ -18,6 +18,7 @@ Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project file
 - Watch-logged weight dropped on the phone (`weight_kg` vs `weight`).
 - Periodization auto-apply on by default, rewrites program targets.
 - Planned warm-up rows prefill 0 weight. Lint has 4 errors.
+- Phone APK build on GitHub Actions is red: debug build signs with a release key path on the PC.
 - Open PRs not on main: #18 reset email, #20 Health Connect, #22 deload weeks.
 
 ## Next

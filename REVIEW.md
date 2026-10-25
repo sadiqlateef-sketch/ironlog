@@ -57,6 +57,7 @@ These are CONFIRMED from GitHub. Some of these branches are a week old and are n
 | `npm run lint` | **4 errors, 33 warnings** | "0 errors, 0 warnings" (HANDOFF) |
 | `npm run typecheck` | Fails on a fresh clone (`LayoutProps` not found). Passes after `npm run build` generates the types. | "0 errors" |
 | `npm run build` | Pass, 16/16 pages | Pass |
+| GitHub "Android APK" workflow | **Fails** on `main` and on this PR (see D10) | "BUILD SUCCESSFUL" (local PC build) |
 
 The lint errors are in:
 - `home/last-session-card.tsx`
@@ -303,6 +304,12 @@ Each proposal lists: problem → proposal · files · effort · risk.
 - **D8. Lint is red (4 errors) and typecheck fails on a fresh clone.**
   - **Proposal:** fix the 4 set-state-in-effect / impure-render errors. Make `typecheck` run `next typegen` first, or document it.
   - **Effort:** quick win. **Risk:** low.
+- **D10. The phone APK no longer builds on GitHub Actions.** CONFIRMED.
+  - **Problem:** the "Android APK" workflow is red on `main` (run 109, from `d129cf4`) and on this PR (run 110), with `SigningConfig "release" is missing required property "storeFile"` at `:app:packageDebug`.
+  - **Cause:** `android/app/build.gradle` now signs the **debug** build with the release key, and the key path falls back to a Windows path on your PC (`C:/Users/sadiq/...`). On GitHub's runner that file doesn't exist, so the debug build has no key. So you can't get a new APK from Actions until this is fixed. Builds from Android Studio on your own PC still work.
+  - **Proposal:** debug builds use the normal debug key again, and release builds use the keystore only when one is provided (the workflow already passes it as a secret).
+  - **Files:** `android/app/build.gradle` (and the same pattern in `watch/android/app/build.gradle`, whose workflow is still green).
+  - **Effort:** quick win. **Risk:** low. A debug-signed APK can't install over a release-signed one without uninstalling first, so I'd check which one is on your phone.
 - **D9. Keystore fallback password committed in two Gradle files.**
   - **Proposal:** remove the fallback (env-only), and consider rotating it if the `.jks` was ever shared.
   - **Effort:** quick win. **Risk:** low. Rotating means re-signing all the ecosystem apps, so treat that as a separate decision.
@@ -376,30 +383,31 @@ Each proposal lists: problem → proposal · files · effort · risk.
 
 **Defects**
 1. D1: Reconnect the app to your cloud account (mock becomes dev-only), keeping offline logging. *Needs your decision: cloud-backed or phone-only.*
-2. D2: Fix the previous-day workout prompt (Resume works, closing keeps it, late-night sessions survive midnight).
-3. D3: Block a second open workout, so finishing one can't pop open another.
-4. D5: Watch-logged weight gets dropped on the phone.
-5. D6: Turn periodization auto-apply off by default, and stop it overriding program targets.
-6. D7: Prefill warm-up weights instead of 0.
-7. D4: Show an error when saving fails (storage full).
-8. D9: Remove the committed keystore password fallback.
-9. D8: Make lint and typecheck green again.
+2. D10: Make the phone APK build on GitHub Actions again (red on `main` since `d129cf4`).
+3. D2: Fix the previous-day workout prompt (Resume works, closing keeps it, late-night sessions survive midnight).
+4. D3: Block a second open workout, so finishing one can't pop open another.
+5. D5: Watch-logged weight gets dropped on the phone.
+6. D6: Turn periodization auto-apply off by default, and stop it overriding program targets.
+7. D7: Prefill warm-up weights instead of 0.
+8. D4: Show an error when saving fails (storage full).
+9. D9: Remove the committed keystore password fallback.
+10. D8: Make lint and typecheck green again.
 
 **Quick wins**
-10. Q1: One bottom dock in the logger (folded); hide tabs during a workout. *(mockup 1)*
-11. Q2: Live volume and exercise count in the logger header.
-12. Q3: Move Discard into the ⋯ menu.
-13. Q4: Inline plate breakdown on barbell sets.
-14. Q6: Per-set notes.
-15. Q5: AMRAP set type and tempo prescriptions.
-16. Q7: Remove duplicate Home header buttons; one name for Programs.
-17. Q8: Bring the Progress deck back to the app's colors; calmer empty states.
+11. Q1: One bottom dock in the logger (folded); hide tabs during a workout. *(mockup 1)*
+12. Q2: Live volume and exercise count in the logger header.
+13. Q3: Move Discard into the ⋯ menu.
+14. Q4: Inline plate breakdown on barbell sets.
+15. Q6: Per-set notes.
+16. Q5: AMRAP set type and tempo prescriptions.
+17. Q7: Remove duplicate Home header buttons; one name for Programs.
+18. Q8: Bring the Progress deck back to the app's colors; calmer empty states.
 
 **Projects**
-18. P1: Two-column Home when unfolded. *(mockup 2)*
-19. P2: Progress summary-first layout. *(mockup 3)*
-20. P3: Missed-rep auto-adjust on the phone.
-21. P5: Rebase and merge the open PRs (#18 reset email, #22 deload, #20 Health Connect).
-22. P4: Circuit mode.
-23. P6: Bujo "today's plan" read hook.
-24. P7: Archive agent leftovers and outdated status docs.
+19. P1: Two-column Home when unfolded. *(mockup 2)*
+20. P2: Progress summary-first layout. *(mockup 3)*
+21. P3: Missed-rep auto-adjust on the phone.
+22. P5: Rebase and merge the open PRs (#18 reset email, #22 deload, #20 Health Connect).
+23. P4: Circuit mode.
+24. P6: Bujo "today's plan" read hook.
+25. P7: Archive agent leftovers and outdated status docs.
