@@ -17,8 +17,10 @@ export function json(body: unknown, status = 200): Response {
 }
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  status: number;
+  constructor(status: number, message: string) {
     super(message);
+    this.status = status;
   }
 }
 

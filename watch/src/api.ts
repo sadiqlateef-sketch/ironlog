@@ -139,15 +139,189 @@ export async function loadUpNext(): Promise<UpNext | null> {
 // workout in progress, so it can start and log a workout in a basement gym.
 // Changes go into the queue and reach the server once there's signal.
 
-const PLAN_KEY = "ironlog.plan";
-const ACTIVE_KEY = "ironlog.active";
+export const PLAN_KEY = "ironlog.plan";
+export const ACTIVE_KEY = "ironlog.active";
 /** The last workout finished on the watch, until the server has heard about it. */
-const FINISHED_KEY = "ironlog.finished";
+export const FINISHED_KEY = "ironlog.finished";
 
 export interface WatchPlan {
   upNext: (UpNext & { routine: PlanRoutine }) | null;
   routines: (RoutineSummary & { routine: PlanRoutine })[];
 }
+
+export const DEFAULT_OFFLINE_PLAN: WatchPlan = {
+  upNext: {
+    routineId: "r-full-body-a",
+    week: 1,
+    day: 1,
+    weeks: 8,
+    name: "Full Body A",
+    fullName: "Full Body A (Squat & Bench)",
+    program: "IronLog Strength",
+    routine: {
+      id: "r-full-body-a",
+      name: "Full Body A (Squat & Bench)",
+      items: [
+        {
+          exerciseId: "e1000000-0000-0000-0000-000000000001",
+          name: "Back Squat",
+          mechanic: "compound",
+          supersetGroup: null,
+          sets: 3,
+          warmups: 2,
+          weightKg: 100,
+          rest: 120,
+          reps: 5,
+        },
+        {
+          exerciseId: "e1000000-0000-0000-0000-000000000002",
+          name: "Bench Press",
+          mechanic: "compound",
+          supersetGroup: null,
+          sets: 3,
+          warmups: 2,
+          weightKg: 80,
+          rest: 120,
+          reps: 5,
+        },
+        {
+          exerciseId: "e1000000-0000-0000-0000-000000000003",
+          name: "Barbell Row",
+          mechanic: "compound",
+          supersetGroup: null,
+          sets: 3,
+          warmups: 1,
+          weightKg: 70,
+          rest: 90,
+          reps: 8,
+        },
+        {
+          exerciseId: "e1000000-0000-0000-0000-000000000004",
+          name: "Overhead Press",
+          mechanic: "compound",
+          supersetGroup: null,
+          sets: 3,
+          warmups: 1,
+          weightKg: 50,
+          rest: 90,
+          reps: 8,
+        },
+      ],
+    },
+  },
+  routines: [
+    {
+      id: "r-full-body-a",
+      name: "Full Body A (Squat & Bench)",
+      exercises: 4,
+      routine: {
+        id: "r-full-body-a",
+        name: "Full Body A (Squat & Bench)",
+        items: [
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000001",
+            name: "Back Squat",
+            mechanic: "compound",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 2,
+            weightKg: 100,
+            rest: 120,
+            reps: 5,
+          },
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000002",
+            name: "Bench Press",
+            mechanic: "compound",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 2,
+            weightKg: 80,
+            rest: 120,
+            reps: 5,
+          },
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000003",
+            name: "Barbell Row",
+            mechanic: "compound",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 1,
+            weightKg: 70,
+            rest: 90,
+            reps: 8,
+          },
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000004",
+            name: "Overhead Press",
+            mechanic: "compound",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 1,
+            weightKg: 50,
+            rest: 90,
+            reps: 8,
+          },
+        ],
+      },
+    },
+    {
+      id: "r-full-body-b",
+      name: "Full Body B (Deadlift & Press)",
+      exercises: 4,
+      routine: {
+        id: "r-full-body-b",
+        name: "Full Body B (Deadlift & Press)",
+        items: [
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000005",
+            name: "Deadlift",
+            mechanic: "compound",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 2,
+            weightKg: 120,
+            rest: 180,
+            reps: 5,
+          },
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000004",
+            name: "Overhead Press",
+            mechanic: "compound",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 2,
+            weightKg: 50,
+            rest: 120,
+            reps: 5,
+          },
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000006",
+            name: "Pull Up",
+            mechanic: "compound",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 0,
+            weightKg: 0,
+            rest: 90,
+            reps: 8,
+          },
+          {
+            exerciseId: "e1000000-0000-0000-0000-000000000007",
+            name: "Hanging Leg Raise",
+            mechanic: "isolation",
+            supersetGroup: null,
+            sets: 3,
+            warmups: 0,
+            weightKg: 0,
+            rest: 60,
+            reps: 12,
+          },
+        ],
+      },
+    },
+  ],
+};
 
 async function readJson<T>(key: string): Promise<T | null> {
   try {
@@ -157,9 +331,12 @@ async function readJson<T>(key: string): Promise<T | null> {
   }
 }
 
-/** The plan as last saved on the watch (null if it has never been online). */
-export function savedPlan(): Promise<WatchPlan | null> {
-  return readJson<WatchPlan>(PLAN_KEY);
+/** The plan as last saved on the watch (seeds default plan if none exists). */
+export async function savedPlan(): Promise<WatchPlan | null> {
+  const existing = await readJson<WatchPlan>(PLAN_KEY);
+  if (existing) return existing;
+  await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(DEFAULT_OFFLINE_PLAN));
+  return DEFAULT_OFFLINE_PLAN;
 }
 
 /** Fetch Up next and your routines with everything needed to start them, and save a copy. Throws when offline. */
@@ -308,5 +485,10 @@ async function send(op: Op): Promise<Outcome> {
 export const queue = new OpQueue(AsyncStorage, send);
 
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
+  await AsyncStorage.removeItem("ironlog.offline_mode");
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // offline
+  }
 }

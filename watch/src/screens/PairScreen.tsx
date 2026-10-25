@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Text } from "react-native";
-import { checkPairing, startPairing, type Pairing } from "../pairing";
+import { ActivityIndicator, Text, View } from "react-native";
+import { checkPairing, enableOfflineMode, startPairing, type Pairing } from "../pairing";
 import { Btn, C, Screen, T } from "../ui";
 
-/** Shows a 6-digit code; you type it on your phone (Home > Link watch). */
+/** Shows a 6-digit code; you type it on your phone (Home > Link watch), or continue offline. */
 export function PairScreen({ onLinked }: { onLinked: () => void }) {
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [expired, setExpired] = useState(false);
@@ -19,6 +19,11 @@ export function PairScreen({ onLinked }: { onLinked: () => void }) {
   }, []);
 
   useEffect(begin, [begin]);
+
+  const handleUseOffline = useCallback(async () => {
+    await enableOfflineMode();
+    onLinked();
+  }, [onLinked]);
 
   useEffect(() => {
     if (!pairing || expired) return;
@@ -47,10 +52,12 @@ export function PairScreen({ onLinked }: { onLinked: () => void }) {
       </T>
       {error ? (
         <>
-          <T center muted>
+          <T center muted small style={{ marginBottom: 4 }}>
             {error}
           </T>
           <Btn label="Try again" onPress={begin} />
+          <View style={{ height: 4 }} />
+          <Btn kind="secondary" label="Use offline" onPress={handleUseOffline} />
         </>
       ) : expired ? (
         <>
@@ -58,21 +65,24 @@ export function PairScreen({ onLinked }: { onLinked: () => void }) {
             That code expired.
           </T>
           <Btn label="New code" onPress={begin} />
+          <View style={{ height: 4 }} />
+          <Btn kind="secondary" label="Use offline" onPress={handleUseOffline} />
         </>
       ) : pairing ? (
         <>
           <T center muted small>
-            On your phone: Home › Link watch
+            On phone: Home › Link watch
           </T>
           <Text
             accessibilityLabel={`Code ${pairing.code.split("").join(" ")}`}
             numberOfLines={1}
             adjustsFontSizeToFit
-            style={{ color: C.text, textAlign: "center", fontSize: 30, fontWeight: "800", letterSpacing: 1, fontVariant: ["tabular-nums"] }}
+            style={{ color: C.text, textAlign: "center", fontSize: 28, fontWeight: "800", letterSpacing: 1, fontVariant: ["tabular-nums"] }}
           >
             {code}
           </Text>
-          <ActivityIndicator color={C.accentText} />
+          <View style={{ height: 6 }} />
+          <Btn kind="secondary" label="Use offline" onPress={handleUseOffline} />
         </>
       ) : (
         <ActivityIndicator color={C.accentText} />

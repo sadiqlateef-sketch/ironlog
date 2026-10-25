@@ -1,6 +1,7 @@
 // Small pure helpers for the workout logger. No React, no Supabase, easy to test.
 
 import type { SetType } from "../types/database";
+import { weightInput, type UnitSystem } from "./units.ts";
 
 export const SET_TYPE_ORDER: SetType[] = ["normal", "warmup", "drop", "failure"];
 
@@ -411,4 +412,32 @@ export function matchTargets(
     }
   }
   return out;
+}
+
+/**
+ * A set logged on the watch, as two patches: what the logger rows show (text, in
+ * your unit) and what gets saved (numbers, weight in kg).
+ */
+export function watchSetPatch(
+  data: { weightKg?: number | null; reps?: number | null; rpe?: number | null },
+  unit: UnitSystem,
+): {
+  ui: { weight?: string; reps?: string; rpe?: number };
+  db: { weight?: number; reps?: number; rpe?: number };
+} {
+  const ui: { weight?: string; reps?: string; rpe?: number } = {};
+  const db: { weight?: number; reps?: number; rpe?: number } = {};
+  if (data.weightKg != null) {
+    ui.weight = weightInput(data.weightKg, unit);
+    db.weight = data.weightKg;
+  }
+  if (data.reps != null) {
+    ui.reps = String(data.reps);
+    db.reps = data.reps;
+  }
+  if (data.rpe != null) {
+    ui.rpe = data.rpe;
+    db.rpe = data.rpe;
+  }
+  return { ui, db };
 }

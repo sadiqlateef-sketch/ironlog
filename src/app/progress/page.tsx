@@ -9,6 +9,7 @@ import { ActivityTab } from "@/components/progress/activity";
 import { BodyTab } from "@/components/progress/body";
 import { ConsistencyCard, RecapCard, StrainCard } from "@/components/progress/insight-cards";
 import { LiftsTab } from "@/components/progress/lifts";
+import { ProgressAnalyticsDeck } from "@/components/progress/progress-analytics-deck";
 import {
   CalendarCard,
   CompareCard,
@@ -113,7 +114,7 @@ function Progress() {
               <StrainCard reloadKey={reload} />
               <CalendarCard data={data} onChanged={() => setReload((r) => r + 1)} />
               <ConsistencyCard data={data} />
-              <ProgressIndexCard data={data} />
+              <ProgressAnalyticsDeck data={data} />
               <MuscleBreakdownCard data={data} />
               <TopLiftsCard data={data} />
               <InsightsCard data={data} />

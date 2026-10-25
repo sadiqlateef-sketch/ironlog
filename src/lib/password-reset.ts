@@ -36,7 +36,7 @@ export function listenForResetLinks(onOpen: () => void): () => void {
     // detectSessionInUrl signs in from the link; just flag the screen.
     const q = new URLSearchParams(window.location.search);
     if (q.get("reset") === "1") {
-      const err = new URLSearchParams(window.location.hash.slice(1)).get("error_description");
+      const err = new URLSearchParams(window.location.hash.slice(1)).get("error_description") ?? q.get("error_description");
       set(!err, err ? err.replace(/\+/g, " ") : null);
     }
     return () => {};
@@ -51,7 +51,8 @@ export function listenForResetLinks(onOpen: () => void): () => void {
       return;
     }
     set(true);
-    const { error } = await getSupabase().auth.setSession(link);
+    const auth = getSupabase().auth;
+    const { error } = "code" in link ? await auth.exchangeCodeForSession(link.code) : await auth.setSession(link);
     if (error) set(false, `That reset link didn't work (${error.message}). Send a new one.`);
     onOpen();
   };

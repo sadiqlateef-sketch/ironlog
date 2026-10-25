@@ -9,6 +9,10 @@ test("reads the sign-in from the app link's fragment", () => {
   });
 });
 
+test("reads the one-time code from a PKCE link", () => {
+  assert.deepEqual(parseResetLink("com.ironlog.app://reset-password?code=abc-123"), { code: "abc-123" });
+});
+
 test("an expired link gives its error", () => {
   assert.deepEqual(parseResetLink("com.ironlog.app://reset-password#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired"), {
     error: "Email link is invalid or has expired",

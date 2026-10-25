@@ -24,6 +24,8 @@ import {
   discardSession,
   finishSession,
   getActiveSession,
+  getStaleSession,
+  resumeStaleSession,
   insertSets,
   listActiveSets,
   renumberSets,
@@ -33,14 +35,18 @@ import {
   updateSets,
 } from "@/lib/offline/workout-store";
 import { getSyncStatus, subscribeSync } from "@/lib/offline/queue";
+import { IronLogEcosystemSync } from "@/services/ironlogEcosystemSync";
+import { wearableBridge } from "@/services/wearableBridge";
 import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar } from "@/lib/gym";
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { cueSetSaved } from "@/lib/cues";
-import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
+import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest, watchSetPatch } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import { PLATE_LOADED } from "@/lib/labels";
-import { matchPrevious, sideReps, suggestWeight, weightStep, type Suggestion } from "@/lib/set-logic";
+import { matchPrevious, sideReps, suggestWeight, weightStep, getOverloadIncrement, type Suggestion } from "@/lib/set-logic";
+import { getStoredOverloadSettings } from "@/lib/overload-settings";
+import { getPhaseForWeek, classifyExerciseBiomechanics } from "@/lib/periodization";
 import type { SetType } from "@/types/database";
 
 /** A set that just beat your best estimated 1RM for that exercise. */
@@ -119,10 +125,14 @@ function saveRest(exerciseId: string, seconds: number) {
   } catch {}
 }
 
-function targetNoteFor(t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null }): string | null {
+function targetNoteFor(
+  t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null },
+  /** A periodization phase already shows its own RPE, so the program's is left out. */
+  skipRpe = false,
+): string | null {
   const parts = [
     t.target_percent_1rm != null ? `${Number(t.target_percent_1rm)}% 1RM` : null,
-    t.target_rpe != null ? `RPE ${Number(t.target_rpe)}` : null,
+    t.target_rpe != null && !skipRpe ? `RPE ${Number(t.target_rpe)}` : null,
     t.notes,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
@@ -163,10 +173,13 @@ export function useWorkout() {
   const bestRef = useRef(new Map<string, number>());
   const recordsRef = useRef(new Set<string>());
   const [record, setRecord] = useState<RecordHit | null>(null);
+  const [staleSession, setStaleSession] = useState<WorkoutSession | null>(null);
   // Your per-exercise settings (note, rest, one side at a time), by exercise id.
   const prefsRef = useRef(new Map<string, ExercisePrefs>());
   const [effortAsk, setEffortAsk] = useState<EffortAsk | null>(null);
   const effortScale = profile?.effort_scale ?? "rir";
+  const inFlightSetsRef = useRef<Set<string>>(new Set());
+  const lastToggleTimeRef = useRef<Map<string, number>>(new Map());
 
   // The ref is updated straight away so a change made right after another
   // (add an exercise, then move it) sees the first one.
@@ -191,14 +204,21 @@ export function useWorkout() {
     (ex: Exercise, previous: LastPerformance, repMax: number | null): Pick<Block, "note" | "unilateral" | "suggestion"> => {
       const p = prefsRef.current.get(ex.id);
       const reps = (ex.tracking ?? "weight_reps") === "weight_reps";
-      const bigLower = ex.mechanic === "compound" && LOWER_BODY.includes(ex.primary_muscle) && PLATE_LOADED.includes(ex.equipment);
+      const overloadSettings = getStoredOverloadSettings();
+      const biomech = classifyExerciseBiomechanics({ name: ex.name, primary_muscle: ex.primary_muscle });
+      const customStep = getOverloadIncrement(unit, biomech.isCompound, biomech.isLowerBody, overloadSettings);
+
       return {
         note: p?.notes?.trim() || null,
         unilateral: reps && (p?.unilateral ?? ex.unilateral ?? false),
         suggestion: reps
           ? suggestWeight(
               previous.map((x) => ({ set_type: x.set_type, weight: inUnit(Number(x.weight), unit), reps: x.reps, rpe: x.rpe == null ? null : Number(x.rpe) })),
-              { repMax, step: weightStep(unit, bigLower) },
+              {
+                repMax,
+                step: customStep,
+                trigger: overloadSettings.progressionTrigger,
+              },
             )
           : null,
       };
@@ -209,7 +229,12 @@ export function useWorkout() {
   // ---- Load the active workout (if any) ----
   const fetchWorkout = useCallback(async (): Promise<{ session: WorkoutSession | null; blocks: Block[] }> => {
     const active = await getActiveSession();
-    if (!active) return { session: null, blocks: [] };
+    if (!active) {
+      const stale = await getStaleSession();
+      setStaleSession(stale);
+      return { session: null, blocks: [] };
+    }
+    setStaleSession(null);
     const [sets, exercises, targets, prefs] = await Promise.all([
       listActiveSets(active.id),
       listExercises(),
@@ -234,22 +259,45 @@ export function useWorkout() {
         const t = planned.get(order);
         const target = t == null ? undefined : targets[t];
         const previous = await getLastPerformance(exercise.id);
-        const repMax = target?.target_reps_max ?? target?.target_reps ?? null;
+        
+        // Auto-Apply Periodization adjustments to targets when enabled
+        const overloadSettings = getStoredOverloadSettings();
+        const activePhase = overloadSettings.autoApplyPeriodization
+          ? getPhaseForWeek(overloadSettings.currentMesocycleWeek, overloadSettings.totalMesocycleWeeks)
+          : null;
+
+        let effectiveRepMin = target?.target_reps ?? null;
+        let effectiveRepMax = target?.target_reps_max ?? null;
+        let periodizedTargetNote = target ? targetNoteFor(target) : null;
+
+        if (activePhase && target) {
+          const biomech = classifyExerciseBiomechanics({ name: exercise.name, primary_muscle: exercise.primary_muscle });
+          effectiveRepMin = Math.max(biomech.isCompound ? 4 : 8, target.target_reps + activePhase.repAdjustment);
+          effectiveRepMax = target.target_reps_max
+            ? Math.max(effectiveRepMin, target.target_reps_max + activePhase.repAdjustment)
+            : null;
+          const phaseNote = `${activePhase.label} (${activePhase.targetRpe}, ${activePhase.rirTarget})`;
+          // Say what the program itself asked for, so the changed target is never a surprise.
+          const programReps = `program: ${target.target_reps}${target.target_reps_max ? "-" + target.target_reps_max : ""} reps`;
+          periodizedTargetNote = [phaseNote, programReps, targetNoteFor(target, true)].filter(Boolean).join(" · ");
+        }
+
+        const repMax = effectiveRepMax ?? effectiveRepMin;
         return {
           order,
           exercise,
           supersetGroup: rows[0].superset_group,
           restSeconds: myRest(exercise) ?? target?.rest_seconds ?? defaultRest(exercise),
-          repTarget: target
-            ? target.target_reps_max
-              ? `${target.target_reps}-${target.target_reps_max}`
-              : String(target.target_reps)
+          repTarget: effectiveRepMin != null
+            ? effectiveRepMax != null
+              ? `${effectiveRepMin}-${effectiveRepMax}`
+              : String(effectiveRepMin)
             : null,
-          targetNote: target ? targetNoteFor(target) : null,
+          targetNote: periodizedTargetNote,
           previous,
           sets: rows.map((r) => toUiSet(r, unit)),
           routineExerciseId: target?.id ?? null,
-          repMin: target?.target_reps ?? null,
+          repMin: effectiveRepMin,
           repMax,
           ...extras(exercise, previous, repMax),
         };
@@ -281,7 +329,15 @@ export function useWorkout() {
   );
 
   useEffect(() => {
-    if (profile) load();
+    let ignore = false;
+    if (profile) {
+      void Promise.resolve().then(() => {
+        if (!ignore) load();
+      });
+    }
+    return () => {
+      ignore = true;
+    };
   }, [profile, load]);
 
   // The server refused a change made offline: show the workout as it really is.
@@ -395,6 +451,26 @@ export function useWorkout() {
         addToCalendar: session.add_to_calendar ?? null,
         startedWithCalendar: session.add_to_calendar ?? null,
       };
+            try {
+        const durationSec = Math.max(1, Math.round((endedAt - new Date(session.start_time).getTime()) / 1000));
+        const totalVolLb = done.reduce((sum, s) => {
+          const wNum = parseNumber(s.weight) || 0;
+          const rNum = parseNumber(s.reps) || 0;
+          const lb = unit === "imperial" ? wNum : wNum * 2.20462;
+          return sum + (lb * rNum);
+        }, 0);
+        IronLogEcosystemSync.onWorkoutCompleted({
+          id: session.id,
+          title: session.name ?? "Workout",
+          startTime: session.start_time,
+          durationSeconds: durationSec,
+          totalVolumeLb: Math.round(totalVolLb),
+          totalSets: done.length,
+          dailyStrain: Math.min(100, Math.round(done.length * 3.5)),
+          prsHit: [...recordsRef.current],
+        }, new Date().toISOString().split("T")[0]).catch(() => {});
+      } catch {}
+      setStaleSession(null);
       recordsRef.current = new Set();
       setSession(null);
       setBlocks(() => []);
@@ -403,7 +479,33 @@ export function useWorkout() {
       fail(e);
       return null;
     }
-  }, [session, profile, restTimer, fail, setBlocks]);
+  }, [session, profile, restTimer, fail, setBlocks, unit]);
+
+  const resumeStale = useCallback(async () => {
+    if (!staleSession) return;
+    await resumeStaleSession(staleSession);
+    setStaleSession(null);
+    await load();
+  }, [staleSession, load]);
+
+  /** Save an old unfinished workout as it is (its logged sets count). */
+  const finishStale = useCallback(async () => {
+    if (!staleSession) return;
+    await resumeStaleSession(staleSession); // loads its sets, so the volume is right
+    await finishSession(staleSession);
+    setStaleSession(null);
+    await load();
+  }, [staleSession, load]);
+
+  const discardStale = useCallback(async () => {
+    if (!staleSession) return;
+    await discardSession(staleSession.id);
+    setStaleSession(null);
+    await load();
+  }, [staleSession, load]);
+
+  /** Close the prompt without touching the workout. */
+  const hideStale = useCallback(() => setStaleSession(null), []);
 
   const discard = useCallback(async () => {
     if (!session) return;
@@ -411,6 +513,7 @@ export function useWorkout() {
       await discardSession(session.id);
       recordsRef.current = new Set();
       restTimer.stop();
+      setStaleSession(null);
       setSession(null);
       setBlocks(() => []);
     } catch (e) {
@@ -959,99 +1062,115 @@ export function useWorkout() {
   /**
    * The one-tap action. Empty fields fall back to last time's numbers (shown as
    * grey placeholders), then the rest timer starts on its own.
-   * Returns false if there's no rep count to log.
+   * Debounced and locked against in-flight race conditions.
+   * Returns false if there's no rep count to log or if locked.
    */
   const toggleDone = useCallback(
     async (order: number, id: string): Promise<boolean> => {
-      const block = blocksRef.current.find((b) => b.order === order);
-      const idx = block?.sets.findIndex((s) => s.id === id) ?? -1;
-      if (!block || idx < 0) return false;
-      const set = block.sets[idx];
-
-      if (set.done) {
-        setEffortAsk((a) => (a?.id === id ? null : a));
-        patchSet(order, id, { done: false });
-        try {
-          await updateSet(id, { is_completed: false });
-        } catch (e) {
-          fail(e);
-        }
-        return true;
+      const nowMs = Date.now();
+      if (inFlightSetsRef.current.has(id)) {
+        return false;
       }
+      const lastTime = lastToggleTimeRef.current.get(id) ?? 0;
+      if (nowMs - lastTime < 350) {
+        return false;
+      }
+      inFlightSetsRef.current.add(id);
+      lastToggleTimeRef.current.set(id, nowMs);
 
-      const prev = matchPrevious(block.sets.map((s) => s.type), block.previous)[idx];
-      const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
-      const startRest = () => {
-        if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
-          restTimer.start(block.restSeconds, block.exercise.name);
-        } else if (set.type === "warmup") {
-          restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
+      try {
+        const block = blocksRef.current.find((b) => b.order === order);
+        const idx = block?.sets.findIndex((s) => s.id === id) ?? -1;
+        if (!block || idx < 0) return false;
+        const set = block.sets[idx];
+
+        if (set.done) {
+          setEffortAsk((a) => (a?.id === id ? null : a));
+          patchSet(order, id, { done: false });
+          try {
+            await updateSet(id, { is_completed: false });
+          } catch (e) {
+            fail(e);
+          }
+          return true;
         }
-      };
 
-      // Timed and cardio sets: empty fields fall back to last time, then the target.
-      const tracking = block.exercise.tracking;
-      if (tracking !== "weight_reps") {
-        const time =
-          set.time ||
-          (prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "") : "");
-        const distance = tracking === "distance_time" ? set.distance || (prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "") : "";
-        const seconds = parseDuration(time);
-        const metres = toMetres(parseNumber(distance) ?? 0, unit);
-        if (!seconds && !metres) return false;
-        const weight = tracking === "time" ? set.weight || (prev?.weight ? toDisplay(prev.weight, unit) : "") : "";
-        patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
+        const prev = matchPrevious(block.sets.map((s) => s.type), block.previous)[idx];
+        const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
+        const startRest = () => {
+          if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
+            restTimer.start(block.restSeconds, block.exercise.name);
+          } else if (set.type === "warmup") {
+            restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
+          }
+        };
+
+        // Timed and cardio sets: empty fields fall back to last time, then the target.
+        const tracking = block.exercise.tracking;
+        if (tracking !== "weight_reps") {
+          const time =
+            set.time ||
+            (prev?.duration_seconds ? formatDuration(prev.duration_seconds) : tracking === "time" ? (block.repTarget?.split("-")[0] ?? "") : "");
+          const distance = tracking === "distance_time" ? set.distance || (prev?.distance_m ? toDistanceDisplay(prev.distance_m, unit) : "") : "";
+          const seconds = parseDuration(time);
+          const metres = toMetres(parseNumber(distance) ?? 0, unit);
+          if (!seconds && !metres) return false;
+          const weight = tracking === "time" ? set.weight || (prev?.weight ? toDisplay(prev.weight, unit) : "") : "";
+          patchSet(order, id, { weight, time: seconds ? formatDuration(seconds) : "", distance, done: true });
+          cueSetSaved();
+          startRest();
+          if (tracking === "time" && set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
+          try {
+            await updateSet(id, {
+              weight: toKg(parseNumber(weight) ?? 0, unit),
+              reps: 0,
+              duration_seconds: seconds,
+              distance_m: metres || null,
+              is_completed: true,
+            });
+          } catch (e) {
+            fail(e);
+          }
+          return true;
+        }
+
+        // Working sets fill in today's suggested weight when there is one.
+        const suggested = block.suggestion && (set.type === "normal" || set.type === "failure") ? String(block.suggestion.weight) : null;
+        const weight = set.weight || suggested || (prev ? toDisplay(prev.weight, unit) : "");
+        const fallback = (side: number | null | undefined) =>
+          prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "");
+        let reps = set.reps || fallback(prev?.reps_right);
+        let repsLeft = "";
+        let sides: ReturnType<typeof sideReps> = null;
+        if (block.unilateral) {
+          // A side left blank did the same as the other side (or last time's).
+          repsLeft = set.repsLeft || set.reps || fallback(prev?.reps_left);
+          reps = set.reps || set.repsLeft || reps;
+          sides = sideReps(intOrNull(repsLeft), intOrNull(reps));
+        }
+        const repsNum = sides ? sides.reps : parseNumber(reps);
+        if (repsNum == null || repsNum === 0) return false;
+
+        patchSet(order, id, { weight, reps, repsLeft, done: true });
         cueSetSaved();
         startRest();
-        if (tracking === "time" && set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
+        if (set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
+        const kg = toKg(parseNumber(weight) ?? 0, unit);
+        if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
         try {
           await updateSet(id, {
-            weight: toKg(parseNumber(weight) ?? 0, unit),
-            reps: 0,
-            duration_seconds: seconds,
-            distance_m: metres || null,
+            weight: kg,
+            reps: Math.round(repsNum),
+            ...sides,
             is_completed: true,
           });
         } catch (e) {
           fail(e);
         }
         return true;
+      } finally {
+        inFlightSetsRef.current.delete(id);
       }
-
-      // Working sets fill in today's suggested weight when there is one.
-      const suggested = block.suggestion && (set.type === "normal" || set.type === "failure") ? String(block.suggestion.weight) : null;
-      const weight = set.weight || suggested || (prev ? toDisplay(prev.weight, unit) : "");
-      const fallback = (side: number | null | undefined) =>
-        prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "");
-      let reps = set.reps || fallback(prev?.reps_right);
-      let repsLeft = "";
-      let sides: ReturnType<typeof sideReps> = null;
-      if (block.unilateral) {
-        // A side left blank did the same as the other side (or last time's).
-        repsLeft = set.repsLeft || set.reps || fallback(prev?.reps_left);
-        reps = set.reps || set.repsLeft || reps;
-        sides = sideReps(intOrNull(repsLeft), intOrNull(reps));
-      }
-      const repsNum = sides ? sides.reps : parseNumber(reps);
-      if (repsNum == null || repsNum === 0) return false;
-
-      patchSet(order, id, { weight, reps, repsLeft, done: true });
-      cueSetSaved();
-      startRest();
-      if (set.type !== "warmup" && effortScale !== "off") setEffortAsk({ order, id });
-      const kg = toKg(parseNumber(weight) ?? 0, unit);
-      if (set.type !== "warmup" && session) checkRecord(block.exercise, kg, Math.round(repsNum), weight, session.id);
-      try {
-        await updateSet(id, {
-          weight: kg,
-          reps: Math.round(repsNum),
-          ...sides,
-          is_completed: true,
-        });
-      } catch (e) {
-        fail(e);
-      }
-      return true;
     },
     [patchSet, unit, restTimer, fail, session, checkRecord, effortScale],
   );
@@ -1067,6 +1186,49 @@ export function useWorkout() {
     [patchSet, toggleDone],
   );
 
+  // ---- Wear OS Live Companion Auto-Sync ----
+  useEffect(() => {
+    if (!session) return;
+    const allSets = blocks.flatMap((b) => b.sets);
+    wearableBridge.broadcastActiveWorkout(session, allSets).catch(() => {});
+
+    const unsubSet = wearableBridge.onSetLogged(async (data) => {
+      if (!data || data.sessionId !== session.id) return;
+      const block = blocksRef.current.find((b) => b.exercise.id === data.exerciseId) ?? blocksRef.current[0];
+      if (!block) return;
+      const targetSet = block.sets.find((s) => s.setNumber === data.setNumber) ?? block.sets.find((s) => !s.done);
+      if (!targetSet) return;
+
+      // The rows show text in your unit; the database gets numbers (weight in kg).
+      const { ui, db } = watchSetPatch(data, unit);
+      if (Object.keys(db).length > 0) {
+        patchSet(block.order, targetSet.id, ui);
+        await updateSet(targetSet.id, db).catch(() => {});
+      }
+
+      if (data.isCompleted && !targetSet.done) {
+        await toggleDone(block.order, targetSet.id);
+      }
+    });
+
+    const unsubFinish = wearableBridge.onWorkoutFinished((data) => {
+      if (data && data.sessionId === session.id) {
+        void finish();
+      }
+    });
+
+    const unsubReq = wearableBridge.onRequestActive(() => {
+      const currentSets = blocksRef.current.flatMap((b) => b.sets);
+      wearableBridge.broadcastActiveWorkout(session, currentSets).catch(() => {});
+    });
+
+    return () => {
+      unsubSet();
+      unsubFinish();
+      unsubReq();
+    };
+  }, [session, blocks, patchSet, toggleDone, finish, unit]);
+
   return {
     startWith,
     session,
@@ -1078,6 +1240,11 @@ export function useWorkout() {
     start,
     finish,
     discard,
+    staleSession,
+    resumeStale,
+    finishStale,
+    discardStale,
+    hideStale,
     addExercise,
     reorder,
     /** The exercises as they are right now (after any change still settling into state). */

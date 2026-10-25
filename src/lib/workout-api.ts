@@ -247,6 +247,7 @@ export type RoutineExercise = Tables<"routine_exercises">;
 export type Adjustment = Tables<"routine_adjustments">;
 
 export interface PlanInput {
+  provider?: "gemini" | "claude";
   goal: "strength" | "hypertrophy" | "powerbuilding" | "general";
   methodology: "auto" | "531" | "sheiko" | "rp" | "linear";
   days_per_week: number;

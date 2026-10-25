@@ -6,8 +6,9 @@
 // back online. Inserts use ids made on the phone and are sent as
 // "insert unless it's already there", so a retry never makes duplicates.
 
-import { getSupabase } from "@/lib/supabase/client";
-import { kvGet, kvSet } from "@/lib/offline/kv";
+import { getSupabase } from "../supabase/client.ts";
+import { kvGet, kvSet } from "./kv.ts";
+import type { Database } from "../../types/database.ts";
 
 type Table = "workout_sessions" | "workout_sets";
 type Row = Record<string, unknown>;
@@ -16,8 +17,8 @@ export type Op =
   | { kind: "insert"; table: Table; rows: Row[] }
   | { kind: "update"; table: Table; ids: string[]; patch: Row }
   | { kind: "delete"; table: Table; ids: string[] }
-  /** Finishing: drop the unchecked sets, then stamp the end time. */
-  | { kind: "finish"; sessionId: string; endTime: string }
+  /** Finishing: drop the unchecked sets, then stamp the end time and volume. */
+  | { kind: "finish"; sessionId: string; endTime: string; volume?: number }
   /** Ask for "next time" suggestions once a routine workout has synced. */
   | { kind: "adjust"; sessionId: string };
 
@@ -70,9 +71,11 @@ async function load(): Promise<Entry[]> {
   return loaded;
 }
 
+export const SAVE_FAILED_MESSAGE = "Couldn't save on this phone (storage full?). Keep the app open until it syncs.";
+
 async function save() {
-  await kvSet(KEY, entries);
-  emit({ pending: entries.length });
+  const saved = await kvSet(KEY, entries);
+  emit({ pending: entries.length, ...(saved ? {} : { error: SAVE_FAILED_MESSAGE }) });
 }
 
 /** Errors that mean "no signal", as opposed to the server saying no. */
@@ -124,9 +127,20 @@ async function sendOnce(op: Op): Promise<void> {
       return check(await db.from(op.table).update(op.patch as any).in("id", op.ids));
     case "delete":
       return check(await db.from(op.table).delete().in("id", op.ids));
-    case "finish":
+    case "finish": {
       check(await db.from("workout_sets").delete().eq("session_id", op.sessionId).eq("is_completed", false));
-      return check(await db.from("workout_sessions").update({ end_time: op.endTime }).eq("id", op.sessionId).is("end_time", null));
+      const patch = {
+        end_time: op.endTime,
+        ...(op.volume != null ? { volume: op.volume } : {}),
+      };
+      return check(
+        await db
+          .from("workout_sessions")
+          .update(patch as unknown as Database["public"]["Tables"]["workout_sessions"]["Update"])
+          .eq("id", op.sessionId)
+          .is("end_time", null)
+      );
+    }
     case "adjust": {
       const { error } = await db.functions.invoke("suggest-adjustments", { body: { session_id: op.sessionId } });
       // Suggestions are a bonus: only "no signal" is worth retrying.
