@@ -63,6 +63,24 @@ export async function getLastPerformance(exerciseId: string): Promise<LastPerfor
   );
 }
 
+export type EarlierSet = Pick<LastPerformance[number], "set_type" | "weight" | "reps" | "rpe">;
+
+/**
+ * The finished workout before the last one for an exercise, in the same shape as getLastPerformance.
+ * Empty when there are fewer than two. Used to spot two missed sessions in a row.
+ */
+export async function getEarlierPerformance(exerciseId: string): Promise<EarlierSet[]> {
+  return cachedRead(`earlier:${exerciseId}`, async () => {
+    const { sets, sessions } = await getExerciseHistory(exerciseId);
+    const ordered = [...sessions].sort((a, b) => b.start_time.localeCompare(a.start_time));
+    const second = ordered[1];
+    if (!second) return [];
+    return sets
+      .filter((s) => s.session_id === second.id)
+      .map((s) => ({ set_type: s.set_type, weight: s.weight, reps: s.reps, rpe: null }));
+  }, []);
+}
+
 export type ExercisePrefs = Tables<"exercise_prefs">;
 
 export async function getExercisePrefs(exerciseId: string): Promise<ExercisePrefs | null> {
@@ -256,6 +274,8 @@ export interface PlanInput {
   experience: "beginner" | "intermediate" | "advanced";
   equipment: string[];
   notes: string;
+  /** Planned lighter weeks every few weeks ("auto") or none. */
+  deload?: "auto" | "off";
   /** From your equipment kit: what it can't do, and its weights in words. */
   exclude_slugs?: string[];
   equipment_note?: string;
@@ -474,9 +494,26 @@ export type AdjustmentWithContext = Adjustment & {
   routine_exercises: { target_reps: number; target_reps_max: number | null; exercises: { name: string } | null; routines: { name: string } | null } | null;
 };
 
-export async function requestAdjustments(sessionId: string): Promise<void> {
-  const { error } = await getSupabase().functions.invoke("suggest-adjustments", { body: { session_id: sessionId } });
+export interface AdjustmentCheck {
+  /** That was a deload week: nothing to change. */
+  deload_week?: boolean;
+  /** You keep missing your targets: take a deload week now? */
+  early_deload?: { program_id: string; reason: string } | null;
+}
+
+export async function requestAdjustments(sessionId: string): Promise<AdjustmentCheck> {
+  const { data, error } = await getSupabase().functions.invoke("suggest-adjustments", { body: { session_id: sessionId } });
   if (error) throw await functionError(error);
+  return (data ?? {}) as AdjustmentCheck;
+}
+
+/** Slot a deload week in at your next week. Returns its week number. */
+export async function applyEarlyDeload(programId: string): Promise<number> {
+  return unwrap(await getSupabase().rpc("apply_early_deload", { p_program_id: programId }));
+}
+
+export async function dismissEarlyDeload(programId: string): Promise<void> {
+  unwrap(await getSupabase().rpc("dismiss_early_deload", { p_program_id: programId }));
 }
 
 export async function listPendingAdjustments(sessionId?: string): Promise<AdjustmentWithContext[]> {

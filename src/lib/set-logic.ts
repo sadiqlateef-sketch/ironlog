@@ -145,6 +145,10 @@ export function suggestWeight(
     step: number;
     trigger?: "all_sets_top" | "first_set_top" | "two_thirds_top";
     targetSets?: number;
+    /** Bottom of the planned rep range. With `earlier`, lets two misses in a row drop the weight. */
+    repMin?: number | null;
+    /** The session before last time (same shape as `previous`). */
+    earlier?: PrevSet[];
   },
 ): Suggestion | null {
   const working = previous.filter((p) => p.set_type !== "warmup" && p.set_type !== "drop" && p.reps > 0 && p.weight > 0);
@@ -157,6 +161,23 @@ export function suggestWeight(
 
   const trigger = o.trigger ?? "all_sets_top";
   const repMax = o.repMax;
+
+  // Missed the bottom of the rep range at this weight two sessions running: back off 10% and build up again.
+  if (o.repMin != null && o.earlier) {
+    const before = o.earlier.filter((p) => p.set_type !== "warmup" && p.set_type !== "drop" && p.reps > 0 && p.weight > 0);
+    if (before.length) {
+      const topBefore = Math.max(...before.map((p) => p.weight));
+      const missed = (sets: PrevSet[]) => Math.max(...sets.map((p) => p.reps)) < o.repMin!;
+      if (
+        Math.abs(topBefore - top) < 1e-6 &&
+        missed(atTop) &&
+        missed(before.filter((p) => Math.abs(p.weight - topBefore) < 1e-6))
+      ) {
+        const lighter = Math.round((top * 0.9) / o.step) * o.step;
+        return { weight: round(lighter), from: top, why: "Missed your reps twice: drop 10% and build back" };
+      }
+    }
+  }
 
   if (repMax != null) {
     let metTrigger = false;

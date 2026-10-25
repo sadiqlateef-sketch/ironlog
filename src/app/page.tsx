@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { AppShell } from "@/components/app-shell";
+import { DeloadOffer, DeloadTag } from "@/components/deload-offer";
 import { CenterStartButton } from "@/components/home/center-start-button";
 import { LastSessionCard } from "@/components/home/last-session-card";
 import { NextSessionCard } from "@/components/home/next-session-card";
@@ -78,7 +79,15 @@ function Dashboard() {
       <CenterStartButton workout={workout} program={program} />
 
       {/* 3. NEXT SESSION BLUEPRINT */}
+      {program?.next_routine_id && program.next_is_deload && (
+        <p className="flex items-center gap-2 text-sm" data-testid="home-deload-next">
+          <DeloadTag /> Your next workout is a lighter deload day.
+        </p>
+      )}
       <NextSessionCard program={program} unit={unit} />
+      {program?.deload_suggestion && (
+        <DeloadOffer programId={program.program_id} reason={program.deload_suggestion} onChange={() => setReload((r) => r + 1)} />
+      )}
 
       {/* Suggested Adjustments */}
       {adjustments.length > 0 && (

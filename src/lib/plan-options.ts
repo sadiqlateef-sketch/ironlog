@@ -32,5 +32,6 @@ export function planDefaults(profile: Tables<"users"> | null): PlanInput {
     // What your current place has (your gym, unless you switched to another kit).
     equipment: profile ? [...activeKit(profile).equipment] : DEFAULT_EQUIPMENT,
     notes: "",
+    deload: "auto",
   };
 }
