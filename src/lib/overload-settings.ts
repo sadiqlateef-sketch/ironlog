@@ -26,7 +26,7 @@ export interface OverloadSettings {
 }
 
 export const DEFAULT_OVERLOAD_SETTINGS: OverloadSettings = {
-  autoApplyPeriodization: true,
+  autoApplyPeriodization: false,
   currentMesocycleWeek: 1,
   totalMesocycleWeeks: 6,
   upperCompoundIncLb: 5,

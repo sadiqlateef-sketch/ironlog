@@ -125,10 +125,14 @@ function saveRest(exerciseId: string, seconds: number) {
   } catch {}
 }
 
-function targetNoteFor(t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null }): string | null {
+function targetNoteFor(
+  t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null },
+  /** A periodization phase already shows its own RPE, so the program's is left out. */
+  skipRpe = false,
+): string | null {
   const parts = [
     t.target_percent_1rm != null ? `${Number(t.target_percent_1rm)}% 1RM` : null,
-    t.target_rpe != null ? `RPE ${Number(t.target_rpe)}` : null,
+    t.target_rpe != null && !skipRpe ? `RPE ${Number(t.target_rpe)}` : null,
     t.notes,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
@@ -273,7 +277,9 @@ export function useWorkout() {
             ? Math.max(effectiveRepMin, target.target_reps_max + activePhase.repAdjustment)
             : null;
           const phaseNote = `${activePhase.label} (${activePhase.targetRpe}, ${activePhase.rirTarget})`;
-          periodizedTargetNote = periodizedTargetNote ? `${phaseNote} · ${periodizedTargetNote}` : phaseNote;
+          // Say what the program itself asked for, so the changed target is never a surprise.
+          const programReps = `program: ${target.target_reps}${target.target_reps_max ? "-" + target.target_reps_max : ""} reps`;
+          periodizedTargetNote = [phaseNote, programReps, targetNoteFor(target, true)].filter(Boolean).join(" · ");
         }
 
         const repMax = effectiveRepMax ?? effectiveRepMin;
