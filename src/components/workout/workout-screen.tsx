@@ -499,15 +499,6 @@ function ActiveWorkout({
           <Button variant="ghost" size="icon" aria-label="Logger display options" onClick={() => setOptions(true)}>
             <SlidersHorizontal />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:bg-destructive/10 font-semibold"
-            onClick={() => setConfirmDiscard(true)}
-            data-testid="discard-button"
-          >
-            Discard
-          </Button>
           <Button onClick={() => (undone > 0 ? setConfirmFinish(true) : finish())} data-testid="finish-button">
             <Flag /> Finish
           </Button>
