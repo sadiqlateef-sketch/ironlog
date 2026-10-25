@@ -27,7 +27,7 @@ export function LastSessionCard({ session, unit, onOpen }: LastSessionCardProps)
 
   useEffect(() => {
     if (!session?.id) return;
-    setLoading(true);
+    void Promise.resolve().then(() => setLoading(true));
 
     Promise.all([listSessionSets(session.id), listExercises()])
       .then(([setsData, exerciseList]) => {

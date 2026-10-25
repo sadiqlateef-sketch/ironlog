@@ -728,6 +728,7 @@ const DEFAULT_EXERCISES = [
     updated_at: "2026-01-01T00:00:00.000Z",
   },
 ];
+export const LOCAL_EXERCISES = DEFAULT_EXERCISES;
 
 const DEFAULT_ROUTINES = [
   {

@@ -76,7 +76,8 @@ export function useOverloadSettings() {
   const [settings, setSettings] = useState<OverloadSettings>(getStoredOverloadSettings);
 
   useEffect(() => {
-    setSettings(getStoredOverloadSettings());
+    // Re-read after mount so the server render (defaults) and the phone match.
+    void Promise.resolve().then(() => setSettings(getStoredOverloadSettings()));
 
     const handler = (e: Event) => {
       const customEvent = e as CustomEvent<OverloadSettings>;
