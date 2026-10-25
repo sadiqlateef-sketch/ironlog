@@ -234,3 +234,12 @@ export function sideReps(left: number | null, right: number | null): { reps_left
 function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/** Weights for n warm-up sets before a working weight (kg): the last n of 50%, 70%, 85%, rounded to 2.5 kg. */
+export function warmupWeightsKg(workingKg: number, n: number): number[] {
+  if (!(workingKg > 0) || n <= 0) return Array(Math.max(0, n)).fill(0);
+  const pcts = [0.5, 0.7, 0.85].slice(-Math.min(n, 3));
+  const out = pcts.map((p) => Math.max(0, Math.round((workingKg * p) / 2.5) * 2.5));
+  while (out.length < n) out.unshift(out[0] ?? 0);
+  return out;
+}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { effortBadge, effortChoices, effortLabel, matchPrevious, platesText, sideReps, suggestWeight, warmupRamp, weightStep } from "../src/lib/set-logic.ts";
+import { effortBadge, effortChoices, effortLabel, matchPrevious, platesText, sideReps, suggestWeight, warmupRamp, warmupWeightsKg, weightStep } from "../src/lib/set-logic.ts";
 
 const LB = { plateLoaded: true, bar: 45, plates: [45, 35, 25, 10, 5, 2.5], step: 5 };
 
@@ -72,4 +72,10 @@ test("last time lines up warm-ups with warm-ups and work with work", () => {
   const prev = [{ set_type: "normal" as const, id: "a" }, { set_type: "normal" as const, id: "b" }];
   const m = matchPrevious(["warmup", "warmup", "normal", "normal", "normal"], prev);
   assert.deepEqual(m.map((p) => p?.id), [undefined, undefined, "a", "b", undefined]);
+});
+
+test("planned warm-up rows are prefilled from the working weight", () => {
+  assert.deepEqual(warmupWeightsKg(100, 2), [70, 85]);
+  assert.deepEqual(warmupWeightsKg(100, 3), [50, 70, 85]);
+  assert.deepEqual(warmupWeightsKg(0, 2), [0, 0]);
 });

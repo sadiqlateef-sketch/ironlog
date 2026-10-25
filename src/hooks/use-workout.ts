@@ -41,7 +41,7 @@ import { checkAtGym, countsForCalendar, gymOf, markSessionAtGym, syncGymCalendar
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { cueSetSaved } from "@/lib/cues";
-import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest } from "@/lib/workout-logic";
+import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest, watchSetPatch } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import { PLATE_LOADED } from "@/lib/labels";
 import { matchPrevious, sideReps, suggestWeight, weightStep, getOverloadIncrement, type Suggestion } from "@/lib/set-logic";
@@ -125,10 +125,14 @@ function saveRest(exerciseId: string, seconds: number) {
   } catch {}
 }
 
-function targetNoteFor(t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null }): string | null {
+function targetNoteFor(
+  t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null },
+  /** A periodization phase already shows its own RPE, so the program's is left out. */
+  skipRpe = false,
+): string | null {
   const parts = [
     t.target_percent_1rm != null ? `${Number(t.target_percent_1rm)}% 1RM` : null,
-    t.target_rpe != null ? `RPE ${Number(t.target_rpe)}` : null,
+    t.target_rpe != null && !skipRpe ? `RPE ${Number(t.target_rpe)}` : null,
     t.notes,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
@@ -273,7 +277,9 @@ export function useWorkout() {
             ? Math.max(effectiveRepMin, target.target_reps_max + activePhase.repAdjustment)
             : null;
           const phaseNote = `${activePhase.label} (${activePhase.targetRpe}, ${activePhase.rirTarget})`;
-          periodizedTargetNote = periodizedTargetNote ? `${phaseNote} · ${periodizedTargetNote}` : phaseNote;
+          // Say what the program itself asked for, so the changed target is never a surprise.
+          const programReps = `program: ${target.target_reps}${target.target_reps_max ? "-" + target.target_reps_max : ""} reps`;
+          periodizedTargetNote = [phaseNote, programReps, targetNoteFor(target, true)].filter(Boolean).join(" · ");
         }
 
         const repMax = effectiveRepMax ?? effectiveRepMin;
@@ -1193,14 +1199,11 @@ export function useWorkout() {
       const targetSet = block.sets.find((s) => s.setNumber === data.setNumber) ?? block.sets.find((s) => !s.done);
       if (!targetSet) return;
 
-      const updates: Record<string, unknown> = {};
-      if (data.weightKg != null) updates.weight_kg = data.weightKg;
-      if (data.reps != null) updates.reps = data.reps;
-      if (data.rpe != null) updates.rpe = data.rpe;
-
-      if (Object.keys(updates).length > 0) {
-        patchSet(block.order, targetSet.id, updates);
-        await updateSet(targetSet.id, updates).catch(() => {});
+      // The rows show text in your unit; the database gets numbers (weight in kg).
+      const { ui, db } = watchSetPatch(data, unit);
+      if (Object.keys(db).length > 0) {
+        patchSet(block.order, targetSet.id, ui);
+        await updateSet(targetSet.id, db).catch(() => {});
       }
 
       if (data.isCompleted && !targetSet.done) {
@@ -1224,7 +1227,7 @@ export function useWorkout() {
       unsubFinish();
       unsubReq();
     };
-  }, [session, blocks, patchSet, toggleDone, finish]);
+  }, [session, blocks, patchSet, toggleDone, finish, unit]);
 
   return {
     startWith,
