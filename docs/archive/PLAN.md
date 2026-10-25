@@ -1,3 +1,5 @@
+Archived 2026: outdated, see REVIEW.md / NOTES.md.
+
 # IronLog — Master Implementation Plan & Phase Rollout
 
 Version: 1.1  

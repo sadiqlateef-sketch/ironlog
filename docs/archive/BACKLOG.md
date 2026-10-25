@@ -1,3 +1,5 @@
+Archived 2026: outdated, see REVIEW.md / NOTES.md.
+
 # IronLog — Master Product & Engineering Backlog
 
 Version: 1.1

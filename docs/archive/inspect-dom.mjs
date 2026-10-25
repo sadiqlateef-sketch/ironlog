@@ -1,3 +1,4 @@
+// Archived 2026: outdated, see REVIEW.md / NOTES.md.
 import http from 'http';
 import { execSync } from 'child_process';
 

@@ -1,3 +1,5 @@
+Archived 2026: outdated, see REVIEW.md / NOTES.md.
+
 # IronLog Master Fix & Phase Delegation Playbook
 
 Version: 1.0  

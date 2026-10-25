@@ -1,3 +1,5 @@
+Archived 2026: outdated, see REVIEW.md / NOTES.md.
+
 # IronLog — Master Status & Verification Handoff
 
 Version: 1.3  
