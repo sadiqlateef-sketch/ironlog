@@ -19,12 +19,23 @@ export type ExerciseMechanic = "compound" | "isolation";
 export type UnitSystem = "metric" | "imperial";
 /** What a set of this exercise records (see migration 20261016020000_timed_sets.sql). */
 export type Tracking = "weight_reps" | "time" | "distance_time";
+/** How the logger asks how hard a set was (see migration 20261018170000_smarter_sets.sql). */
+export type EffortScale = "rir" | "rpe" | "off";
 export type TrainingGoal = "strength" | "hypertrophy" | "powerbuilding" | "general";
 export type SessionSource = "web" | "phone" | "watch" | "import" | "claude";
 export type AdjustmentAction = "increase" | "hold" | "deload" | "adjust_reps";
 export type AdjustmentStatus = "pending" | "applied" | "dismissed";
 
 /** Shape of users.physical_stats (all optional). */
+/** A weekly recap, from the weekly-recap Edge Function. */
+export type WeeklyRecap = {
+  headline: string;
+  wins: string[];
+  watch_outs: string[];
+  next_week: string[];
+  numbers: { workouts: number; sets: number; volume_kg: number; minutes: number; records: number; prev_workouts: number; prev_volume_kg: number };
+};
+
 export type PhysicalStats = {
   height_cm?: number;
   bodyweight_kg?: number;
@@ -58,6 +69,10 @@ export type Database = {
           training_equipment: string[];
           training_days_per_week: number | null;
           onboarded_at: string | null;
+          equipment_kits: Json;
+          active_kit_id: string | null;
+          work_shifts: Json;
+          effort_scale: EffortScale;
         } & Timestamps;
         Insert: {
           id: string;
@@ -76,6 +91,10 @@ export type Database = {
           training_equipment?: string[];
           training_days_per_week?: number | null;
           onboarded_at?: string | null;
+          equipment_kits?: Json;
+          active_kit_id?: string | null;
+          work_shifts?: Json;
+          effort_scale?: EffortScale;
         };
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
         Relationships: [];
@@ -95,6 +114,9 @@ export type Database = {
           aliases: string[];
           image_urls: string[];
           tracking: Tracking;
+          unilateral: boolean;
+          /** Caption under the form demo, e.g. when the photos show a similar movement. */
+          demo_note?: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -110,6 +132,7 @@ export type Database = {
           aliases?: string[];
           image_urls?: string[];
           tracking?: Tracking;
+          unilateral?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["exercises"]["Insert"]>;
         Relationships: [];
@@ -119,15 +142,23 @@ export type Database = {
           user_id: string;
           exercise_id: string;
           goal_weight_kg: number | null;
+          goal_date: string | null;
+          goal_start_kg: number | null;
           favorite: boolean;
           notes: string | null;
+          rest_seconds: number | null;
+          unilateral: boolean | null;
         } & Timestamps;
         Insert: {
           user_id?: string;
           exercise_id: string;
           goal_weight_kg?: number | null;
+          goal_date?: string | null;
+          goal_start_kg?: number | null;
           favorite?: boolean;
           notes?: string | null;
+          rest_seconds?: number | null;
+          unilateral?: boolean | null;
         };
         Update: Partial<Database["public"]["Tables"]["exercise_prefs"]["Insert"]>;
         Relationships: [];
@@ -280,6 +311,9 @@ export type Database = {
           notes: string | null;
           at_gym: boolean | null;
           calendar_event_id: string | null;
+          kit_id: string | null;
+          add_to_calendar: boolean | null;
+          import_key: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -294,6 +328,9 @@ export type Database = {
           notes?: string | null;
           at_gym?: boolean | null;
           calendar_event_id?: string | null;
+          kit_id?: string | null;
+          add_to_calendar?: boolean | null;
+          import_key?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sessions"]["Insert"]>;
         Relationships: [
@@ -321,6 +358,8 @@ export type Database = {
           client_id: string | null;
           duration_seconds: number | null;
           distance_m: number | null;
+          reps_left: number | null;
+          reps_right: number | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -341,6 +380,8 @@ export type Database = {
           client_id?: string | null;
           duration_seconds?: number | null;
           distance_m?: number | null;
+          reps_left?: number | null;
+          reps_right?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sets"]["Insert"]>;
         Relationships: [
@@ -408,11 +449,23 @@ export type Database = {
         Row: {
           id: number;
           user_id: string;
-          kind: "generate_plan" | "adjust_session" | "import_workout";
+          kind: "generate_plan" | "adjust_session" | "import_workout" | "weekly_recap";
           model: string | null;
           input_tokens: number | null;
           output_tokens: number | null;
           ok: boolean;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      weekly_recaps: {
+        Row: {
+          user_id: string;
+          week_start: string;
+          recap: WeeklyRecap;
+          source: "ai" | "rules";
           created_at: string;
         };
         Insert: never;
@@ -457,6 +510,8 @@ export type Database = {
           rpe: number | null;
           duration_seconds: number | null;
           distance_m: number | null;
+          reps_left: number | null;
+          reps_right: number | null;
         }[];
       };
       apply_routine_adjustment: {

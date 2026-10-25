@@ -12,6 +12,9 @@ import { formatDuration, sessionRecords, trainingSummary, type TrainingSummary }
 import { kgToLb, type UnitSystem } from "@/lib/units";
 import { listExercises, listFinishedSetsSince, listSessionsSince, type Exercise, type StatsSet, type WorkoutSession } from "@/lib/workout-api";
 import { bestE1rm } from "@/lib/workout-logic";
+import { SkeletonList } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Timer } from "lucide-react";
 
 const PAGE = 10;
 
@@ -48,9 +51,14 @@ export function ActivityTab({ reloadKey, onChanged }: { reloadKey: number; onCha
   }, [reloadKey]);
 
   if (error) return <p className="text-destructive text-sm">{error}</p>;
-  if (!feed) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (!feed) return <SkeletonList rows={3} rowClassName="h-28" />;
   const { sessions } = feed.data;
-  if (!sessions.length) return <p className="text-muted-foreground text-sm">Finish a workout and it shows up here.</p>;
+  if (!sessions.length)
+    return (
+      <EmptyState icon={Timer} title="No workouts to break down yet">
+        Finish a workout and it shows up here, with how your time split between lifting, resting and setting up.
+      </EmptyState>
+    );
 
   return (
     <>
@@ -154,7 +162,7 @@ function Item({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-muted-foreground truncate text-xs">{label}</dt>
-      <dd className="font-mono text-lg font-extrabold">{value}</dd>
+      <dd className="num text-lg font-bold">{value}</dd>
     </div>
   );
 }

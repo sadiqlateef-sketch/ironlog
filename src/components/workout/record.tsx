@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Trophy } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import type { RecordHit } from "@/hooks/use-workout";
@@ -31,10 +31,16 @@ const CONFETTI = Array.from({ length: 18 }, (_, i) => ({
 /** Pops up in the logger when a set beats your best for that lift, then fades on its own. */
 export function RecordCelebration({ hit, onDone }: { hit: RecordHit; onDone: () => void }) {
   const { unit } = useAuth();
+  // The logger re-renders every second (workout clock, rest timer) and hands us a
+  // new onDone each time, so the timer must not restart when it changes.
+  const done = useRef(onDone);
   useEffect(() => {
-    const id = setTimeout(onDone, 4000);
+    done.current = onDone;
+  });
+  useEffect(() => {
+    const id = setTimeout(() => done.current(), 4000);
     return () => clearTimeout(id);
-  }, [onDone]);
+  }, []);
 
   return (
     <button
@@ -61,7 +67,7 @@ export function RecordCelebration({ hit, onDone }: { hit: RecordHit; onDone: () 
           <span className="text-record block text-lg leading-tight font-extrabold">New record!</span>
           <span className="block truncate font-semibold">{hit.exercise}</span>
           <span className="text-muted-foreground block text-sm">
-            <span className="text-foreground font-mono font-bold">
+            <span className="text-foreground num font-bold">
               {hit.weight} {unit === "imperial" ? "lb" : "kg"} × {hit.reps}
             </span>{" "}
             · your strongest set yet

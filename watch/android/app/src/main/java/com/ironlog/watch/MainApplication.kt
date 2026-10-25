@@ -14,7 +14,7 @@ class MainApplication : Application(), ReactApplication {
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
-          // Our own native code: heart rate from the watch sensor.
+          // Our own native code: heart rate from the watch sensor, and voice input.
           add(HeartRatePackage())
         },
     )

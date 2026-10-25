@@ -337,7 +337,7 @@ function WorkoutSummary({
             <span className={cn("font-semibold", !x.exercise_id && "text-set-warmup")}>
               {(x.exercise_id && names.get(x.exercise_id)) || x.name_as_written}
             </span>
-            <span className="text-muted-foreground font-mono"> · {setLines(x.sets, unit).join(", ")}</span>
+            <span className="text-muted-foreground num"> · {setLines(x.sets, unit).join(", ")}</span>
           </li>
         ))}
       </ul>

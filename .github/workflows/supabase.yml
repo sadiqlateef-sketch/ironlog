@@ -8,7 +8,8 @@
 #   SUPABASE_DB_PASSWORD   the database password you chose when creating the project
 #   ANTHROPIC_API_KEY      optional: turns on Claude for AI programs
 #   GOOGLE_CLIENT_ID       optional, with GOOGLE_CLIENT_SECRET: turns on gym
-#   GOOGLE_CLIENT_SECRET   workouts on Google Calendar (see README)
+#   GOOGLE_CLIENT_SECRET   workouts on Google Calendar and "Continue with
+#                          Google" sign-in (see README)
 name: Deploy database and functions
 
 on:
@@ -67,7 +68,7 @@ jobs:
           fi
 
       - name: Deploy functions
-        run: npx supabase functions deploy generate-plan suggest-adjustments watch-pair import-workout gym-calendar claude-connector --project-ref "$PROJECT_REF" --use-api
+        run: npx supabase functions deploy generate-plan suggest-adjustments watch-pair import-workout gym-calendar claude-connector weekly-recap --project-ref "$PROJECT_REF" --use-api
 
       - name: Set Claude API key
         if: ${{ env.ANTHROPIC_API_KEY != '' }}
@@ -76,3 +77,22 @@ jobs:
       - name: Set Google Calendar keys
         if: ${{ env.GOOGLE_CLIENT_ID != '' && env.GOOGLE_CLIENT_SECRET != '' }}
         run: npx supabase secrets set GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" --project-ref "$PROJECT_REF"
+
+      # Same Google keys, for "Continue with Google" on the sign-in screen:
+      # switches on Supabase's Google provider and allows the app's link back
+      # (com.ironlog.app://auth-callback). Other auth settings are left alone.
+      - name: Turn on Google sign-in
+        if: ${{ env.GOOGLE_CLIENT_ID != '' && env.GOOGLE_CLIENT_SECRET != '' }}
+        run: |
+          api="https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth"
+          current=$(curl -fsS "$api" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")
+          allow=$(jq -r --arg cb "com.ironlog.app://auth-callback" '
+            (.uri_allow_list // "") | split(",") | map(select(. != "")) | (if index($cb) then . else . + [$cb] end) | join(",")
+          ' <<<"$current")
+          jq -n --arg id "$GOOGLE_CLIENT_ID" --arg secret "$GOOGLE_CLIENT_SECRET" --arg allow "$allow" '{
+            external_google_enabled: true,
+            external_google_client_id: $id,
+            external_google_secret: $secret,
+            uri_allow_list: $allow
+          }' | curl -fsS -X PATCH "$api" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @- -o /dev/null
+          echo "Google sign-in is on. Allowed return links: $allow"

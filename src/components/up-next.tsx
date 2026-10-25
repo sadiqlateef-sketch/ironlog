@@ -21,8 +21,8 @@ export function useActiveProgram(reloadKey = 0) {
   return progress;
 }
 
-/** The big "do this next" card for the active program. */
-export function UpNext({ progress, onChange }: { progress: ProgramProgress; onChange?: () => void }) {
+/** The big "do this next" card for the active program (`embedded`: just its contents, for Home's Today card). */
+export function UpNext({ progress, embedded, onChange }: { progress: ProgramProgress; embedded?: boolean; onChange?: () => void }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +42,9 @@ export function UpNext({ progress, onChange }: { progress: ProgramProgress; onCh
     }
   }
 
+  const Wrap = embedded ? "div" : Card;
   return (
-    <Card className="border-primary gap-3 p-4" data-testid="up-next">
+    <Wrap className={embedded ? "flex flex-col gap-3" : "border-primary gap-3 p-4"} data-testid="up-next">
       <div className="min-w-0">
         <p className="text-primary-text flex items-center gap-2 text-xs font-bold tracking-wide uppercase">
           {finished ? "Program complete" : `Up next · Week ${progress.next_week} of ${progress.weeks}`}
@@ -69,6 +70,6 @@ export function UpNext({ progress, onChange }: { progress: ProgramProgress; onCh
       {!finished && progress.deload_suggestion && (
         <DeloadOffer programId={progress.program_id} reason={progress.deload_suggestion} onChange={onChange} />
       )}
-    </Card>
+    </Wrap>
   );
 }

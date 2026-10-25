@@ -37,7 +37,10 @@ Deno.serve(
     const bySlug = new Map<string, (typeof exercises)[number]>();
     for (const e of exercises) if (!bySlug.has(e.slug) || e.created_by) bySlug.set(e.slug, e);
     const allowed = new Set([...input.equipment, "bodyweight"]);
-    const library = [...bySlug.values()].filter((e) => input.equipment.length === 0 || allowed.has(e.equipment));
+    const excluded = new Set(input.exclude_slugs);
+    const library = [...bySlug.values()].filter(
+      (e) => (input.equipment.length === 0 || allowed.has(e.equipment)) && !excluded.has(e.slug),
+    );
     if (library.length < 3) throw new HttpError(400, "Not enough exercises match your equipment.");
 
     const since = new Date(Date.now() - 120 * 86_400_000).toISOString();

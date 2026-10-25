@@ -23,7 +23,7 @@ import type { UnitSystem } from "../_shared/units.ts";
 const Body = z.object({ session_id: z.string().uuid() });
 
 const TARGET_COLUMNS = "id, routine_id, exercise_id, position, target_sets, target_reps, target_reps_max, target_weight_kg, exercises(name, primary_muscle)";
-const SET_COLUMNS = "session_id, exercise_id, exercise_order, set_type, weight, reps, is_completed";
+const SET_COLUMNS = "session_id, exercise_id, exercise_order, set_type, weight, reps, rpe, is_completed";
 
 interface ProgramInfo {
   id: string;

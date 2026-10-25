@@ -15,7 +15,7 @@ const typeStyles = {
 } as const;
 
 const numInput =
-  "h-11 w-full min-w-0 rounded-xl bg-secondary text-center font-mono text-lg font-bold outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring";
+  "h-11 w-full min-w-0 rounded-xl bg-secondary text-center num text-lg font-bold outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring";
 
 /** Grid columns for a header row plus SetLine rows. */
 export const SET_GRID = "grid grid-cols-[2.5rem_1fr_1fr_2.75rem] items-center gap-2 px-1";
@@ -41,7 +41,7 @@ export function SetLine({
         type="button"
         onClick={() => onChange({ type: nextSetType(s.type) })}
         aria-label={`Set type ${s.type}. Tap to change.`}
-        className={cn("h-9 rounded-lg font-mono text-sm font-bold", typeStyles[s.type])}
+        className={cn("h-9 rounded-lg num text-sm font-bold", typeStyles[s.type])}
       >
         {label}
       </button>
