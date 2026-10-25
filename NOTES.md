@@ -1,0 +1,24 @@
+# IronLog notes
+
+Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project files `ironlog-review/`.
+
+## Decisions
+- Personal app: one user, Galaxy Z Fold8 (folded + unfolded) and Galaxy Watch.
+- Nothing from the review gets built until Sadiq approves it item by item (REVIEW.md section 7).
+- Open: cloud-backed (Supabase) or phone-only? The app has been phone-only since Oct 23 (mock backend).
+- Theme is now ruby/gold "Cosmic Ruby" (replaced the Oct 14 navy glass look).
+
+## Verified on my phone
+- (Nothing verified from this review yet. Add items here after testing on the Fold8.)
+
+## Known bugs / half-finished
+- All sign-in, data and AI calls are answered by `src/lib/supabase/mock-backend.ts`; cloud history not shown.
+- Previous-day workout: Resume does nothing; closing the prompt deletes it; workouts vanish at midnight.
+- Two open workouts: finishing one opens the other (no one-active rule locally).
+- Watch-logged weight dropped on the phone (`weight_kg` vs `weight`).
+- Periodization auto-apply on by default, rewrites program targets.
+- Planned warm-up rows prefill 0 weight. Lint has 4 errors.
+- Open PRs not on main: #18 reset email, #20 Health Connect, #22 deload weeks.
+
+## Next
+- Sadiq picks items from REVIEW.md section 7. Suggested first: D1 decision, then D2 and D3.
