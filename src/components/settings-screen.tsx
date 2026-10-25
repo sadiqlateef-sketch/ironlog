@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BriefcaseMedical, ChevronRight, Dumbbell, FileDown, FileUp, LogOut, MapPin, MessageCircle, Sliders, Sparkles } from "lucide-react";
+import { Bell, BriefcaseMedical, ChevronRight, Dumbbell, FileDown, FileUp, HeartPulse, LogOut, MapPin, MessageCircle, Sliders, Sparkles } from "lucide-react";
 import { AppearanceSettings } from "@/components/appearance-settings";
 import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
 import { ModifyProgramSheet } from "@/components/modify-program-sheet";
@@ -13,6 +13,7 @@ import { OverloadSettingsSheet } from "@/components/overload-settings-sheet";
 import { BackupButton } from "@/components/import/backup-button";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
+import { HealthSheet } from "@/components/health-sheet";
 import { ShiftsSheet } from "@/components/shifts-sheet";
 import { ReminderRow } from "@/components/workout/home-tab";
 import { useKits } from "@/hooks/use-kits";
@@ -64,7 +65,7 @@ export function SettingsScreen() {
   const router = useRouter();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [note, setNote] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | "shifts" | "modify_program" | "overload" | null>(null);
+  const [sheet, setSheet] = useState<"weights" | "gym" | "claude" | "shifts" | "health" | "modify_program" | "overload" | null>(null);
   const [programs, setPrograms] = useState<ProgramWithWorkouts[] | null>(null);
   const { kits } = useKits();
 
@@ -235,6 +236,7 @@ export function SettingsScreen() {
       <Section title="Gym and connections">
         <div className="flex flex-col">
           <Row icon={MapPin} label="Gym & calendar" detail={profile?.gym_name ?? "Check in at your gym, add workouts to Google Calendar"} onClick={() => setSheet("gym")} />
+          <Row icon={HeartPulse} label="Health Connect" detail="Share workouts with Samsung Health; bring in heart rate and weight" onClick={() => setSheet("health")} />
           <Row icon={MessageCircle} label="Connect to Claude" detail="Log workouts from a Claude chat" onClick={() => setSheet("claude")} />
         </div>
       </Section>
@@ -268,6 +270,7 @@ export function SettingsScreen() {
       <ShiftsSheet open={sheet === "shifts"} onOpenChange={(o) => !o && setSheet(null)} />
       <GymSheet open={sheet === "gym"} onOpenChange={(o) => !o && setSheet(null)} />
       <ClaudeConnectSheet open={sheet === "claude"} onOpenChange={(o) => !o && setSheet(null)} />
+      <HealthSheet open={sheet === "health"} onOpenChange={(o) => !o && setSheet(null)} />
       <ModifyProgramSheet
         open={sheet === "modify_program"}
         onOpenChange={(o) => !o && setSheet(null)}

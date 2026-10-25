@@ -24,12 +24,15 @@ export function TodayCard({
   program,
   recent,
   reloadKey,
+  onChange,
 }: {
   workout: ActiveWorkout | undefined;
   /** undefined while loading */
   program: ProgramProgress | null | undefined;
   recent: WorkoutSession[] | null;
   reloadKey: number;
+  /** After something on the card changes your plan (e.g. taking a deload week). */
+  onChange?: () => void;
 }) {
   const today = new Date();
   const doneToday = recent?.find((s) => s.end_time && sameDay(new Date(s.start_time), today));
@@ -58,7 +61,7 @@ export function TodayCard({
               <Skeleton className="h-12 w-full rounded-xl" />
             </div>
           ) : program ? (
-            <UpNext progress={program} embedded />
+            <UpNext progress={program} embedded onChange={onChange} />
           ) : (
             <NoProgram />
           )}
