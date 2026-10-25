@@ -18,19 +18,21 @@ public class IronLogContentProvider extends ContentProvider {
     private static final int WORKOUTS = 100;
     private static final int RECOVERY = 200;
     private static final int PRS = 300;
+    private static final int TODAY_PLAN = 400;
     private static final UriMatcher URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
 
     static {
         URI_MATCHER.addURI(AUTHORITY, "workouts", WORKOUTS);
         URI_MATCHER.addURI(AUTHORITY, "recovery", RECOVERY);
         URI_MATCHER.addURI(AUTHORITY, "prs", PRS);
+        URI_MATCHER.addURI(AUTHORITY, "today_plan", TODAY_PLAN);
     }
 
     private IronLogDbHelper dbHelper;
 
     public static class IronLogDbHelper extends SQLiteOpenHelper {
         private static final String DB_NAME = "ironlog_ecosystem.db";
-        private static final int DB_VERSION = 1;
+        private static final int DB_VERSION = 2;
 
         public IronLogDbHelper(Context context) {
             super(context, DB_NAME, null, DB_VERSION);
@@ -48,6 +50,11 @@ public class IronLogContentProvider extends ContentProvider {
             db.execSQL("CREATE TABLE IF NOT EXISTS prs (" +
                 "id TEXT PRIMARY KEY, exerciseName TEXT, weightLb REAL, reps INTEGER, " +
                 "estimated1Rm REAL, achievedAt TEXT)");
+            // Added in DB version 2. Read-only for Bujo Tasks; exercisesJson is a JSON array of
+            // { name, sets, reps, weightLb }, empty on a rest day.
+            db.execSQL("CREATE TABLE IF NOT EXISTS today_plan (" +
+                "date TEXT PRIMARY KEY, routineName TEXT, programName TEXT, week INTEGER, day INTEGER, " +
+                "exercisesJson TEXT, updatedAt TEXT)");
         }
 
         @Override
@@ -102,6 +109,7 @@ public class IronLogContentProvider extends ContentProvider {
         switch (URI_MATCHER.match(uri)) {
             case RECOVERY: return "recovery";
             case PRS: return "prs";
+            case TODAY_PLAN: return "today_plan";
             case WORKOUTS:
             default: return "workouts";
         }
