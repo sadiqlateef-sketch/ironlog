@@ -6,6 +6,7 @@
 
 import { getSupabase, isLocalBackend } from "../supabase/client.ts";
 import { kvGet, kvSet } from "./kv.ts";
+import { warmupWeightsKg } from "../set-logic.ts";
 import { enqueue, flush, hasPending, isNetworkError, type Op } from "./queue.ts";
 import type { Database } from "../../types/database.ts";
 import type { WorkoutSession, WorkoutSet } from "../workout-api.ts";
@@ -261,7 +262,8 @@ export async function startPlannedSession(
   items.forEach((item, i) => {
     let n = 1;
     const base = { session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, superset_group: item.superset_group ?? null, reps: 0 };
-    for (let w = 0; w < (item.warmups ?? 0); w++) inserts.push({ ...base, set_number: n++, set_type: "warmup", weight: 0 });
+    const warmupKg = warmupWeightsKg(item.weight_kg ?? 0, item.warmups ?? 0);
+    for (let w = 0; w < (item.warmups ?? 0); w++) inserts.push({ ...base, set_number: n++, set_type: "warmup", weight: warmupKg[w] });
     for (let s = 0; s < item.sets; s++) inserts.push({ ...base, set_number: n++, set_type: "normal", weight: item.weight_kg ?? 0 });
   });
   const sets = inserts.map((s) => toRow(s, uid));
