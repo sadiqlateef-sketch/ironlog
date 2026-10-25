@@ -4,7 +4,7 @@
 // sent straight away when there's signal. While anything is still waiting,
 // the local copy is the truth; once everything has synced, the server is.
 
-import { getSupabase } from "../supabase/client.ts";
+import { getSupabase, isLocalBackend } from "../supabase/client.ts";
 import { kvGet, kvSet } from "./kv.ts";
 import { enqueue, flush, hasPending, isNetworkError, type Op } from "./queue.ts";
 import type { Database } from "../../types/database.ts";
@@ -243,7 +243,7 @@ export async function startPlannedSession(
   await writeMirror({ session, sets });
 
   // Direct write to mock local storage if active so session is instantly present
-  if (typeof window !== "undefined" && window.localStorage) {
+  if (isLocalBackend() && typeof window !== "undefined" && window.localStorage) {
     try {
       const sessKey = "ironlog_table_workout_sessions";
       const raw = window.localStorage.getItem(sessKey);
@@ -290,7 +290,7 @@ export async function finishSession(session: WorkoutSession): Promise<{ synced: 
   await writeMirror(null);
 
   // Synchronously update local mock storage if present
-  if (typeof window !== "undefined" && window.localStorage) {
+  if (isLocalBackend() && typeof window !== "undefined" && window.localStorage) {
     try {
       const sessKey = "ironlog_table_workout_sessions";
       const raw = window.localStorage.getItem(sessKey);
@@ -322,7 +322,7 @@ export async function discardSession(sessionId: string): Promise<void> {
   await changeMirror((m) => (m.session.id === sessionId ? null : m));
   await writeMirror(null);
 
-  if (typeof window !== "undefined" && window.localStorage) {
+  if (isLocalBackend() && typeof window !== "undefined" && window.localStorage) {
     try {
       const sessKey = "ironlog_table_workout_sessions";
       const raw = window.localStorage.getItem(sessKey);

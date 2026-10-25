@@ -5,6 +5,15 @@ import { handleMockRequest } from "./mock-backend.ts";
 let client: SupabaseClient<Database> | undefined;
 
 /**
+ * True when the app has no Supabase project to talk to (local testing and
+ * the smoke test). Then the local test backend in mock-backend.ts answers
+ * everything. Real builds always have both settings.
+ */
+export function isLocalBackend(): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+}
+
+/**
  * One shared Supabase client for the whole app. The session is kept in local
  * storage, which works the same in a browser tab and inside the Capacitor
  * Android shell.
@@ -26,13 +35,15 @@ export function getSupabase(): SupabaseClient<Database> {
   return client;
 }
 
-/** Offline-first fetch: fulfills local mock engine first, falls back to network with 12s timeout. */
+/** Database calls give up after 12 seconds, so a dead connection doesn't freeze logging. (Without Supabase settings, the local test backend answers instead.) */
 const fetchWithTimeout: typeof fetch = async (input, init) => {
-  try {
-    const mockRes = await handleMockRequest(input, init);
-    if (mockRes) return mockRes;
-  } catch (err) {
-    console.warn("Mock request handling warning:", err);
+  if (isLocalBackend()) {
+    try {
+      const mockRes = await handleMockRequest(input, init);
+      if (mockRes) return mockRes;
+    } catch (err) {
+      console.warn("Local test backend:", err);
+    }
   }
 
   const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;

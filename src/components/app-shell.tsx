@@ -6,11 +6,13 @@ import { useEffect, type ReactNode } from "react";
 import { ActiveWorkoutBar } from "@/components/active-workout-bar";
 import { useAuth } from "@/components/providers/auth-provider";
 import { RestTimerBar } from "@/components/rest-timer-bar";
+import { LegacyUploadBanner } from "@/components/legacy-upload-banner";
 import { SyncBanner } from "@/components/sync-banner";
 import { Tour, useTour } from "@/components/tour";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkout } from "@/hooks/use-active-workout";
 import { TABS, tabFor } from "@/lib/nav";
+import { isLocalBackend } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 /** Signed-in layout: page content, the workout bar, and the bottom tab bar. */
@@ -50,9 +52,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       {/* Keyed by screen so each one fades in as you switch. Responsively scales for foldable unfolded inner displays. */}
       <main key={pathname} className={cn("page-in mx-auto w-full max-w-md md:max-w-4xl lg:max-w-5xl flex-1 px-4 pt-6 transition-all", workout && !onWorkout ? "pb-48" : "pb-40")}>
+        {isLocalBackend() && <p className="text-set-warmup mb-3 text-xs font-semibold">Test mode: not connected to your account</p>}
         {children}
       </main>
       <div className="fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]">
+        <LegacyUploadBanner />
         <SyncBanner />
         {/* Mid-workout, every other screen shows the workout (and its rest countdown);
             the workout screen has the full-size rest timer. */}
