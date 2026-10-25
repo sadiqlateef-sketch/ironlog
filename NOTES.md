@@ -22,4 +22,4 @@ Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project file
 - Open PRs not on main: #18 reset email, #20 Health Connect, #22 deload weeks.
 
 ## Next
-- Sadiq picks items from REVIEW.md section 7. Suggested first: D1 decision, then D2 and D3.
+- Follow FIX_PLAN.md phase by phase (Phase 1 D10 done in 6fa4408). Test checkpoint after every phase: `node scripts/smoke-test.mjs`.
