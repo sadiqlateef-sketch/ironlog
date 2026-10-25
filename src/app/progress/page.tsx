@@ -9,6 +9,8 @@ import { ActivityTab } from "@/components/progress/activity";
 import { BodyTab } from "@/components/progress/body";
 import { ConsistencyCard, RecapCard, StrainCard } from "@/components/progress/insight-cards";
 import { LiftsTab } from "@/components/progress/lifts";
+import { Section } from "@/components/progress/section";
+import { SummaryCards } from "@/components/progress/summary-cards";
 import { ProgressAnalyticsDeck } from "@/components/progress/progress-analytics-deck";
 import {
   CalendarCard,
@@ -94,7 +96,7 @@ function Progress() {
 
       {tab === "overview" && (
         <>
-          {data?.total === 0 && (
+          {data?.total === 0 && data.sessions.length === 0 && (
             <EmptyState
               icon={ChartNoAxesColumn}
               title="Your progress starts with one workout"
@@ -109,51 +111,63 @@ function Progress() {
           )}
           {data ? (
             <>
-              <RecapCard data={data} />
-              <WeekCards data={data} />
-              <StrainCard reloadKey={reload} />
-              <CalendarCard data={data} onChanged={() => setReload((r) => r + 1)} />
-              <ConsistencyCard data={data} />
-              <ProgressAnalyticsDeck data={data} />
-              <MuscleBreakdownCard data={data} />
-              <TopLiftsCard data={data} />
-              <InsightsCard data={data} />
-              <CompareCard data={data} />
+              {(data.total > 0 || data.sessions.length > 0) && <SummaryCards data={data} />}
+              <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start">
+                <Section id="muscles" title="Muscles and recovery">
+                  <MuscleBreakdownCard data={data} />
+                  <StrainCard reloadKey={reload} />
+                </Section>
+                <Section id="volume" title="Volume charts">
+                  <TopLiftsCard data={data} />
+                  {/* One filter row, scoping every chart below it */}
+                  <div className="bg-secondary grid grid-cols-3 rounded-xl p-1" role="group" aria-label="Time range">
+                    {RANGES.map((r) => (
+                      <button
+                        key={r.key}
+                        type="button"
+                        aria-pressed={range.key === r.key}
+                        onClick={() => {
+                          setRange(r);
+                          setSince(daysAgo(r.days));
+                        }}
+                        className={cn(
+                          "rounded py-1.5 text-sm font-semibold",
+                          range.key === r.key ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
+                        )}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <VolumeCard since={since} />
+                  <StrengthCard since={since} />
+                </Section>
+                <Section id="streaks" title="Streaks and calendar">
+                  <RecapCard data={data} />
+                  <WeekCards data={data} />
+                  <CalendarCard data={data} onChanged={() => setReload((r) => r + 1)} />
+                  <ConsistencyCard data={data} />
+                </Section>
+                <Section id="science" title="Training science">
+                  <ProgressAnalyticsDeck data={data} />
+                  <PeriodizationCard />
+                  <InsightsCard data={data} />
+                  <CompareCard data={data} />
+                </Section>
+                <Section id="tools" title="Tools: 1RM calculator">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>1RM calculator</CardTitle>
+                      <CardDescription>Estimate your max from any set, plus training percentages.</CardDescription>
+                    </CardHeader>
+                    <OneRmCalculator />
+                  </Card>
+                </Section>
+              </div>
             </>
           ) : (
             !error && <SkeletonList rows={4} rowClassName="h-32" />
           )}
-          <PeriodizationCard />
-          <h2 className="text-muted-foreground mt-2 text-xs font-semibold tracking-wide uppercase">Charts</h2>
-          {/* One filter row, scoping every chart below it */}
-          <div className="bg-secondary grid grid-cols-3 rounded-xl p-1" role="group" aria-label="Time range">
-            {RANGES.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                aria-pressed={range.key === r.key}
-                onClick={() => {
-                  setRange(r);
-                  setSince(daysAgo(r.days));
-                }}
-                className={cn(
-                  "rounded py-1.5 text-sm font-semibold",
-                  range.key === r.key ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
-                )}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-          <VolumeCard since={since} />
-          <StrengthCard since={since} />
-          <Card>
-            <CardHeader>
-              <CardTitle>1RM calculator</CardTitle>
-              <CardDescription>Estimate your max from any set, plus training percentages.</CardDescription>
-            </CardHeader>
-            <OneRmCalculator />
-          </Card>
         </>
       )}
     </div>
