@@ -55,6 +55,7 @@ import {
   exerciseUnits,
   focusAfterLog,
   formatClock,
+  groupSize,
   liveVolume,
   moveUnit,
   nextUnfinished,
@@ -415,6 +416,8 @@ function ActiveWorkout({
           block={block}
           focused={view === "focus"}
           isLast={blocks.indexOf(block) === blocks.length - 1}
+          groupSize={groupSize(blocks, block.supersetGroup)}
+          nextIsGrouped={blocks[blocks.indexOf(block) + 1]?.supersetGroup != null}
           onShowInfo={() => onInfo(block.exercise)}
           onChart={() => setChartFor(block.exercise)}
           onSwap={() => setSwapFor(block.order)}

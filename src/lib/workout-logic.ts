@@ -60,6 +60,31 @@ export function shouldStartRest(
   return exerciseOrder === Math.max(...inGroup);
 }
 
+/** How many exercises share a superset group. */
+export function groupSize(blocks: { supersetGroup: number | null }[], group: number | null): number {
+  return group == null ? 0 : blocks.filter((b) => b.supersetGroup === group).length;
+}
+
+/** Two linked exercises are a superset; three or more are a circuit. */
+export function groupName(size: number): "Superset" | "Circuit" | null {
+  return size >= 3 ? "Circuit" : size === 2 ? "Superset" : null;
+}
+
+/**
+ * Who is next in the round after `order`: the following exercise in its group
+ * (wrapping round) that still has sets left, and whether this one closes the
+ * round (the rest timer starts only then). Null when not grouped.
+ */
+export function nextInRound(
+  order: number,
+  blocks: { order: number; supersetGroup: number | null; sets: { done: boolean }[] }[],
+): { next: number; endsRound: boolean } | null {
+  const block = blocks.find((b) => b.order === order);
+  if (!block || block.supersetGroup == null) return null;
+  const group = blocks.filter((b) => b.supersetGroup === block.supersetGroup).sort((a, b) => a.order - b.order);
+  return { next: focusAfterLog(order, blocks), endsRound: group.at(-1)!.order === order };
+}
+
 /** mm:ss for the rest timer. */
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.ceil(totalSeconds));

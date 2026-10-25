@@ -45,7 +45,7 @@ import { formatWeight } from "@/lib/units";
 import { dropWeight } from "@/lib/keypad";
 import { useLoggerPrefs, weightStep } from "@/lib/logger-prefs";
 import { describeTimedSet, distanceUnit, formatDuration, pace, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
-import { bestE1rm, formatClock, parseNumber, workingSetNumbers } from "@/lib/workout-logic";
+import { bestE1rm, formatClock, groupName, parseNumber, workingSetNumbers } from "@/lib/workout-logic";
 import { calculatePlates, ownedPlates } from "@/lib/plates";
 import { effortBadge, matchPrevious } from "@/lib/set-logic";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,8 @@ import { cn } from "@/lib/utils";
 export function ExerciseBlock({
   block,
   isLast,
+  groupSize: sizeOfGroup,
+  nextIsGrouped,
   focused,
   onShowInfo,
   onChart,
@@ -91,6 +93,10 @@ export function ExerciseBlock({
 }: {
   block: Block;
   isLast: boolean;
+  /** How many exercises are linked with this one (itself included); 3 or more is a circuit. */
+  groupSize: number;
+  /** The exercise after this one is already in a group, so linking joins it. */
+  nextIsGrouped: boolean;
   /** Focus view: one exercise fills the screen, so the header is bigger. */
   focused?: boolean;
   onShowInfo: () => void;
@@ -212,6 +218,7 @@ export function ExerciseBlock({
     onPlates(w ?? (prev ? parseNumber(toDisplay(prev.weight, unit)) : null));
   };
 
+  const groupLabel = groupName(sizeOfGroup) ?? "Superset";
   const actions: SheetAction[] = [
     ...(onDoNext ? [{ label: "Do next", icon: ArrowUpToLine, onSelect: onDoNext }] : []),
     ...(onMoveUp ? [{ label: "Move up", icon: ArrowUp, onSelect: onMoveUp }] : []),
@@ -219,9 +226,9 @@ export function ExerciseBlock({
     { label: "Reorder exercises", icon: ArrowUpDown, onSelect: onReorder },
     { label: "Add exercise after this", icon: ListPlus, onSelect: onAddAfter },
     ...(block.supersetGroup != null
-      ? [{ label: "Remove from superset", icon: Unlink, onSelect: onToggleSuperset }]
+      ? [{ label: `Remove from ${groupLabel.toLowerCase()}`, icon: Unlink, onSelect: onToggleSuperset }]
       : !isLast
-        ? [{ label: "Add a superset", icon: Link2, onSelect: onToggleSuperset }]
+        ? [{ label: nextIsGrouped ? "Join the next group" : "Add a superset", icon: Link2, onSelect: onToggleSuperset }]
         : []),
     { label: "Swap exercise", icon: ArrowLeftRight, onSelect: onSwap },
     ...(tracking === "weight_reps" ? [{ label: "Warm-up sets", icon: Flame, onSelect: onWarmups }] : []),
@@ -337,7 +344,7 @@ export function ExerciseBlock({
           </span>
         </button>
         <button type="button" onClick={onShowInfo} className="min-w-0 flex-1 px-1 text-left">
-          {block.supersetGroup != null && <p className="text-set-drop text-xs font-bold tracking-wide">SUPERSET</p>}
+          {block.supersetGroup != null && <p className="text-set-drop text-xs font-bold tracking-wide uppercase">{groupLabel}</p>}
           <h2 className={cn("font-bold tracking-tight", focused ? "text-2xl leading-tight" : "truncate text-xl")}>
             {block.exercise.name}
           </h2>
