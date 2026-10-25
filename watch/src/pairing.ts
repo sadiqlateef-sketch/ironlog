@@ -37,39 +37,22 @@ async function call<T>(body: object): Promise<T> {
 }
 
 export async function startPairing(): Promise<Pairing> {
-  // If unconfigured or pointing to placeholder, provide standalone pairing code immediately
+  // A made-up code here would look fine on the watch but could never be
+  // entered on the phone, so say what's wrong instead ("Use offline" stays).
   if (!SUPABASE_URL || SUPABASE_URL.includes("YOUR-PROJECT")) {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    return {
-      pairing_id: "offline-pairing",
-      secret: "offline-secret",
-      code,
-      expires_at: new Date(Date.now() + 600_000).toISOString(),
-    };
+    throw new Error("This watch build has no server settings (watch/config.json). Rebuild it with them to link.");
   }
-
   try {
     return await call<Pairing>({ action: "start" });
-  } catch {
-    // If network fails (e.g. basement gym, no internet connectivity, or server down),
-    // provide an offline fallback pairing code rather than throwing a raw Network request failed error
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    return {
-      pairing_id: "offline-pairing",
-      secret: "offline-secret",
-      code,
-      expires_at: new Date(Date.now() + 600_000).toISOString(),
-    };
+  } catch (e) {
+    // fetch throws a TypeError ("Network request failed") when there's no connection.
+    if (e instanceof TypeError) throw new Error("Can't reach Ironlog. Check the watch's Wi-Fi or phone connection, then try again.");
+    throw e;
   }
 }
 
 /** Checks once. Resolves "linked" after signing the watch in, or "pending" / "expired". */
 export async function checkPairing(p: Pairing): Promise<"linked" | "pending" | "expired"> {
-  if (p.pairing_id === "offline-pairing") {
-    const offline = await isOfflineMode();
-    return offline ? "linked" : "pending";
-  }
-
   try {
     const r = await call<{ status: "pending" | "expired" | "ready"; token_hash?: string }>({
       action: "poll",
