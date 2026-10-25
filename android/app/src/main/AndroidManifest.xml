@@ -18,6 +18,11 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Health Connect: send workouts, read heart rate and body weight. -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
@@ -27,6 +32,8 @@
         <package android:name="com.sadiqlateef.braindump" />
         <package android:name="com.sadiqlateef.budget" />
         <package android:name="eu.darken.sdmse.glass" />
+        <!-- Lets the app find the Health Connect app on Android 13 and older. -->
+        <package android:name="com.google.android.apps.healthdata" />
         <provider android:authorities="com.sadiqlateef.bujotasks.provider" />
         <provider android:authorities="com.sadiqlateef.braindump.provider" />
         <provider android:authorities="com.sadiqlateef.budget.provider" />
@@ -102,6 +109,27 @@
             android:grantUriPermissions="false"
             android:readPermission="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA"
             android:writePermission="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA" />
+
+        <!-- Health Connect shows this as Ironlog's privacy policy (Android 13 and older). -->
+        <activity
+            android:name=".HealthPrivacyActivity"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <!-- The same screen on Android 14 and newer. -->
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".HealthPrivacyActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <provider
             android:name="androidx.core.content.FileProvider"

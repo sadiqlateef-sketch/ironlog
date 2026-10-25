@@ -326,6 +326,26 @@ Deploy it with the **Deploy database and functions** workflow (it's in the
 function list there), or by hand:
 `npx supabase functions deploy claude-connector`.
 
+## Health Connect (Android)
+
+Settings > Health Connect links Ironlog to Android's health hub, so:
+
+- every workout you finish shows up in Samsung Health, Google Fit and other apps (strength workouts as "Strength training", runs, walks, rides, rows and elliptical as their own type, with distance),
+- heart rate from your watch fills in a workout's average and peak when Ironlog's own watch app didn't record it,
+- weigh-ins from a smart scale or Samsung Health fill in the weight chart on the Body tab (only for days you haven't logged a weight yourself).
+
+It syncs the last 30 days when you finish a workout, when you open the app, and when you tap Sync now. Editing a workout updates it in Health Connect and deleting one removes it. Nothing needs setting up on Supabase; the phone does all of it. The Android code is `android/app/src/main/java/com/ironlog/app/HealthConnectPlugin.kt` and the app side is `src/lib/health.ts`.
+
+### Turning it on (on your phone)
+
+1. Install the new APK (Android 14 and newer already have Health Connect built in; on older phones Ironlog offers a button to get it from the Play Store).
+2. Open Ironlog, tap **Settings**, then **Health Connect**.
+3. Tap **Connect Health Connect**. Health Connect opens with a list of switches. Tap **Allow all**, then **Allow**.
+4. Ironlog sends your last 30 days and shows what it did.
+5. To see workouts in Samsung Health: open Samsung Health, tap the three dots (top right) > **Settings** > **Health Connect** > **App permissions**, and make sure Samsung Health is allowed to read **Exercise**.
+
+To stop, tap **Stop syncing** in the same screen. To remove Ironlog's access completely, tap **Open Health Connect** > **App permissions** > **Ironlog** > **Remove access**.
+
 ## Gym check-in and Google Calendar
 
 Progress > gear > **Gym & calendar**.

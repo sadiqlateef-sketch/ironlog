@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(RestCountdownPlugin.class);
         registerPlugin(IronLogEcosystemPlugin.class);
         registerPlugin(WearableBridgePlugin.class);
+        registerPlugin(HealthConnectPlugin.class);
         super.onCreate(savedInstanceState);
         WebView.setWebContentsDebuggingEnabled(true);
     }
