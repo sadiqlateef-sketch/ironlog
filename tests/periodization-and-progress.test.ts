@@ -172,5 +172,7 @@ test("Progress Index Advanced: 6-Week Overview & Target Band", () => {
   assert.equal(overview.targetBand.min, 98);
   assert.equal(overview.targetBand.max, 106);
   // Without recent sessions, properly alerts status
-  assert.ok(overview.currentStatus.includes("Week Closed Empty"));
+  assert.equal(overview.currentStatus, "No workouts yet this week");
+  assert.ok(!/[⚠️😪]/u.test(overview.currentStatus));
+  assert.ok(overview.weeks.every((w) => !w.hasData));
 });

@@ -136,9 +136,9 @@ export function PlannedTab({
       ) : (
         <section className="glass flex flex-col gap-3 rounded-3xl p-5">
           <p className="text-lg font-bold">No program running</p>
-          <p className="text-muted-foreground text-sm">Pick a ready-made plan, let the AI build one, or just start an empty workout.</p>
+          <p className="text-muted-foreground text-sm">Pick a ready-made program, let the AI build one, or just start an empty workout.</p>
           <div className="grid grid-cols-2 gap-2">
-            <Button onClick={onFindPlan}>Find a plan</Button>
+            <Button onClick={onFindPlan}>Find a program</Button>
             <Button variant="secondary" onClick={() => onStart()} disabled={busy}>
               <Play /> Empty workout
             </Button>
@@ -288,7 +288,7 @@ function ProgramBanner({
       <div className="absolute top-3 left-3 flex gap-2">
         <Button asChild variant="secondary" size="sm">
           <Link href="/plans/">
-            <CalendarRange /> Plan
+            <CalendarRange /> Programs
           </Link>
         </Button>
         <Button variant="secondary" size="icon" className="size-9" aria-label="Program options" onClick={() => setMenu(true)}>

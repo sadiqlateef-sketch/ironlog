@@ -70,24 +70,24 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
   const polygonPath = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <Card className="rounded-2xl border border-[var(--progress-purple-border)] bg-[#120F17] p-5 shadow-xl transition-all">
+    <Card className="rounded-2xl border border-border bg-card p-5 shadow-xl transition-all">
       {/* Title & Badge */}
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-1.5">
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Movement Balance {!hasRealSets && <span className="text-xs font-normal text-zinc-400">(sample)</span>}
+            <h3 className="text-xl font-bold text-foreground tracking-tight">
+              Movement Balance {!hasRealSets && <span className="text-xs font-normal text-muted-foreground">(sample)</span>}
             </h3>
             <button
               type="button"
               onClick={() => setShowExplanation((prev) => !prev)}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-colors"
               title="What is Movement Balance?"
             >
               <Info className="size-3.5" />
             </button>
           </div>
-          <p className="text-zinc-400 text-xs mt-1">
+          <p className="text-muted-foreground text-xs mt-1">
             Movement Patterns {hasRealSets ? "(Past 28 Days)" : "(Demo View)"}
           </p>
         </div>
@@ -104,33 +104,33 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
       </div>
 
       <div className="mt-2 flex items-baseline gap-2">
-        <span className="text-2xl font-black text-white">{scoreText}</span>
+        <span className="text-2xl font-black text-foreground">{scoreText}</span>
       </div>
 
       {/* Educational Note */}
       {showExplanation && (
-        <div className="mt-3 rounded-xl border border-purple-500/30 bg-purple-950/30 p-3 text-xs text-zinc-300 leading-relaxed">
-          <p className="font-semibold text-purple-300 mb-1">About Movement Balance:</p>
+        <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-muted-foreground leading-relaxed">
+          <p className="font-semibold text-primary-text mb-1">About Movement Balance:</p>
           The radar shows how evenly you&apos;re training across all 6 patterns over the past month. The closer it is to a full, even shape — the more balanced your structural training.
         </div>
       )}
 
       {/* Agonist:Antagonist Ratio Tiles */}
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center divide-x divide-zinc-800">
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center divide-x divide-border">
         <div className="flex flex-col items-center">
-          <span className="text-zinc-400 text-[10px] font-medium">V.Push : V.Pull</span>
-          <span className="num text-base font-bold text-white mt-0.5">{ratios.vPushToPull} : 1</span>
+          <span className="text-muted-foreground text-[10px] font-medium">V.Push : V.Pull</span>
+          <span className="num text-base font-bold text-foreground mt-0.5">{ratios.vPushToPull} : 1</span>
         </div>
         <div className="flex flex-col items-center pl-2">
-          <span className="text-zinc-400 text-[10px] font-medium">H.Push : H.Pull</span>
-          <span className="num text-base font-bold text-white mt-0.5">{ratios.hPushToPull} : 1</span>
+          <span className="text-muted-foreground text-[10px] font-medium">H.Push : H.Pull</span>
+          <span className="num text-base font-bold text-foreground mt-0.5">{ratios.hPushToPull} : 1</span>
         </div>
         <div className="flex flex-col items-center pl-2">
-          <span className="text-zinc-400 text-[10px] font-medium flex items-center justify-center gap-1">
+          <span className="text-muted-foreground text-[10px] font-medium flex items-center justify-center gap-1">
             Squat : Hinge
           </span>
           <div className="flex items-center gap-1 mt-0.5">
-            <span className="num text-base font-bold text-white">{ratios.squatToHinge} : 1</span>
+            <span className="num text-base font-bold text-foreground">{ratios.squatToHinge} : 1</span>
             {ratios.squatToHinge < 0.9 && (
               <span className="rounded-full bg-amber-500/20 text-amber-400 text-[9px] px-1 font-bold">!</span>
             )}
@@ -139,7 +139,7 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
       </div>
 
       {/* Hexagonal Radar / Spider Chart */}
-      <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-zinc-800/80 bg-[#16121C] p-4">
+      <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-border bg-secondary/60 p-4">
         <svg viewBox={`0 0 ${size} ${size}`} className="size-60 overflow-visible" aria-hidden>
           {/* Concentric grid webs */}
           {gridPolygons.map((poly, idx) => (
@@ -147,7 +147,7 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
               key={idx}
               points={poly}
               fill="none"
-              stroke="#2B213A"
+              stroke="var(--border)"
               strokeWidth="1.25"
             />
           ))}
@@ -163,7 +163,7 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
                 y1={cy}
                 x2={x}
                 y2={y}
-                stroke="#2B213A"
+                stroke="var(--border)"
                 strokeWidth="1"
               />
             );
@@ -173,7 +173,7 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
           <polygon
             points={polygonPath}
             fill="rgba(124, 101, 193, 0.25)"
-            stroke="var(--progress-purple-light)"
+            stroke="var(--primary)"
             strokeWidth="2"
             strokeLinejoin="round"
           />
@@ -185,7 +185,7 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
               cx={pt.x}
               cy={pt.y}
               r="3.5"
-              className="fill-white stroke-[var(--progress-purple)]"
+              className="fill-foreground stroke-primary"
               strokeWidth="2"
             />
           ))}
@@ -201,7 +201,7 @@ export function MovementBalanceCard({ data }: { data: StatsData }) {
                 x={lx}
                 y={ly + 3}
                 textAnchor="middle"
-                className="fill-zinc-400 text-[10px] font-medium"
+                className="fill-muted-foreground text-[10px] font-medium"
               >
                 {pt.label}
               </text>

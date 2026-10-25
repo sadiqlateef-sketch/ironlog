@@ -73,13 +73,13 @@ export function NextSessionCard({ program, unit }: NextSessionCardProps) {
             <Target className="size-3" /> Next Session Blueprint
           </span>
           <Link href="/plans/" className="text-primary-text flex items-center gap-1 text-xs font-semibold hover:underline">
-            Choose Plan <ChevronRight className="size-3" />
+            Choose program <ChevronRight className="size-3" />
           </Link>
         </div>
         <div>
           <h3 className="text-base font-bold text-foreground">No Active Program Selected</h3>
           <p className="text-muted-foreground text-xs mt-0.5">
-            Select a multi-week program or have AI design a tailored hypertrophy plan to automatically map progressive overload targets here.
+            Select a multi-week program or have AI design a tailored hypertrophy program to automatically map progressive overload targets here.
           </p>
         </div>
         <Link
@@ -88,7 +88,7 @@ export function NextSessionCard({ program, unit }: NextSessionCardProps) {
         >
           <span className="flex items-center gap-2">
             <Sparkles className="text-primary size-4" />
-            Build new hypertrophy plan
+            Build a program
           </span>
           <ArrowUpRight className="size-4 text-muted-foreground" />
         </Link>

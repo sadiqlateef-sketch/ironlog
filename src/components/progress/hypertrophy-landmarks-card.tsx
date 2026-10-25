@@ -58,34 +58,34 @@ export function HypertrophyLandmarksCard({ data }: { data: StatsData }) {
   const hasRealSets = Object.values(setsByMuscle).some((count) => count > 0);
 
   return (
-    <Card className="rounded-2xl border border-[var(--progress-purple-border)] bg-[#120F17] p-5 shadow-xl transition-all">
+    <Card className="rounded-2xl border border-border bg-card p-5 shadow-xl transition-all">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-1.5">
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Hypertrophy Volume Landmarks {!hasRealSets && <span className="text-xs font-normal text-zinc-400">(sample)</span>}
+            <h3 className="text-xl font-bold text-foreground tracking-tight">
+              Hypertrophy Volume Landmarks {!hasRealSets && <span className="text-xs font-normal text-muted-foreground">(sample)</span>}
             </h3>
             <button
               type="button"
               onClick={() => setShowExplanation((prev) => !prev)}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-colors"
               title="What are Hypertrophy Volume Landmarks?"
             >
               <Info className="size-3.5" />
             </button>
           </div>
-          <p className="text-zinc-400 text-xs mt-1">
+          <p className="text-muted-foreground text-xs mt-1">
             Weekly set thresholds (RP Model): MEV · MAV · MRV
           </p>
         </div>
-        <span className="bg-purple-500/20 text-[var(--progress-purple-light)] border border-purple-500/30 rounded-md px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
+        <span className="bg-primary/20 text-primary-text border border-primary/30 rounded-md px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
           SCIENTIFIC
         </span>
       </div>
 
       {showExplanation && (
-        <div className="mt-3 rounded-xl border border-purple-500/30 bg-purple-950/30 p-3 text-xs text-zinc-300 leading-relaxed">
-          <p className="font-semibold text-purple-300 mb-1">About Hypertrophy Landmarks (Dr. Mike Israetel / RP):</p>
+        <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-muted-foreground leading-relaxed">
+          <p className="font-semibold text-primary-text mb-1">About Hypertrophy Landmarks (Dr. Mike Israetel / RP):</p>
           • <strong>MEV (Minimum Effective Volume):</strong> Lowest sets to still trigger growth.<br />
           • <strong>MAV (Maximum Adaptive Volume):</strong> The optimal sweet spot for fastest muscle growth.<br />
           • <strong>MRV (Maximum Recoverable Volume):</strong> Upper ceiling where volume causes systemic overtraining.
@@ -93,14 +93,14 @@ export function HypertrophyLandmarksCard({ data }: { data: StatsData }) {
       )}
 
       {/* Threshold Key */}
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-[#16121C] border border-zinc-800/80 p-2.5 text-center text-[10px]">
+      <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-secondary/60 border border-border p-2.5 text-center text-[10px]">
         <div>
-          <span className="block font-bold text-zinc-400">MEV</span>
-          <span className="text-zinc-500">Min Effective</span>
+          <span className="block font-bold text-muted-foreground">MEV</span>
+          <span className="text-muted-foreground">Min Effective</span>
         </div>
         <div>
-          <span className="block font-bold text-[var(--progress-purple-light)]">MAV (Sweet Spot)</span>
-          <span className="text-purple-400/80">Max Adaptive</span>
+          <span className="block font-bold text-primary-text">MAV (Sweet Spot)</span>
+          <span className="text-primary-text">Max Adaptive</span>
         </div>
         <div>
           <span className="block font-bold text-rose-400">MRV</span>
@@ -128,8 +128,8 @@ export function HypertrophyLandmarksCard({ data }: { data: StatsData }) {
           const pctOfMrv = Math.min(100, Math.round((sets / cfg.mrv) * 100));
 
           let zone = "Under MEV";
-          let zoneColor = "text-zinc-500";
-          let barBg = "bg-zinc-700";
+          let zoneColor = "text-muted-foreground";
+          let barBg = "bg-muted-foreground/40";
 
           if (sets >= cfg.mrv) {
             zone = "Near MRV (High Fatigue)";
@@ -137,31 +137,31 @@ export function HypertrophyLandmarksCard({ data }: { data: StatsData }) {
             barBg = "bg-rose-500";
           } else if (sets >= cfg.mavMin) {
             zone = "Optimal MAV";
-            zoneColor = "text-[var(--progress-purple-light)] font-bold";
-            barBg = "bg-[var(--progress-purple-light)]";
+            zoneColor = "text-primary-text font-bold";
+            barBg = "bg-primary";
           } else if (sets >= cfg.mev) {
             zone = "MEV (Stimulating)";
-            zoneColor = "text-white font-semibold";
-            barBg = "bg-purple-600";
+            zoneColor = "text-foreground font-semibold";
+            barBg = "bg-primary";
           }
 
           return (
             <div key={cfg.muscle} className="flex flex-col gap-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-white">{cfg.muscle}</span>
+                <span className="font-bold text-foreground">{cfg.muscle}</span>
                 <span className={`text-[11px] ${zoneColor}`}>
-                  <strong className="text-white">{sets}</strong> / {cfg.mavMin}-{cfg.mavMax} sets · {zone}
+                  <strong className="text-foreground">{sets}</strong> / {cfg.mavMin}-{cfg.mavMax} sets · {zone}
                 </span>
               </div>
-              <div className="bg-[#16121C] relative h-2 w-full overflow-hidden rounded-full border border-zinc-800">
+              <div className="bg-secondary/60 relative h-2 w-full overflow-hidden rounded-full border border-border">
                 {/* Marker for MEV */}
                 <div
-                  className="bg-zinc-600 absolute top-0 bottom-0 w-0.5 z-10"
+                  className="bg-muted-foreground/40 absolute top-0 bottom-0 w-0.5 z-10"
                   style={{ left: `${(cfg.mev / cfg.mrv) * 100}%` }}
                 />
                 {/* Marker for MAV min */}
                 <div
-                  className="bg-[var(--progress-purple)] absolute top-0 bottom-0 w-0.5 z-10"
+                  className="bg-primary absolute top-0 bottom-0 w-0.5 z-10"
                   style={{ left: `${(cfg.mavMin / cfg.mrv) * 100}%` }}
                 />
                 {/* Progress fill */}

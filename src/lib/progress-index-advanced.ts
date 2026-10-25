@@ -398,6 +398,8 @@ export interface SixWeekOverview {
     value: number; // e.g. 104.2
     isCurrent: boolean;
     inBand: boolean;
+    /** Any sets logged that week; without them the value is a placeholder, not a score. */
+    hasData: boolean;
   }[];
   targetBand: { min: number; max: number };
   currentStatus: string;
@@ -472,6 +474,7 @@ export function calculateSixWeekOverview(
       label,
       value: Math.round(val * 10) / 10,
       isCurrent: i === 0,
+      hasData: weekSets.length > 0,
       inBand: val >= targetBand.min && val <= targetBand.max,
     });
   }
@@ -481,8 +484,8 @@ export function calculateSixWeekOverview(
   let statusMessage = "Your training load and progressive overload are progressing right inside the target band.";
 
   if (recentSessions.length === 0) {
-    currentStatus = "Week Closed Empty ⚠️";
-    statusMessage = "Extended week also closed without sessions — the cycle stays at the same target. Even 2 compound sessions early next week starts building toward the band.";
+    currentStatus = "No workouts yet this week";
+    statusMessage = "Log a workout and your score shows up here. Even 2 compound sessions this week starts building toward the target band.";
   } else if (weekList[5].value > targetBand.max) {
     currentStatus = "Strong Gains 🔥";
     statusMessage = "You're surpassing target benchmarks across key lifts. Maintain recovery to avoid overreaching.";
