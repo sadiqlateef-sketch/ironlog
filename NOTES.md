@@ -5,7 +5,7 @@ Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project file
 ## Decisions
 - Personal app: one user, Galaxy Z Fold8 (folded + unfolded) and Galaxy Watch.
 - Nothing from the review gets built until Sadiq approves it item by item (REVIEW.md section 7).
-- Open: cloud-backed (Supabase) or phone-only? The app has been phone-only since Oct 23 (mock backend).
+- 2026-10-25: Sadiq chose cloud-backed again (Supabase), with offline logging kept. The app has been phone-only since Oct 23 (mock backend).
 - Theme is now ruby/gold "Cosmic Ruby" (replaced the Oct 14 navy glass look).
 
 ## Verified on my phone
