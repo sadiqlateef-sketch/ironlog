@@ -43,13 +43,13 @@ export function NextSessionCard({ program, unit }: NextSessionCardProps) {
       .catch(() => {});
 
     if (program?.next_routine_id) {
-      setLoading(true);
+      void Promise.resolve().then(() => setLoading(true));
       getRoutineTargets(program.next_routine_id)
         .then(setTargets)
         .catch((err) => console.warn("Failed loading routine targets:", err))
         .finally(() => setLoading(false));
     } else {
-      setTargets([]);
+      void Promise.resolve().then(() => setTargets([]));
     }
   }, [program?.next_routine_id]);
 

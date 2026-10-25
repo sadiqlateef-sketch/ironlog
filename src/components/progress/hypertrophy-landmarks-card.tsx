@@ -31,11 +31,12 @@ const RP_LANDMARKS: MuscleLandmarkConfig[] = [
 export function HypertrophyLandmarksCard({ data }: { data: StatsData }) {
   const exMap = data.exercises;
   const [showExplanation, setShowExplanation] = useState(false);
+  const [mountedAt] = useState(() => Date.now());
 
   // Calculate actual working sets this week per muscle
   const setsByMuscle = useMemo(() => {
     const DAY = 86_400_000;
-    const now = data.now ?? Date.now();
+    const now = data.now ?? mountedAt;
     const d = new Date(now);
     const dayOfWeek = d.getDay();
     const startOfWeek = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dayOfWeek).getTime();
@@ -52,7 +53,7 @@ export function HypertrophyLandmarksCard({ data }: { data: StatsData }) {
       }
     }
     return counts;
-  }, [data.sets, exMap, data.now]);
+  }, [data.sets, exMap, data.now, mountedAt]);
 
   const hasRealSets = Object.values(setsByMuscle).some((count) => count > 0);
 
