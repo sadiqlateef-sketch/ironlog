@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type Ref } from "react";
-import { Check, Trash2, Undo2, X } from "lucide-react";
+import { Check, StickyNote, Trash2, Undo2, X } from "lucide-react";
 import type { UiSet } from "@/hooks/use-workout";
 import { useKeypad, type KeypadField } from "@/components/workout/keypad";
 import { formatDuration, parseDuration } from "@/lib/cardio";
@@ -16,6 +16,7 @@ const typeStyles = {
   warmup: "bg-set-warmup/20 text-set-warmup",
   drop: "bg-set-drop/20 text-set-drop",
   failure: "bg-set-failure/20 text-set-failure",
+  amrap: "bg-set-amrap/20 text-set-amrap",
 } as const;
 
 /** Set · Last time · weight · reps · done. The header and "add set" rows use the same columns. */
@@ -97,6 +98,7 @@ export function SetRow({
   onLongPress: () => void;
 }) {
   const [shake, setShake] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const secondRef = useRef<HTMLInputElement>(null);
   const swipe = useSwipe({
     onRight: () => done(),
@@ -105,10 +107,16 @@ export function SetRow({
   });
 
   async function done() {
-    const ok = await onToggleDone();
-    if (!ok) {
-      setShake(true);
-      setTimeout(() => setShake(false), 400);
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const ok = await onToggleDone();
+      if (!ok) {
+        setShake(true);
+        setTimeout(() => setShake(false), 400);
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -157,9 +165,10 @@ export function SetRow({
           type="button"
           onClick={onCycleType}
           aria-label={`Set ${workingNumber}, type ${set.type}. Tap to change type, hold for more.`}
-          className={cn("num h-12 rounded-xl text-base font-bold", typeStyles[set.type])}
+          className={cn("num relative h-12 rounded-xl text-base font-bold", typeStyles[set.type])}
         >
           {setLabel(set.type, workingNumber)}
+          {set.note && <StickyNote data-testid="set-note-icon" aria-label="Has a note" className="absolute right-0.5 top-0.5 size-3 opacity-80" />}
         </button>
 
         {!sides && (
@@ -259,11 +268,14 @@ export function SetRow({
           <button
             type="button"
             onClick={done}
+            disabled={submitting}
+            aria-busy={submitting}
             aria-label={set.done ? `Mark set not done${effort ? ` (effort ${effort})` : ""}` : "Complete set"}
             aria-pressed={set.done}
             className={cn(
               "relative grid h-14 w-full place-items-center rounded-xl transition-colors",
               set.done ? "bg-success text-[#08200d]" : "bg-secondary text-muted-foreground",
+              submitting && "opacity-75 cursor-not-allowed pointer-events-none",
             )}
           >
             <Check className="size-7" strokeWidth={3} />

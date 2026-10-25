@@ -2,9 +2,9 @@
 // tab per kind of data. Weights are in your units; the IDs let each tab be
 // matched up with the others (a set's workout ID is on the Workouts tab).
 
-import { getSupabase } from "@/lib/supabase/client";
-import { kgToLb, type UnitSystem } from "@/lib/units";
-import { buildXlsx, type CellValue, type Sheet } from "@/lib/xlsx";
+import { getSupabase } from "./supabase/client.ts";
+import { kgToLb, type UnitSystem } from "./units.ts";
+import { buildXlsx, type CellValue, type Sheet } from "./xlsx.ts";
 
 type Row = Record<string, unknown>;
 

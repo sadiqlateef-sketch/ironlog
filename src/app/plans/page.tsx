@@ -55,6 +55,10 @@ function Plans() {
   const [adjustments, setAdjustments] = useState<AdjustmentWithContext[]>([]);
   const [editing, setEditing] = useState<RoutineWithExercises | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [modifying, setModifying] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("modify") === "1";
+  });
 
   const refresh = useCallback(() => {
     listPrograms()
@@ -69,10 +73,12 @@ function Plans() {
   }, []);
   useEffect(refresh, [refresh]);
 
-  // /plans/?build=1 (from the welcome steps or Home) opens on the builder.
+  // /plans/?build=1 or /plans/?modify=1 opens on the builder.
   const hasProfile = !!profile;
   useEffect(() => {
-    if (hasProfile && new URLSearchParams(window.location.search).get("build") === "1") {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (hasProfile && (params.get("build") === "1" || params.get("modify") === "1")) {
       document.getElementById("generator")?.scrollIntoView({ block: "start" });
     }
   }, [hasProfile]);
@@ -93,9 +99,19 @@ function Plans() {
     }
   }
 
+  const activePrograms = programs?.filter((p) => p.is_active) ?? [];
+  const hasActive = activePrograms.length > 0;
+
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Programs</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Programs</h1>
+        {hasActive && !modifying && (
+          <Button variant="outline" size="sm" onClick={() => setModifying(true)} className="gap-1.5">
+            <Sparkles className="size-4 text-primary" /> Modify program
+          </Button>
+        )}
+      </div>
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       {adjustments.length > 0 && (
@@ -108,10 +124,19 @@ function Plans() {
         </Card>
       )}
 
-      {/* Your active program first, then the generator, then the rest. */}
+      {/* When loading */}
       {programs === null && !error && <SkeletonList rows={2} rowClassName="h-28" />}
-      {programs?.filter((p) => p.is_active).map((p) => (
-        <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
+
+      {/* Active program view */}
+      {activePrograms.map((p) => (
+        <ProgramCard
+          key={p.id}
+          program={p}
+          progress={progress[p.id]}
+          onChange={refresh}
+          onEdit={setEditing}
+          onModify={() => setModifying(true)}
+        />
       ))}
 
       {fresh && (
@@ -131,11 +156,15 @@ function Plans() {
         </Card>
       )}
 
-      {profile && (
+      {/* Generator form: shown if no program is active, OR if user clicked Modify */}
+      {profile && (!hasActive || modifying) && (
         <Generator
           key={profile.id}
           initial={planDefaults(profile)}
-          onCreated={(id) => {
+          isModifying={modifying}
+          onCancel={hasActive ? () => setModifying(false) : undefined}
+          onCreated={async (id) => {
+            setModifying(false);
             refresh();
             setFresh(id);
             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -143,18 +172,23 @@ function Plans() {
         />
       )}
 
-      {programs?.filter((p) => !p.is_active).map((p) => (
-        <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
-      ))}
-      {manual.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>My routines</CardTitle>
-          </CardHeader>
-          {manual.map((r) => (
-            <DayRow key={r.id} routine={r} onEdit={() => setEditing(r)} />
+      {/* When there is NO active program, allow selecting from inactive programs or manual routines */}
+      {!hasActive && (
+        <>
+          {programs?.filter((p) => !p.is_active).map((p) => (
+            <ProgramCard key={p.id} program={p} progress={progress[p.id]} onChange={refresh} onEdit={setEditing} />
           ))}
-        </Card>
+          {manual.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>My routines</CardTitle>
+              </CardHeader>
+              {manual.map((r) => (
+                <DayRow key={r.id} routine={r} onEdit={() => setEditing(r)} />
+              ))}
+            </Card>
+          )}
+        </>
       )}
 
       <WorkoutEditor routine={editing} onOpenChange={(o) => !o && setEditing(null)} onSaved={refresh} />
@@ -165,7 +199,7 @@ function Plans() {
 // ---------------- Generator form ----------------
 
 const STYLES = [
-  { v: "auto", l: "Claude picks", d: "Best fit for your goal and schedule" },
+  { v: "auto", l: "Auto pick", d: "Best fit for your goal and schedule" },
   { v: "531", l: "5/3/1", d: "Jim Wendler: steady monthly strength gains" },
   { v: "sheiko", l: "Sheiko", d: "Frequent, technical powerlifting practice" },
   { v: "rp", l: "RP hypertrophy", d: "Renaissance Periodization volume for size" },
@@ -188,11 +222,21 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-function Generator({ initial, onCreated }: { initial: PlanInput; onCreated: (programId: string) => void }) {
+function Generator({
+  initial,
+  onCreated,
+  isModifying,
+  onCancel,
+}: {
+  initial: PlanInput;
+  onCreated: (programId: string) => void;
+  isModifying?: boolean;
+  onCancel?: () => void;
+}) {
   const { profile, unit } = useAuth();
   const kits = kitsOf(profile);
   const [kitId, setKitId] = useState(() => activeKit(profile, kits).id);
-  const [form, setForm] = useState<PlanInput>(initial);
+  const [form, setForm] = useState<PlanInput>({ ...initial, provider: initial.provider ?? "gemini" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof PlanInput>(k: K, v: PlanInput[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -207,7 +251,12 @@ function Generator({ initial, onCreated }: { initial: PlanInput; onCreated: (pro
       const used = { ...kit, equipment: form.equipment.filter((x) => (EQUIPMENT as readonly string[]).includes(x)) as typeof kit.equipment };
       const library = await listExercises().catch(() => []);
       const exclude = [...new Set(library.filter((x) => !kitAllows(x, used)).map((x) => x.slug))];
-      const { program_id } = await generatePlan({ ...form, exclude_slugs: exclude, equipment_note: describeKit(used, unit).slice(0, 400) });
+      const { program_id } = await generatePlan({
+        ...form,
+        provider: form.provider ?? "gemini",
+        exclude_slugs: exclude,
+        equipment_note: describeKit(used, unit).slice(0, 400),
+      });
       onCreated(program_id);
     } catch (err) {
       setError((err as Error).message);
@@ -216,15 +265,55 @@ function Generator({ initial, onCreated }: { initial: PlanInput; onCreated: (pro
     }
   }
 
+  const isClaude = form.provider === "claude";
+
   return (
     <Card id="generator" className="scroll-mt-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="text-primary-text size-4" /> New program with Claude
+          <Sparkles className="text-primary-text size-4" />{" "}
+          {isModifying ? "Modify program" : "New program"} with {isClaude ? "Claude" : "Gemini"}
         </CardTitle>
-        <CardDescription>Every workout mapped out week by week, built around your logged maxes and equipment.</CardDescription>
+        <CardDescription>
+          {isModifying
+            ? "Redesign your program structure and progression with your chosen AI coach."
+            : "Every workout mapped out week by week, built around your logged maxes and equipment."}
+        </CardDescription>
       </CardHeader>
       <form onSubmit={submit} className="flex flex-col gap-4">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 text-sm font-medium">AI Coach</legend>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              aria-pressed={!isClaude}
+              onClick={() => set("provider", "gemini")}
+              className={cn(
+                "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors",
+                !isClaude ? "border-primary bg-primary/10 text-foreground font-semibold" : "border-input bg-secondary text-muted-foreground",
+              )}
+            >
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                <Sparkles className="size-4 text-primary" /> Gemini
+              </span>
+              <span className="text-xs font-normal opacity-80">Gemini 3.8 Flash · Fast & tailored</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={isClaude}
+              onClick={() => set("provider", "claude")}
+              className={cn(
+                "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors",
+                isClaude ? "border-primary bg-primary/10 text-foreground font-semibold" : "border-input bg-secondary text-muted-foreground",
+              )}
+            >
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                Claude
+              </span>
+              <span className="text-xs font-normal opacity-80">Claude 5.5 Opus · Deep volume</span>
+            </button>
+          </div>
+        </fieldset>
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-2 text-sm font-medium">Goal</legend>
           <div className="flex flex-wrap gap-2">
@@ -358,9 +447,20 @@ function Generator({ initial, onCreated }: { initial: PlanInput; onCreated: (pro
           />
         </label>
         {error && <p className="text-destructive text-sm">{error}</p>}
-        <Button type="submit" size="lg" disabled={busy}>
-          {busy ? "Claude is designing your program… (up to a minute)" : "Build my program"}
-        </Button>
+        <div className="flex gap-2">
+          {onCancel && (
+            <Button type="button" variant="secondary" size="lg" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" size="lg" className="flex-1" disabled={busy}>
+            {busy
+              ? `${isClaude ? "Claude" : "Gemini"} is designing your program… (up to a minute)`
+              : isModifying
+                ? `Rebuild program with ${isClaude ? "Claude" : "Gemini"}`
+                : `Build my program with ${isClaude ? "Claude" : "Gemini"}`}
+          </Button>
+        </div>
       </form>
     </Card>
   );
@@ -373,11 +473,13 @@ function ProgramCard({
   progress,
   onChange,
   onEdit,
+  onModify,
 }: {
   program: ProgramWithWorkouts;
   progress: ProgramProgress | undefined;
   onChange: () => void;
   onEdit: (r: RoutineWithExercises) => void;
+  onModify?: () => void;
 }) {
   const active = program.is_active;
   const done = new Set(active ? (progress?.done_routine_ids ?? []) : []);
@@ -403,11 +505,10 @@ function ProgramCard({
     }
   }
   const start = () => {
-    if (confirm(`Start "${program.name}" from week 1, day 1? It becomes your only active program.`)) run(() => startProgram(program.id));
+    run(() => startProgram(program.id));
   };
   const remove = () =>
     run(async () => {
-      if (!confirm(`Delete "${program.name}"? Your logged workouts stay.`)) return;
       await deleteProgram(program.id);
     });
 
@@ -457,8 +558,12 @@ function ProgramCard({
       <div className="flex flex-wrap gap-2">
         {active ? (
           <>
+            {onModify && (
+              <Button variant="outline" size="sm" onClick={onModify} data-testid="modify-program-btn">
+                <Sparkles className="size-4 text-primary" /> Modify program
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => run(async () => {
-              if (!confirm("Restart from week 1, day 1? Your logged workouts stay in your history.")) return;
               await startProgram(program.id);
             })}>
               <RotateCcw /> Restart

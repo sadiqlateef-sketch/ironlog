@@ -20,7 +20,11 @@ const toItems = (r: RoutineWithExercises): EditableItem[] =>
     target_reps: x.target_reps,
     target_reps_max: x.target_reps_max,
     target_weight_kg: x.target_weight_kg,
+    tempo: x.tempo ?? null,
   }));
+
+/** Seconds down, pause, up, pause. X means as fast as you can. */
+const TEMPO = /^[0-9X]-[0-9X]-[0-9X]-[0-9X]$/;
 
 const shown = (kg: number | null, unit: UnitSystem) =>
   kg == null ? "" : String(Math.round((unit === "imperial" ? kgToLb(kg) : kg) * 2) / 2);
@@ -61,6 +65,8 @@ function Editor({
     setBusy(true);
     setError(null);
     try {
+      const bad = items.find((x) => x.tempo && !TEMPO.test(x.tempo));
+      if (bad) throw new Error(`Tempo for ${bad.name} should look like 3-1-1-0.`);
       await saveWorkoutEdits(routine, items, inProgram && laterWeeks);
       onSaved();
       onOpenChange(false);
@@ -137,6 +143,16 @@ function Editor({
                     />
                   </Field>
                 </div>
+                <Field label="Tempo (optional)">
+                  <Input
+                    inputMode="text"
+                    placeholder="3-1-1-0"
+                    maxLength={7}
+                    value={x.tempo ?? ""}
+                    aria-invalid={!!x.tempo && !TEMPO.test(x.tempo)}
+                    onChange={(e) => set(i, { tempo: e.target.value.toUpperCase().replace(/[^0-9X-]/g, "") || null })}
+                  />
+                </Field>
               </li>
             ))}
           </ul>
@@ -189,7 +205,7 @@ function Editor({
           else
             setItems((xs) => [
               ...xs,
-              { id: null, exercise_id: e.id, name: e.name, target_sets: 3, target_reps: 10, target_reps_max: null, target_weight_kg: null },
+              { id: null, exercise_id: e.id, name: e.name, target_sets: 3, target_reps: 10, target_reps_max: null, target_weight_kg: null, tempo: null },
             ]);
           setPicker(null);
         }}

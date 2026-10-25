@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadProfile, queue, type Profile } from "./src/api";
+import { OFFLINE_KEY } from "./src/pairing";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { PairScreen } from "./src/screens/PairScreen";
 import { WorkoutScreen } from "./src/screens/WorkoutScreen";
@@ -19,7 +21,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => (data.session ? signedIn() : setRoute("pair")));
+    async function checkAuth() {
+      const offline = await AsyncStorage.getItem(OFFLINE_KEY);
+      if (offline === "true") {
+        signedIn();
+        return;
+      }
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) signedIn();
+        else setRoute("pair");
+      } catch {
+        setRoute("pair");
+      }
+    }
+    checkAuth();
+
     // Keep trying to send waiting changes in the background.
     const id = setInterval(() => queue.flush(), 20_000);
     return () => clearInterval(id);

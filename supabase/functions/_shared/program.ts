@@ -15,6 +15,7 @@ export const METHODOLOGIES = {
 } as const;
 
 export const PlanRequest = z.object({
+  provider: z.enum(["gemini", "claude"]).optional().default("gemini"),
   goal: z.enum(["strength", "hypertrophy", "powerbuilding", "general"]),
   methodology: z.enum(Object.keys(METHODOLOGIES) as [keyof typeof METHODOLOGIES, ...(keyof typeof METHODOLOGIES)[]]),
   days_per_week: z.number().int().min(2).max(6),

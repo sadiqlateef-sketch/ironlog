@@ -9,7 +9,7 @@
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { isNative } from "@/lib/native";
-import { getSupabase } from "@/lib/supabase/client";
+import { getSupabase, isLocalBackend } from "@/lib/supabase/client";
 import { APP_AUTH_CALLBACK, parseAuthCallback } from "@/lib/google-sign-in-logic";
 
 /** The login screen waiting on the result, if it's open. */
@@ -24,6 +24,21 @@ let exchanging = false;
  * once the page is on its way to Google).
  */
 export async function signInWithGoogle(): Promise<string | null> {
+  // Local test backend: no Google, just sign in.
+  if (isLocalBackend()) {
+    try {
+      const { data, error } = await getSupabase().auth.signInWithPassword({
+        email: "sadiq.lateef@gmail.com",
+        password: "offline-mock-auth",
+      });
+      if (!error && data?.session) {
+        return null;
+      }
+    } catch (err) {
+      console.warn("Local test sign in attempt:", err);
+    }
+  }
+
   const native = isNative();
   const { data, error } = await getSupabase().auth.signInWithOAuth({
     provider: "google",

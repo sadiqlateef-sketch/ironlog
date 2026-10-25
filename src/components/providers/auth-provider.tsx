@@ -2,7 +2,7 @@
 
 import { createContext, use, useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { getSupabase } from "@/lib/supabase/client";
+import { getSupabase, isLocalBackend } from "@/lib/supabase/client";
 import { listenForGoogleSignIn } from "@/lib/google-sign-in";
 import { cachedRead } from "@/lib/offline/cache";
 import { kvClear, kvSet } from "@/lib/offline/kv";
@@ -33,7 +33,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const supabase = getSupabase();
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(async ({ data }) => {
+      const s = data.session;
+      // A sign-in made by the local test backend (Oct 23-25 builds) isn't a real
+      // account: drop it so you sign in for real. Workouts it saved stay on the
+      // phone for the one-time upload (see legacy-upload.ts).
+      const fake = s && (s.refresh_token === "ironlog-offline-refresh-token" || s.access_token.endsWith(".ironlog_offline_sig"));
+      if (fake && !isLocalBackend()) {
+        await supabase.auth.signOut({ scope: "local" });
+        await discardPending();
+        await kvClear();
+        setSession(null);
+        return;
+      }
+      setSession(s);
+    });
     const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
     const stopGoogle = listenForGoogleSignIn();
     return () => (data.subscription.unsubscribe(), stopGoogle());

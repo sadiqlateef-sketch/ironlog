@@ -33,3 +33,12 @@ export function weightInput(kg: number, unit: UnitSystem): string {
 export function toKg(value: number, unit: UnitSystem): number {
   return unit === "imperial" ? lbToKg(value) : value;
 }
+
+/** Round a load in kg to standard plate increments in the user's unit (nearest 0.5 lb or 0.25 kg). */
+export function roundLoadKg(kg: number, unit: UnitSystem): number {
+  if (unit === "imperial") {
+    const lb = Math.round(kgToLb(kg) * 2) / 2;
+    return lbToKg(lb);
+  }
+  return Math.round(kg * 4) / 4;
+}

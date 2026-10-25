@@ -22,6 +22,7 @@ export const DEFAULT_EQUIPMENT = ["barbell", "dumbbell", "machine", "cable"];
 /** The program builder's starting answers: yours from the welcome steps, else sensible defaults. */
 export function planDefaults(profile: Tables<"users"> | null): PlanInput {
   return {
+    provider: "gemini",
     goal: profile?.training_goal ?? "strength",
     methodology: "auto",
     days_per_week: profile?.training_days_per_week ?? 4,

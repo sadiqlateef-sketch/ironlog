@@ -3,6 +3,7 @@
 // workout mapped out (one routine per week and day) and returns it.
 
 import { askStructured, checkDailyLimit, MODEL } from "../_shared/claude.ts";
+import { askStructuredGemini, checkDailyLimitGemini, GEMINI_MODEL } from "../_shared/gemini.ts";
 import { handle, HttpError, json, userClient } from "../_shared/http.ts";
 import {
   buildPlanPrompt,
@@ -22,7 +23,11 @@ Deno.serve(
     const parsed = PlanRequest.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new HttpError(400, "Please check the form and try again.");
     const input = parsed.data;
-    await checkDailyLimit(userId, "generate_plan");
+    if (input.provider === "gemini") {
+      await checkDailyLimitGemini(userId, "generate_plan");
+    } else {
+      await checkDailyLimit(userId, "generate_plan");
+    }
 
     // ---- Context: profile, exercise library, recent maxes ----
     const [{ data: profile }, { data: exercises, error: exErr }, { data: logged }] = await Promise.all([
@@ -60,24 +65,35 @@ Deno.serve(
       }),
     );
 
-    // ---- Ask Claude ----
+    // ---- Ask Gemini or Claude ----
     const deloads = deloadWeeks(input);
     const slugs = library.map((e) => e.slug) as [string, ...string[]];
-    const program = await askStructured({
-      userId,
-      kind: "generate_plan",
-      system: PLAN_SYSTEM_PROMPT,
-      prompt: buildPlanPrompt(input, {
-        unit,
-        physicalStats: (profile?.physical_stats as Record<string, unknown>) ?? {},
-        lifts,
-        library: library.map(({ slug, name, primary_muscle, equipment }) => ({ slug, name, primary_muscle, equipment })),
-        deloads,
-      }),
-      schema: programSchema(slugs),
-      effort: "high",
-      maxTokens: 16000,
+    const planPrompt = buildPlanPrompt(input, {
+      unit,
+      physicalStats: (profile?.physical_stats as Record<string, unknown>) ?? {},
+      lifts,
+      library: library.map(({ slug, name, primary_muscle, equipment }) => ({ slug, name, primary_muscle, equipment })),
+      deloads,
     });
+
+    const isGemini = input.provider === "gemini";
+    const program = isGemini
+      ? await askStructuredGemini({
+          userId,
+          kind: "generate_plan",
+          system: PLAN_SYSTEM_PROMPT,
+          prompt: planPrompt,
+          schema: programSchema(slugs),
+        })
+      : await askStructured({
+          userId,
+          kind: "generate_plan",
+          system: PLAN_SYSTEM_PROMPT,
+          prompt: planPrompt,
+          schema: programSchema(slugs),
+          effort: "high",
+          maxTokens: 16000,
+        });
 
     const workouts = toProgramWorkouts(
       program,
@@ -90,7 +106,9 @@ Deno.serve(
       input.days_per_week,
       deloads,
     );
-    if (workouts.length === 0) throw new HttpError(502, "Claude's plan had no usable exercises. Please try again.");
+    if (workouts.length === 0) {
+      throw new HttpError(502, `${isGemini ? "Gemini" : "Claude"}'s plan had no usable exercises. Please try again.`);
+    }
 
     // ---- Save: the program, then one routine per week and day ----
     const { data: saved, error: pErr } = await db
@@ -104,7 +122,7 @@ Deno.serve(
         days_per_week: Math.max(...workouts.map((w) => w.day)),
         ai_generated: true,
         deload_every: deloads.length ? deloadInterval(input) : null,
-        ai_metadata: { request: input, model: MODEL, generated_at: new Date().toISOString() },
+        ai_metadata: { request: input, model: isGemini ? GEMINI_MODEL : MODEL, generated_at: new Date().toISOString() },
       })
       .select("id, name")
       .single();

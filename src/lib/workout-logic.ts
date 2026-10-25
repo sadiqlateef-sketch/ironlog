@@ -1,10 +1,11 @@
 // Small pure helpers for the workout logger. No React, no Supabase, easy to test.
 
 import type { SetType } from "../types/database";
+import { weightInput, type UnitSystem } from "./units.ts";
 
-export const SET_TYPE_ORDER: SetType[] = ["normal", "warmup", "drop", "failure"];
+export const SET_TYPE_ORDER: SetType[] = ["normal", "warmup", "drop", "failure", "amrap"];
 
-/** Tapping the set-number badge cycles: normal -> warm-up -> drop -> failure -> normal. */
+/** Tapping the set-number badge cycles: normal -> warm-up -> drop -> failure -> AMRAP -> normal. */
 export function nextSetType(current: SetType): SetType {
   const i = SET_TYPE_ORDER.indexOf(current);
   return SET_TYPE_ORDER[(i + 1) % SET_TYPE_ORDER.length];
@@ -19,12 +20,14 @@ export function setLabel(type: SetType, workingIndex: number): string {
       return "D";
     case "failure":
       return "F";
+    case "amrap":
+      return "A";
     default:
       return String(workingIndex);
   }
 }
 
-/** For each set, its number counting only normal sets (W, D and F don't count). */
+/** For each set, its number counting only normal sets (W, D, F and A don't count). */
 export function workingSetNumbers(types: SetType[]): number[] {
   let n = 0;
   return types.map((t) => (t === "normal" ? ++n : n));
@@ -411,4 +414,50 @@ export function matchTargets(
     }
   }
   return out;
+}
+
+/**
+ * A set logged on the watch, as two patches: what the logger rows show (text, in
+ * your unit) and what gets saved (numbers, weight in kg).
+ */
+export function watchSetPatch(
+  data: { weightKg?: number | null; reps?: number | null; rpe?: number | null },
+  unit: UnitSystem,
+): {
+  ui: { weight?: string; reps?: string; rpe?: number };
+  db: { weight?: number; reps?: number; rpe?: number };
+} {
+  const ui: { weight?: string; reps?: string; rpe?: number } = {};
+  const db: { weight?: number; reps?: number; rpe?: number } = {};
+  if (data.weightKg != null) {
+    ui.weight = weightInput(data.weightKg, unit);
+    db.weight = data.weightKg;
+  }
+  if (data.reps != null) {
+    ui.reps = String(data.reps);
+    db.reps = data.reps;
+  }
+  if (data.rpe != null) {
+    ui.rpe = data.rpe;
+    db.rpe = data.rpe;
+  }
+  return { ui, db };
+}
+
+/**
+ * Weight lifted so far: weight x reps for every done set that isn't a warm-up,
+ * in the same unit the weights are typed in (so no conversion is needed).
+ * One-sided sets count both sides.
+ */
+export function liveVolume(
+  blocks: { sets: { done: boolean; type: SetType; weight: string; reps: string; repsLeft?: string }[] }[],
+): number {
+  let total = 0;
+  for (const b of blocks)
+    for (const s of b.sets) {
+      if (!s.done || s.type === "warmup") continue;
+      const weight = parseNumber(s.weight) ?? 0;
+      total += weight * ((parseNumber(s.reps) ?? 0) + (parseNumber(s.repsLeft ?? "") ?? 0));
+    }
+  return Math.round(total * 10) / 10;
 }

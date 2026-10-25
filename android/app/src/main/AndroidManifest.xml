@@ -1,40 +1,100 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.ironlog.app">
+
+    <!-- Shared Signature Permission across all 5 Lateef Ecosystem Apps -->
+    <permission
+        android:name="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA" />
+    <uses-permission android:name="com.sadiqlateef.braindump.permission.READ_WRITE_DATA" />
+    <uses-permission android:name="com.sadiqlateef.budget.permission.READ_WRITE_DATA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- Android 11+ (API 30-36) Package Visibility for the 5-App Ecosystem -->
+    <queries>
+        <package android:name="com.sadiqlateef.bujotasks" />
+        <package android:name="com.sadiqlateef.braindump" />
+        <package android:name="com.sadiqlateef.budget" />
+        <package android:name="eu.darken.sdmse.glass" />
+        <provider android:authorities="com.sadiqlateef.bujotasks.provider" />
+        <provider android:authorities="com.sadiqlateef.braindump.provider" />
+        <provider android:authorities="com.sadiqlateef.budget.provider" />
+        <provider android:authorities="eu.darken.sdmse.glass.provider" />
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+
+        <!-- Galaxy Z Fold8 Ultra Multi-Resume & Unfold Continuity -->
+        <meta-data
+            android:name="android.allow_multiple_resumed_activities"
+            android:value="true" />
+
         <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
-            android:name=".MainActivity"
-            android:label="@string/title_activity_main"
-            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:name="com.ironlog.app.MainActivity"
+            android:exported="true"
             android:launchMode="singleTask"
-            android:exported="true">
+            android:resizeableActivity="true"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:theme="@style/AppTheme.NoActionBarLaunch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Google sends you back here after connecting your calendar. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.ironlog.app" android:host="gym-calendar" />
             </intent-filter>
-            <!-- ...and here after signing in with Google. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.ironlog.app" android:host="auth-callback" />
             </intent-filter>
+            <!-- Deep Link for Braindump Rage/Stress Lift & Bujo Tasks Workout Launch -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ironlog" android:host="workout" />
+            </intent-filter>
         </activity>
+
+        <!-- Locked-Down IronLogContentProvider for Bujo Tasks, Braindump, Budget & SD Maid Glass -->
+        <provider
+            android:name="com.ironlog.app.IronLogContentProvider"
+            android:authorities="com.ironlog.app.provider"
+            android:enabled="true"
+            android:exported="true"
+            android:grantUriPermissions="false"
+            android:readPermission="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA"
+            android:writePermission="com.sadiqlateef.bujotasks.permission.READ_WRITE_DATA" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -43,13 +103,16 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+    
+        <!-- Rest Timer Lockscreen & Notification Interactive Actions -->
+        <receiver
+            android:name="com.ironlog.app.RestActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ironlog.app.ACTION_EXTEND_REST_30" />
+                <action android:name="com.ironlog.app.ACTION_REDUCE_REST_15" />
+                <action android:name="com.ironlog.app.ACTION_SKIP_REST" />
+            </intent-filter>
+        </receiver>
     </application>
-
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Gym check-in: is the phone at your gym when a workout starts? -->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>

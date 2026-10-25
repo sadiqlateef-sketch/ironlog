@@ -18,7 +18,7 @@ A standalone watch app in `watch/` (React Native). It talks to the same
 Supabase database as the phone, so a workout started on either shows up on both.
 
 - **Link once, no typing on the watch.** The watch shows a 6-digit code. On
-  your phone, go to Home > **Link watch** and enter it. That button is hidden
+  your phone, go to More > **Watch pairing** (`/link-watch/`) and enter it. That button is hidden
   until you turn it on: add a repository variable `FEATURE_WATCH` = `1`
   (Settings > Secrets and variables > Actions > Variables) and rebuild the APK. Codes last 10 minutes
   and work once, and 10 wrong tries locks code entry for a while.

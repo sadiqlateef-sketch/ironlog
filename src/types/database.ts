@@ -4,7 +4,7 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type SetType = "warmup" | "normal" | "drop" | "failure";
+export type SetType = "warmup" | "normal" | "drop" | "failure" | "amrap";
 export type MuscleGroup =
   | "chest" | "upper_back" | "lats" | "lower_back" | "traps"
   | "front_delts" | "side_delts" | "rear_delts"
@@ -273,6 +273,7 @@ export type Database = {
           warmup_sets: number;
           rest_seconds: number;
           notes: string | null;
+          tempo: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -289,6 +290,7 @@ export type Database = {
           warmup_sets?: number;
           rest_seconds?: number;
           notes?: string | null;
+          tempo?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["routine_exercises"]["Insert"]>;
         Relationships: [

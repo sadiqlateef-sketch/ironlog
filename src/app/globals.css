@@ -9,56 +9,45 @@
 :root {
   --radius: 0.875rem;
   color-scheme: dark;
-
-  /* Dark glass: frosted, see-through panels over a deep navy/violet backdrop
-     with soft colour glows. Every text colour here is checked (WCAG AA)
-     against the brightest spot the glow can put behind it, because gym
-     lighting is harsh and numbers must still pop mid-set. */
-  --background: #07080f;
-  --foreground: #f5f7ff;
-  --card: rgb(24 27 48 / 0.58);          /* glass: see-through, blurred */
-  --card-solid: #151829;                  /* same tone, opaque, for strokes/outlines */
-  --card-foreground: #f5f7ff;
-  --popover: rgb(20 23 42 / 0.82);
-  --popover-foreground: #f5f7ff;
-  --primary: #3d63ee;                     /* blue fill: "do this now" (white text on it) */
-  --primary-foreground: #ffffff;
-  --primary-text: #84a8ff;                /* blue for text and icons on glass */
-  --secondary: rgb(255 255 255 / 0.08);
-  --secondary-foreground: #f5f7ff;
-  --muted: rgb(255 255 255 / 0.08);
-  --muted-foreground: #a3aacb;
-  --accent: rgb(255 255 255 / 0.12);
-  --accent-foreground: #f5f7ff;
-  --destructive: #e5484d;
-  --border: rgb(255 255 255 / 11%);
-  --input: rgb(255 255 255 / 16%);
-  --ring: #6b97ff;
-  --success: #7fe08a;                     /* completed sets */
-  --ai: #b39aff;                          /* AI suggestions */
-
-  /* Set-type colours used by the logger */
-  --set-warmup: #ffd479;
-  --set-drop: #5fd4e0;
-  --set-failure: #ff8a7a;
-  --record: #ffcf5c;                      /* new personal records (gold) */
-
-  /* Charts (blue line/bars on glass; >= 3:1 against the card surface) */
-  --chart-1: #6b97ff;
-  --chart-grid: rgb(255 255 255 / 8%);
-  --chart-axis: rgb(255 255 255 / 18%);
-  /* Muscle figures: a smooth grey body, muscles a step lighter. Recovery
-     tints tired muscles from that grey toward a warm red. */
-  --body-base: #2a2f48;
-  --body-muscle: #454c6e;
-  --heat: #ff6a4d;
-
-  /* Backdrop glows behind the glass */
-  --glow-1: rgb(42 70 216 / 0.42);
-  --glow-2: rgb(106 47 214 / 0.34);
-  --glow-3: rgb(15 122 138 / 0.26);
-  --glass-highlight: rgb(255 255 255 / 0.07);
+  --background: #070507;
+  --foreground: #FAF7F0;
+  --card: rgba(26, 10, 18, 0.82);
+  --card-solid: #14090E;
+  --card-foreground: #FAF7F0;
+  --popover: rgba(18, 8, 12, 0.94);
+  --popover-foreground: #FAF7F0;
+  --primary: #D4AF37;
+  --primary-foreground: #140B04;
+  --primary-text: #FCE69C;
+  --secondary: rgba(92, 29, 36, 0.38);
+  --secondary-foreground: #FAF7F0;
+  --muted: rgba(255, 255, 255, 0.07);
+  --muted-foreground: #C8BDCC;
+  --accent: rgba(212, 175, 55, 0.18);
+  --accent-foreground: #FCE69C;
+  --destructive: #FF2B46;
+  --border: rgba(212, 175, 55, 0.26);
+  --input: rgba(212, 175, 55, 0.22);
+  --ring: #D4AF37;
+  --success: #68D391;
+  --ai: #FCE69C;
+  --set-warmup: #FFD479;
+  --set-drop: #E5BF4C;
+  --set-failure: #FF2B46;
+  --set-amrap: #F59E0B;
+  --record: #D4AF37;
+  --chart-1: #D4AF37;
+  --chart-grid: rgba(212, 175, 55, 0.12);
+  --chart-axis: rgba(250, 247, 240, 0.28);
+  --body-base: #1D1116;
+  --body-muscle: #4A0E17;
+  --heat: #B81D2D;
+  --glow-1: rgba(74, 14, 23, 0.55);
+  --glow-2: rgba(212, 175, 55, 0.28);
+  --glow-3: rgba(184, 29, 45, 0.35);
+  --glass-highlight: rgba(255, 255, 255, 0.07);
   --glass-shadow: rgb(0 0 0 / 0.35);
+  --progress-dark-bar: #2B213A;
 }
 
 /* Light mode (Settings > Appearance). Same layout and accents, on a pale
@@ -91,6 +80,7 @@
   --set-warmup: #8a5800;
   --set-drop: #0a6c78;
   --set-failure: #b42318;
+  --set-amrap: #a15c07;
   --record: #7a5200;
   --chart-1: #2f55d4;
   --chart-grid: rgb(14 17 36 / 0.08);
@@ -148,6 +138,7 @@
   --color-set-warmup: var(--set-warmup);
   --color-set-drop: var(--set-drop);
   --color-set-failure: var(--set-failure);
+  --color-set-amrap: var(--set-amrap);
   --color-record: var(--record);
   --color-chart-1: var(--chart-1);
 }
@@ -240,3 +231,16 @@
   100% { opacity: 0; }
 }
 .demo-flip { animation: demo-flip 2.8s ease-in-out infinite; }
+
+
+/* Unfolded Galaxy Z Fold8 Ultra Dual-Pane Gym Studio (720px+) */
+@media (min-width: 720px) {
+  .ironlog-fold-studio {
+    max-width: 960px !important;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 20px;
+    align-items: start;
+  }
+}
