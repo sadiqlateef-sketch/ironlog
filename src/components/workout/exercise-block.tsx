@@ -176,7 +176,7 @@ export function ExerciseBlock({
   // Today's suggested weight fills working sets; anything else repeats last time.
   const weightHint = (i: number) => {
     const set = block.sets[i];
-    if (block.suggestion && (set.type === "normal" || set.type === "failure")) return String(block.suggestion.weight);
+    if (block.suggestion && (set.type === "normal" || set.type === "failure" || set.type === "amrap")) return String(block.suggestion.weight);
     const prev = prevOf[i];
     return prev ? toDisplay(prev.weight, unit) || "0" : "0";
   };

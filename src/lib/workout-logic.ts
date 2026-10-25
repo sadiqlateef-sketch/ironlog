@@ -3,9 +3,9 @@
 import type { SetType } from "../types/database";
 import { weightInput, type UnitSystem } from "./units.ts";
 
-export const SET_TYPE_ORDER: SetType[] = ["normal", "warmup", "drop", "failure"];
+export const SET_TYPE_ORDER: SetType[] = ["normal", "warmup", "drop", "failure", "amrap"];
 
-/** Tapping the set-number badge cycles: normal -> warm-up -> drop -> failure -> normal. */
+/** Tapping the set-number badge cycles: normal -> warm-up -> drop -> failure -> AMRAP -> normal. */
 export function nextSetType(current: SetType): SetType {
   const i = SET_TYPE_ORDER.indexOf(current);
   return SET_TYPE_ORDER[(i + 1) % SET_TYPE_ORDER.length];
@@ -20,12 +20,14 @@ export function setLabel(type: SetType, workingIndex: number): string {
       return "D";
     case "failure":
       return "F";
+    case "amrap":
+      return "A";
     default:
       return String(workingIndex);
   }
 }
 
-/** For each set, its number counting only normal sets (W, D and F don't count). */
+/** For each set, its number counting only normal sets (W, D, F and A don't count). */
 export function workingSetNumbers(types: SetType[]): number[] {
   let n = 0;
   return types.map((t) => (t === "normal" ? ++n : n));

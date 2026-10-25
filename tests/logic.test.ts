@@ -10,6 +10,7 @@ import {
   moveUnit,
   workingOn,
   nextSetType,
+  setLabel,
   parseNumber,
   shouldStartRest,
   workingSetNumbers,
@@ -39,7 +40,13 @@ test("plates: target at or below bar needs no plates", () => {
 
 test("set type cycles", () => {
   assert.equal(nextSetType("normal"), "warmup");
-  assert.equal(nextSetType("failure"), "normal");
+  assert.equal(nextSetType("failure"), "amrap");
+  assert.equal(nextSetType("amrap"), "normal");
+});
+
+test("an AMRAP set is labelled A and is not a working-set number", () => {
+  assert.equal(setLabel("amrap", 3), "A");
+  assert.deepEqual(workingSetNumbers(["normal", "amrap", "normal"]), [1, 1, 2]);
 });
 
 test("working set numbers skip warm-ups", () => {

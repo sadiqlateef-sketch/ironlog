@@ -59,7 +59,7 @@ export function computeRecovery(sets: MuscleSet[], now: Date = new Date()): Musc
   for (const s of sets) {
     if (s.set_type === "warmup") continue;
     const ageH = Math.max(0, (now.getTime() - new Date(s.completed_at).getTime()) / 3_600_000);
-    const weight = s.set_type === "failure" ? 1.25 : 1;
+    const weight = s.set_type === "failure" || s.set_type === "amrap" ? 1.25 : 1;
     add(s.primary_muscle, weight, ageH);
     counts.set(s.primary_muscle, (counts.get(s.primary_muscle) ?? 0) + 1);
     for (const m of s.secondary_muscles) add(m, weight * 0.5, ageH);

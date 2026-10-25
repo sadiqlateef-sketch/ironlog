@@ -302,7 +302,7 @@ function setLines(sets: ImportedWorkout["exercises"][number]["sets"], unit: Unit
     let n = 1;
     while (i + n < sets.length && sets[i + n].weight_kg === s.weight_kg && sets[i + n].reps === s.reps && sets[i + n].set_type === s.set_type) n++;
     const load = s.weight_kg > 0 ? `${showWeight(s.weight_kg, unit)} ${u}` : "bodyweight";
-    const tag = s.set_type === "warmup" ? " warm-up" : s.set_type === "drop" ? " drop" : s.set_type === "failure" ? " to failure" : "";
+    const tag = s.set_type === "warmup" ? " warm-up" : s.set_type === "drop" ? " drop" : s.set_type === "failure" ? " to failure" : s.set_type === "amrap" ? " AMRAP" : "";
     lines.push(`${n > 1 ? `${n} × ` : ""}${s.reps} at ${load}${tag}`);
     i += n;
   }

@@ -353,6 +353,8 @@ export interface EditableItem {
   target_reps: number;
   target_reps_max: number | null;
   target_weight_kg: number | null;
+  /** Lifting speed as down-pause-up-pause, like "3-1-1-0". Empty for none. */
+  tempo: string | null;
 }
 
 /**
@@ -379,7 +381,8 @@ export async function saveWorkoutEdits(
         b.target_sets !== e.target_sets ||
         b.target_reps !== e.target_reps ||
         b.target_reps_max !== e.target_reps_max ||
-        b.target_weight_kg !== e.target_weight_kg)
+        b.target_weight_kg !== e.target_weight_kg ||
+        (b.tempo ?? null) !== (e.tempo ?? null))
     );
   });
 
@@ -428,6 +431,7 @@ export async function saveWorkoutEdits(
             target_reps: e.target_reps,
             target_reps_max: e.target_reps_max,
             target_weight_kg: weight,
+            tempo: e.tempo,
             // A weight you set yourself replaces the percent-of-max target.
             ...(weightChanged ? { target_percent_1rm: null } : {}),
           })
@@ -453,6 +457,7 @@ export async function saveWorkoutEdits(
               target_reps: e.target_reps,
               target_reps_max: e.target_reps_max,
               target_weight_kg: e.target_weight_kg,
+              tempo: e.tempo,
             })),
           )
           .select("id"),

@@ -882,7 +882,7 @@ function ActiveWorkout({
         const b = blocks.find((x) => x.order === warmupFor);
         const { bar, plates: owned } = ownedPlates(profile, unit);
         // Today's working weight: what's typed on the first working set, else the suggestion, else last time.
-        const firstWork = b?.sets.find((s) => s.type === "normal" || s.type === "failure");
+        const firstWork = b?.sets.find((s) => s.type === "normal" || s.type === "failure" || s.type === "amrap");
         const prevWork = b?.previous.find((p) => p.set_type === "normal");
         const working =
           Number(firstWork?.weight) ||

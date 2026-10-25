@@ -128,13 +128,14 @@ function saveRest(exerciseId: string, seconds: number) {
 }
 
 function targetNoteFor(
-  t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null },
+  t: { target_rpe: number | null; target_percent_1rm: number | null; notes: string | null; tempo?: string | null },
   /** A periodization phase already shows its own RPE, so the program's is left out. */
   skipRpe = false,
 ): string | null {
   const parts = [
     t.target_percent_1rm != null ? `${Number(t.target_percent_1rm)}% 1RM` : null,
     t.target_rpe != null && !skipRpe ? `RPE ${Number(t.target_rpe)}` : null,
+    t.tempo ? `Tempo ${t.tempo}` : null,
     t.notes,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
@@ -1152,7 +1153,7 @@ export function useWorkout() {
         }
 
         // Working sets fill in today's suggested weight when there is one.
-        const suggested = block.suggestion && (set.type === "normal" || set.type === "failure") ? String(block.suggestion.weight) : null;
+        const suggested = block.suggestion && (set.type === "normal" || set.type === "failure" || set.type === "amrap") ? String(block.suggestion.weight) : null;
         const weight = set.weight || suggested || (prev ? toDisplay(prev.weight, unit) : "");
         const fallback = (side: number | null | undefined) =>
           prev ? String(side ?? prev.reps) : (block.repTarget?.split("-")[0] ?? "");
