@@ -71,9 +71,11 @@ async function load(): Promise<Entry[]> {
   return loaded;
 }
 
+export const SAVE_FAILED_MESSAGE = "Couldn't save on this phone (storage full?). Keep the app open until it syncs.";
+
 async function save() {
-  await kvSet(KEY, entries);
-  emit({ pending: entries.length });
+  const saved = await kvSet(KEY, entries);
+  emit({ pending: entries.length, ...(saved ? {} : { error: SAVE_FAILED_MESSAGE }) });
 }
 
 /** Errors that mean "no signal", as opposed to the server saying no. */

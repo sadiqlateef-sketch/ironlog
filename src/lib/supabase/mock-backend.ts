@@ -62,8 +62,8 @@ function setStored<T>(key: string, val: T): void {
   if (typeof window === "undefined" || !window.localStorage) return;
   try {
     window.localStorage.setItem(key, JSON.stringify(val));
-  } catch {
-    // quota exceeded or private mode
+  } catch (e) {
+    console.error("Local test backend couldn't save", key, e);
   }
 }
 
