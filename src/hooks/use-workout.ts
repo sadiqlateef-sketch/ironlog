@@ -1130,11 +1130,9 @@ export function useWorkout() {
         const prev = matchPrevious(block.sets.map((s) => s.type), block.previous)[idx];
         const others = blocksRef.current.map((b) => ({ order: b.order, supersetGroup: b.supersetGroup }));
         const startRest = () => {
-          if (set.type !== "warmup" && shouldStartRest(order, block.supersetGroup, others)) {
-            restTimer.start(block.restSeconds, block.exercise.name);
-          } else if (set.type === "warmup") {
-            restTimer.start(Math.min(60, block.restSeconds), block.exercise.name);
-          }
+          // In a superset or circuit the rest comes after the last exercise of the round, warm-ups included.
+          if (!shouldStartRest(order, block.supersetGroup, others)) return;
+          restTimer.start(set.type === "warmup" ? Math.min(60, block.restSeconds) : block.restSeconds, block.exercise.name);
         };
 
         // Timed and cardio sets: empty fields fall back to last time, then the target.

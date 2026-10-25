@@ -4,6 +4,9 @@ import { calculatePlates } from "../src/lib/plates.ts";
 import {
   doNextIndex,
   exerciseUnits,
+  groupName,
+  groupSize,
+  nextInRound,
   formatClock,
   liveVolume,
   matchTargets,
@@ -276,4 +279,30 @@ test("liveVolume adds weight x reps for done working sets only", () => {
   ];
   assert.equal(liveVolume(blocks), 225 * 5 * 2 + 100 * 10);
   assert.equal(liveVolume([]), 0);
+});
+
+test("three or more linked exercises are a circuit", () => {
+  const blocks = [{ supersetGroup: 1 }, { supersetGroup: 1 }, { supersetGroup: 1 }, { supersetGroup: null }];
+  assert.equal(groupSize(blocks, 1), 3);
+  assert.equal(groupName(groupSize(blocks, 1)), "Circuit");
+  assert.equal(groupName(2), "Superset");
+  assert.equal(groupName(0), null);
+  assert.equal(groupSize(blocks, null), 0);
+});
+
+test("in a circuit you go round: A, B, C, then rest after C", () => {
+  const sets = (done: boolean[]) => done.map((d) => ({ done: d }));
+  const blocks = [
+    { order: 1, supersetGroup: 1, sets: sets([true, false]) },
+    { order: 2, supersetGroup: 1, sets: sets([false, false]) },
+    { order: 3, supersetGroup: 1, sets: sets([false, false]) },
+    { order: 4, supersetGroup: null, sets: sets([false]) },
+  ];
+  assert.deepEqual(nextInRound(1, blocks), { next: 2, endsRound: false });
+  assert.deepEqual(nextInRound(2, blocks), { next: 3, endsRound: false });
+  assert.deepEqual(nextInRound(3, blocks), { next: 1, endsRound: true });
+  assert.equal(nextInRound(4, blocks), null);
+  // exercise 2 has no sets left: skip it
+  const skipped = blocks.map((b) => (b.order === 2 ? { ...b, sets: sets([true, true]) } : b));
+  assert.equal(nextInRound(1, skipped)?.next, 3);
 });
