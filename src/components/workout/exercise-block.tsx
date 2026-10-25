@@ -190,6 +190,18 @@ export function ExerciseBlock({
     .filter((p) => p.set_type !== "warmup")
     .reduce<(typeof block.previous)[number] | null>((b, p) => (!b || p.weight * (1 + p.reps / 30) > b.weight * (1 + b.reps / 30) ? p : b), null);
 
+  // Under the sets of a barbell lift: what to load for the set you're about to do.
+  const plateLine = (() => {
+    if (!plateLoaded || tracking !== "weight_reps" || !nextUndone) return null;
+    const w = parseNumber(nextUndone.weight) ?? parseNumber(weightHint(block.sets.indexOf(nextUndone)));
+    if (!w) return null;
+    const { bar, plates: owned } = ownedPlates(profile, unit);
+    const r = calculatePlates(w, bar, owned);
+    if (!r.perSide.length) return "Bar only";
+    const side = `${r.perSide.join("+")} /side`;
+    return r.remainder > 0 ? `≈ ${r.achieved} ${u}: ${side}` : side;
+  })();
+
   const plates = () => {
     const w = nextUndone ? parseNumber(nextUndone.weight) : null;
     const prevIdx = nextUndone ? block.sets.indexOf(nextUndone) : -1;
@@ -503,6 +515,11 @@ export function ExerciseBlock({
         <span aria-hidden className="num text-foreground/35 text-xl font-bold">{(timed ? last?.time : last?.reps) || ""}</span>
         <span className="text-muted-foreground text-xs font-semibold">Add</span>
       </button>
+      {plateLine && (
+        <p className="text-primary-text px-1 text-sm font-semibold" data-testid="plate-line">
+          Plates: {plateLine}
+        </p>
+      )}
 
       <ActionSheet open={menu} onOpenChange={setMenu} title={block.exercise.name} actions={actions} />
       <ActionSheet
