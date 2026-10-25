@@ -79,3 +79,20 @@ test("planned warm-up rows are prefilled from the working weight", () => {
   assert.deepEqual(warmupWeightsKg(100, 3), [50, 70, 85]);
   assert.deepEqual(warmupWeightsKg(0, 2), [0, 0]);
 });
+
+test("missing the bottom of the rep range twice at the same weight drops 10%", () => {
+  const set = (weight: number, reps: number) => ({ set_type: "normal" as const, weight, reps, rpe: null });
+  const last = [set(200, 4), set(200, 3), set(200, 3)];
+  const before = [set(200, 5), set(200, 4), set(200, 3)];
+  const s = suggestWeight(last, { repMax: 8, repMin: 6, step: 5, earlier: before });
+  assert.deepEqual(s, { weight: 180, from: 200, why: "Missed your reps twice: drop 10% and build back" });
+});
+
+test("no drop when only one session missed, or the weights differ, or no rep floor", () => {
+  const set = (weight: number, reps: number) => ({ set_type: "normal" as const, weight, reps, rpe: null });
+  const last = [set(200, 4), set(200, 3)];
+  assert.equal(suggestWeight(last, { repMax: 8, repMin: 6, step: 5, earlier: [set(200, 6), set(200, 6)] }), null);
+  assert.equal(suggestWeight(last, { repMax: 8, repMin: 6, step: 5, earlier: [set(190, 3)] }), null);
+  assert.equal(suggestWeight(last, { repMax: 8, step: 5, earlier: [set(200, 3)] }), null);
+  assert.equal(suggestWeight(last, { repMax: 8, repMin: 6, step: 5 }), null);
+});

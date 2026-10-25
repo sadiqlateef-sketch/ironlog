@@ -63,6 +63,24 @@ export async function getLastPerformance(exerciseId: string): Promise<LastPerfor
   );
 }
 
+export type EarlierSet = Pick<LastPerformance[number], "set_type" | "weight" | "reps" | "rpe">;
+
+/**
+ * The finished workout before the last one for an exercise, in the same shape as getLastPerformance.
+ * Empty when there are fewer than two. Used to spot two missed sessions in a row.
+ */
+export async function getEarlierPerformance(exerciseId: string): Promise<EarlierSet[]> {
+  return cachedRead(`earlier:${exerciseId}`, async () => {
+    const { sets, sessions } = await getExerciseHistory(exerciseId);
+    const ordered = [...sessions].sort((a, b) => b.start_time.localeCompare(a.start_time));
+    const second = ordered[1];
+    if (!second) return [];
+    return sets
+      .filter((s) => s.session_id === second.id)
+      .map((s) => ({ set_type: s.set_type, weight: s.weight, reps: s.reps, rpe: null }));
+  }, []);
+}
+
 export type ExercisePrefs = Tables<"exercise_prefs">;
 
 export async function getExercisePrefs(exerciseId: string): Promise<ExercisePrefs | null> {
