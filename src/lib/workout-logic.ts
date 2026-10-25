@@ -441,3 +441,21 @@ export function watchSetPatch(
   }
   return { ui, db };
 }
+
+/**
+ * Weight lifted so far: weight x reps for every done set that isn't a warm-up,
+ * in the same unit the weights are typed in (so no conversion is needed).
+ * One-sided sets count both sides.
+ */
+export function liveVolume(
+  blocks: { sets: { done: boolean; type: SetType; weight: string; reps: string; repsLeft?: string }[] }[],
+): number {
+  let total = 0;
+  for (const b of blocks)
+    for (const s of b.sets) {
+      if (!s.done || s.type === "warmup") continue;
+      const weight = parseNumber(s.weight) ?? 0;
+      total += weight * ((parseNumber(s.reps) ?? 0) + (parseNumber(s.repsLeft ?? "") ?? 0));
+    }
+  return Math.round(total * 10) / 10;
+}

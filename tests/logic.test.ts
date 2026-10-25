@@ -5,6 +5,7 @@ import {
   doNextIndex,
   exerciseUnits,
   formatClock,
+  liveVolume,
   matchTargets,
   moveUnit,
   workingOn,
@@ -258,4 +259,14 @@ test("reorder: routine targets follow a moved exercise", () => {
     [2, 0],
     [3, 1],
   ]);
+});
+
+test("liveVolume adds weight x reps for done working sets only", () => {
+  const set = (type: "normal" | "warmup", weight: string, reps: string, done: boolean) => ({ type, weight, reps, done });
+  const blocks = [
+    { sets: [set("warmup", "135", "5", true), set("normal", "225", "5", true), set("normal", "225", "5", true), set("normal", "225", "5", false)] },
+    { sets: [set("normal", "100", "10", true), set("normal", "", "", true)] },
+  ];
+  assert.equal(liveVolume(blocks), 225 * 5 * 2 + 100 * 10);
+  assert.equal(liveVolume([]), 0);
 });

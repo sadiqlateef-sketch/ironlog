@@ -53,6 +53,7 @@ import {
   exerciseUnits,
   focusAfterLog,
   formatClock,
+  liveVolume,
   moveUnit,
   nextUnfinished,
   segmentStates,
@@ -464,6 +465,7 @@ function ActiveWorkout({
   const nextReps = nextSet ? nextSet.reps || (focus?.repTarget?.split("-")[0] ?? "") : "";
   const nextLoad = nextSet && nextSet.weight && nextReps ? `${nextSet.weight} × ${nextReps}` : null;
   const resting = !!rest.timer && !rest.inline;
+  const volume = liveVolume(blocks);
 
   return (
     <KeypadProvider>
@@ -474,8 +476,18 @@ function ActiveWorkout({
             <ChevronLeft className="size-4" aria-hidden /> Home
           </Link>
           <h1 className="truncate text-2xl font-bold">{session.name ?? "Workout"}</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Elapsed since={session.start_time} />
+            {blocks.length > 0 && (
+              <span className="text-muted-foreground num text-xs" data-testid="exercise-count">
+                · Ex {Math.max(1, blocks.findIndex((b) => b.order === focusOrder) + 1)} of {blocks.length}
+              </span>
+            )}
+            {volume > 0 && (
+              <span className="bg-muted num rounded-full px-2 py-0.5 text-xs font-semibold" data-testid="live-volume">
+                Vol {volume.toLocaleString()} {unit === "imperial" ? "lb" : "kg"}
+              </span>
+            )}
             {session.at_gym && (
               <span className="text-muted-foreground flex items-center gap-1 text-xs">
                 <MapPin className="size-3.5" aria-hidden /> At the gym
