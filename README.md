@@ -704,15 +704,11 @@ Code: `src/lib/offline/`.
 
 ## Forgot password
 
-The sign-in screen has **Forgot password?**: enter your email, then type the
-code from the email and a new password. Supabase's standard reset email only
-has a link, so make it show the code (one time):
-
-1. Open your project's [email templates](https://supabase.com/dashboard/project/_/auth/templates)
-   and pick **Reset Password**.
-2. Set the subject to `Your Ironlog password reset code`.
-3. Replace the message body with the contents of `supabase/templates/recovery.html`
-   and save.
+The sign-in screen has **Forgot password?**: enter your email and Supabase sends
+its standard reset email. Open it on your phone and tap **Reset password**:
+Ironlog opens and asks for a new password. The **Deploy database and
+functions** action allows that link (`com.ironlog.app://reset-password`) in
+Supabase's Redirect URLs for you; without it the link can't open the app.
 
 ## Sign in with Google
 
