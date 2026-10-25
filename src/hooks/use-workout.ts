@@ -6,6 +6,7 @@ import { useRestTimer } from "@/components/providers/rest-timer-provider";
 import { kgToLb, toKg, weightInput, type UnitSystem } from "@/lib/units";
 import {
   getBestE1rms,
+  getEarlierPerformance,
   getLastPerformance,
   getRoutineTargets,
   listExercisePrefs,
@@ -13,6 +14,7 @@ import {
   saveExercisePrefs,
   startSession,
   type Exercise,
+  type EarlierSet,
   type ExercisePrefs,
   type LastPerformance,
   type Routine,
@@ -205,7 +207,13 @@ export function useWorkout() {
 
   /** Note, one-side logging and today's suggested weight for an exercise card. */
   const extras = useCallback(
-    (ex: Exercise, previous: LastPerformance, repMax: number | null): Pick<Block, "note" | "unilateral" | "suggestion"> => {
+    (
+      ex: Exercise,
+      previous: LastPerformance,
+      repMax: number | null,
+      /** The planned rep floor and the session before last: two misses in a row drop the weight. */
+      misses?: { repMin: number | null; earlier: EarlierSet[] },
+    ): Pick<Block, "note" | "unilateral" | "suggestion"> => {
       const p = prefsRef.current.get(ex.id);
       const reps = (ex.tracking ?? "weight_reps") === "weight_reps";
       const overloadSettings = getStoredOverloadSettings();
@@ -222,6 +230,8 @@ export function useWorkout() {
                 repMax,
                 step: customStep,
                 trigger: overloadSettings.progressionTrigger,
+                repMin: misses?.repMin ?? null,
+                earlier: misses?.earlier.map((x) => ({ set_type: x.set_type, weight: inUnit(Number(x.weight), unit), reps: x.reps, rpe: null })),
               },
             )
           : null,
@@ -263,7 +273,8 @@ export function useWorkout() {
         const t = planned.get(order);
         const target = t == null ? undefined : targets[t];
         const previous = await getLastPerformance(exercise.id);
-        
+        const earlier = target ? await getEarlierPerformance(exercise.id) : [];
+
         // Auto-Apply Periodization adjustments to targets when enabled
         const overloadSettings = getStoredOverloadSettings();
         const activePhase = overloadSettings.autoApplyPeriodization
@@ -303,7 +314,7 @@ export function useWorkout() {
           routineExerciseId: target?.id ?? null,
           repMin: effectiveRepMin,
           repMax,
-          ...extras(exercise, previous, repMax),
+          ...extras(exercise, previous, repMax, { repMin: effectiveRepMin, earlier }),
         };
       }),
     );
