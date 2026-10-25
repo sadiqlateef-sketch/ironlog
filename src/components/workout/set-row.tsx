@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type Ref } from "react";
-import { Check, Trash2, Undo2, X } from "lucide-react";
+import { Check, StickyNote, Trash2, Undo2, X } from "lucide-react";
 import type { UiSet } from "@/hooks/use-workout";
 import { useKeypad, type KeypadField } from "@/components/workout/keypad";
 import { formatDuration, parseDuration } from "@/lib/cardio";
@@ -164,9 +164,10 @@ export function SetRow({
           type="button"
           onClick={onCycleType}
           aria-label={`Set ${workingNumber}, type ${set.type}. Tap to change type, hold for more.`}
-          className={cn("num h-12 rounded-xl text-base font-bold", typeStyles[set.type])}
+          className={cn("num relative h-12 rounded-xl text-base font-bold", typeStyles[set.type])}
         >
           {setLabel(set.type, workingNumber)}
+          {set.note && <StickyNote data-testid="set-note-icon" aria-label="Has a note" className="absolute right-0.5 top-0.5 size-3 opacity-80" />}
         </button>
 
         {!sides && (

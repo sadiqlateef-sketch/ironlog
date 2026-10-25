@@ -73,6 +73,8 @@ export interface UiSet {
   done: boolean;
   /** How hard it was, as RPE (asked as reps left or RPE). */
   rpe: number | null;
+  /** A note on just this set ("felt a twinge"). */
+  note: string;
 }
 
 /** One exercise card in the logger. */
@@ -159,6 +161,7 @@ function toUiSet(s: WorkoutSet, unit: UnitSystem): UiSet {
     distance: s.distance_m ? toDistanceDisplay(s.distance_m, unit) : "",
     done: s.is_completed,
     rpe: s.rpe == null ? null : Number(s.rpe),
+    note: s.notes ?? "",
   };
 }
 
@@ -826,6 +829,20 @@ export function useWorkout() {
     [setBlocks],
   );
 
+  /** A note on one set; empty clears it. */
+  const setSetNote = useCallback(
+    async (order: number, id: string, text: string) => {
+      const note = text.trim();
+      patchSet(order, id, { note });
+      try {
+        await updateSet(id, { notes: note || null });
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [patchSet, fail],
+  );
+
   const addSet = useCallback(
     async (order: number) => {
       const block = blocksRef.current.find((b) => b.order === order);
@@ -1258,6 +1275,7 @@ export function useWorkout() {
     addSet,
     removeSet,
     patchSet,
+    setSetNote,
     commitSet,
     cycleType,
     setSetType,

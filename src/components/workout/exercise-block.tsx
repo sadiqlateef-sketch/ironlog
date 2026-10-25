@@ -27,6 +27,7 @@ import {
   PlayCircle,
   Plus,
   Split,
+  StickyNote,
   Timer,
   Trash2,
   Unlink,
@@ -83,6 +84,7 @@ export function ExerciseBlock({
   onEffort,
   onSkipEffort,
   onNote,
+  onSetNote,
   onToggleUnilateral,
   onWarmups,
   onHold,
@@ -129,6 +131,7 @@ export function ExerciseBlock({
   onEffort: (id: string, rpe: number) => void;
   onSkipEffort: () => void;
   onNote: () => void;
+  onSetNote: (setId: string) => void;
   onToggleUnilateral: () => void;
   onWarmups: () => void;
   /** Timed holds: open the hold stopwatch. */
@@ -239,6 +242,7 @@ export function ExerciseBlock({
   const menuIdx = menuSet ? block.sets.indexOf(menuSet) : -1;
   const setActions: SheetAction[] = menuSet
     ? [
+        { label: menuSet.note ? "Edit set note" : "Note on this set", icon: StickyNote, onSelect: () => onSetNote(menuSet.id) },
         { label: "Duplicate set", icon: Copy, onSelect: () => onDuplicateSet(menuSet.id) },
         menuSet.type === "warmup"
           ? { label: "Make it a working set", icon: Dumbbell, onSelect: () => onSetType(menuSet.id, "normal") }

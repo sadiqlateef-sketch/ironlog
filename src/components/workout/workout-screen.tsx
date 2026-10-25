@@ -235,6 +235,7 @@ function ActiveWorkout({
   const [focusPick, setFocus] = useState<number | null>(null);
   const [restFor, setRestFor] = useState<number | null>(null);
   const [noteFor, setNoteFor] = useState<number | null>(null);
+  const [setNoteTarget, setSetNoteTarget] = useState<{ order: number; id: string } | null>(null);
   const [warmupFor, setWarmupFor] = useState<number | null>(null);
   const [holdFor, setHoldFor] = useState<number | null>(null);
   const [swapFor, setSwapFor] = useState<number | null>(null);
@@ -445,6 +446,7 @@ function ActiveWorkout({
           onEffort={(id, rpe) => w.setEffort(block.order, id, rpe)}
           onSkipEffort={w.dismissEffort}
           onNote={() => setNoteFor(block.order)}
+          onSetNote={(id) => setSetNoteTarget({ order: block.order, id })}
           onToggleUnilateral={() => w.setUnilateral(block.order, !block.unilateral)}
           onWarmups={() => setWarmupFor(block.order)}
           onHold={() => setHoldFor(block.order)}
@@ -858,6 +860,21 @@ function ActiveWorkout({
             title="Exercise note"
             description={`Shown on ${b?.exercise.name ?? "this exercise"} every time you log it.`}
             placeholder="e.g. Seat on 4, pins on 12. Narrow grip."
+          />
+        );
+      })()}
+      {(() => {
+        const t = setNoteTarget;
+        const s = t ? blocks.find((x) => x.order === t.order)?.sets.find((x) => x.id === t.id) : undefined;
+        return (
+          <NotesSheet
+            open={!!s}
+            onOpenChange={(o) => !o && setSetNoteTarget(null)}
+            notes={s?.note || null}
+            onSave={(text) => t && w.setSetNote(t.order, t.id, text)}
+            title="Set note"
+            description="Saved with this set only."
+            placeholder="e.g. Left elbow twinge on the last rep."
           />
         );
       })()}
