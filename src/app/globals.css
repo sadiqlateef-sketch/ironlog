@@ -53,6 +53,149 @@
 /* Light mode (Settings > Appearance). Same layout and accents, on a pale
    blue-grey backdrop with white frosted cards. Every text colour is checked
    (WCAG AA, 4.5:1) against the page, the strongest glow and a card. */
+
+/* ---------------- Accent Vibe Variations ---------------- */
+
+/* Iron: Glacier Blue & Slate */
+[data-accent="iron"] {
+  --primary: #38BDF8;
+  --primary-foreground: #082F49;
+  --primary-text: #BAE6FD;
+  --secondary: rgba(15, 23, 42, 0.55);
+  --accent: rgba(56, 189, 248, 0.18);
+  --accent-foreground: #BAE6FD;
+  --border: rgba(56, 189, 248, 0.26);
+  --input: rgba(56, 189, 248, 0.22);
+  --ring: #38BDF8;
+  --chart-1: #38BDF8;
+  --glow-1: rgba(12, 74, 110, 0.55);
+  --glow-2: rgba(56, 189, 248, 0.28);
+  --glow-3: rgba(2, 132, 199, 0.35);
+}
+.light[data-accent="iron"], .light [data-accent="iron"] {
+  --primary: #0284C7;
+  --primary-foreground: #ffffff;
+  --primary-text: #0369A1;
+  --ring: #0284C7;
+  --chart-1: #0284C7;
+  --glow-1: rgb(14 165 233 / 0.12);
+  --glow-2: rgb(2 132 199 / 0.1);
+  --glow-3: rgb(56 189 248 / 0.1);
+}
+
+/* Blaze: Sunset Amber & Hot Ember */
+[data-accent="blaze"] {
+  --primary: #FF6B35;
+  --primary-foreground: #2A0800;
+  --primary-text: #FFD2C0;
+  --secondary: rgba(120, 20, 10, 0.45);
+  --accent: rgba(255, 107, 53, 0.2);
+  --accent-foreground: #FFD2C0;
+  --border: rgba(255, 107, 53, 0.28);
+  --input: rgba(255, 107, 53, 0.22);
+  --ring: #FF6B35;
+  --chart-1: #FF6B35;
+  --glow-1: rgba(153, 27, 27, 0.6);
+  --glow-2: rgba(255, 107, 53, 0.32);
+  --glow-3: rgba(239, 68, 68, 0.35);
+}
+.light[data-accent="blaze"], .light [data-accent="blaze"] {
+  --primary: #EA580C;
+  --primary-foreground: #ffffff;
+  --primary-text: #C2410C;
+  --ring: #EA580C;
+  --chart-1: #EA580C;
+  --glow-1: rgb(234 88 12 / 0.12);
+  --glow-2: rgb(194 65 12 / 0.1);
+  --glow-3: rgb(249 115 22 / 0.1);
+}
+
+/* Royal: Electric Violet & Amethyst */
+[data-accent="royal"] {
+  --primary: #A855F7;
+  --primary-foreground: #200538;
+  --primary-text: #E9D5FF;
+  --secondary: rgba(59, 7, 100, 0.45);
+  --accent: rgba(168, 85, 247, 0.2);
+  --accent-foreground: #E9D5FF;
+  --border: rgba(168, 85, 247, 0.28);
+  --input: rgba(168, 85, 247, 0.22);
+  --ring: #A855F7;
+  --chart-1: #A855F7;
+  --glow-1: rgba(88, 28, 135, 0.6);
+  --glow-2: rgba(168, 85, 247, 0.3);
+  --glow-3: rgba(147, 51, 234, 0.35);
+}
+.light[data-accent="royal"], .light [data-accent="royal"] {
+  --primary: #7E22CE;
+  --primary-foreground: #ffffff;
+  --primary-text: #6B21A8;
+  --ring: #7E22CE;
+  --chart-1: #7E22CE;
+  --glow-1: rgb(126 34 206 / 0.12);
+  --glow-2: rgb(168 85 247 / 0.1);
+  --glow-3: rgb(107 33 168 / 0.1);
+}
+
+/* Stealth: Cyber Emerald & Obsidian */
+[data-accent="stealth"] {
+  --primary: #10B981;
+  --primary-foreground: #022C22;
+  --primary-text: #A7F3D0;
+  --secondary: rgba(6, 78, 59, 0.45);
+  --accent: rgba(16, 185, 129, 0.2);
+  --accent-foreground: #A7F3D0;
+  --border: rgba(16, 185, 129, 0.28);
+  --input: rgba(16, 185, 129, 0.22);
+  --ring: #10B981;
+  --chart-1: #10B981;
+  --glow-1: rgba(4, 120, 87, 0.6);
+  --glow-2: rgba(16, 185, 129, 0.3);
+  --glow-3: rgba(5, 150, 105, 0.35);
+}
+.light[data-accent="stealth"], .light [data-accent="stealth"] {
+  --primary: #059669;
+  --primary-foreground: #ffffff;
+  --primary-text: #047857;
+  --ring: #059669;
+  --chart-1: #059669;
+  --glow-1: rgb(5 150 105 / 0.12);
+  --glow-2: rgb(16 185 129 / 0.1);
+  --glow-3: rgb(4 120 87 / 0.1);
+}
+
+/* Reactive Ambient Effects */
+@keyframes ambient-rest-pulse {
+  0%, 100% {
+    opacity: 0.85;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.2) saturate(1.25);
+  }
+}
+
+.ambient-rest-active {
+  animation: ambient-rest-pulse 3s ease-in-out infinite;
+}
+
+@keyframes ambient-pr-flare {
+  0% {
+    filter: brightness(1) saturate(1);
+  }
+  25% {
+    filter: brightness(1.7) saturate(1.9);
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+}
+
+.ambient-flare {
+  animation: ambient-pr-flare 1.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 .light {
   color-scheme: light;
   --background: #f3f5fb;
@@ -243,4 +386,32 @@
     gap: 20px;
     align-items: start;
   }
+}
+/* Micro-Interaction Vocabulary: Physical set stamp, sonar ping, card breathe */
+@keyframes set-stamp {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.96); filter: brightness(1.2); }
+  75% { transform: scale(1.02); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+.animate-set-stamp {
+  animation: set-stamp 280ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes card-breathe {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.015); box-shadow: 0 0 20px var(--glow-1); }
+  100% { transform: scale(1); }
+}
+.animate-card-breathe {
+  animation: card-breathe 400ms ease-out both;
+}
+
+@keyframes sonar-ping {
+  0% { transform: scale(0.95); opacity: 0.9; }
+  70% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+.animate-sonar-ping {
+  animation: sonar-ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }

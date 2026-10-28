@@ -274,7 +274,8 @@ export function SetRow({
             aria-pressed={set.done}
             className={cn(
               "relative grid h-14 w-full place-items-center rounded-xl transition-colors",
-              set.done ? "bg-success text-[#08200d]" : "bg-secondary text-muted-foreground",
+              set.done ? "bg-success text-[#08200d] animate-set-stamp" : "bg-secondary text-muted-foreground active:scale-95",
+              "transition-all",
               submitting && "opacity-75 cursor-not-allowed pointer-events-none",
             )}
           >

@@ -14,6 +14,7 @@ import { useActiveWorkout } from "@/hooks/use-active-workout";
 import { TABS, tabFor } from "@/lib/nav";
 import { isLocalBackend } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { ReactiveAmbient } from "@/components/ui/reactive-ambient";
 
 /** Signed-in layout: page content, the workout bar, and the bottom tab bar. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -49,7 +50,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col relative">
+      <ReactiveAmbient />
       {/* Keyed by screen so each one fades in as you switch. Responsively scales for foldable unfolded inner displays. */}
       <main key={pathname} className={cn("page-in mx-auto w-full max-w-md md:max-w-4xl lg:max-w-5xl flex-1 px-4 pt-6 transition-all", workout && !onWorkout ? "pb-48" : "pb-40")}>
         {isLocalBackend() && <p className="text-set-warmup mb-3 text-xs font-semibold">Test mode: not connected to your account</p>}

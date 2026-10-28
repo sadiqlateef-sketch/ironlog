@@ -25,6 +25,24 @@ test("warm-ups: 225 lb bench ramps bar, 90, 135, 180 with plates", () => {
   for (let i = 1; i < r.length; i++) assert.ok(r[i].weight > r[i - 1].weight && r[i].weight < 225);
 });
 
+test("warm-ups: thorough protocol provides progressive steps for fatigued tissues", () => {
+  const r = warmupRamp(225, { ...LB, protocol: "thorough" });
+  assert.equal(r.length >= 4, true);
+  // starts at bar and climbs
+  assert.equal(r[0].weight, 45);
+  for (let i = 1; i < r.length; i++) {
+    assert.ok(r[i].weight > r[i - 1].weight && r[i].weight < 225);
+  }
+});
+
+test("warm-ups: express protocol generates concise ramp", () => {
+  const r = warmupRamp(225, { ...LB, protocol: "express" });
+  assert.equal(r.length, 3); // bar, 135, 180
+  assert.equal(r[0].weight, 45);
+  assert.equal(r[1].weight, 135);
+  assert.equal(r[2].weight, 180);
+});
+
 test("warm-ups: light work skips steps that land on the bar; the bar itself needs none", () => {
   assert.deepEqual(warmupRamp(95, LB).map((w) => w.weight), [45, 55, 75]);
   assert.deepEqual(warmupRamp(45, LB), []);

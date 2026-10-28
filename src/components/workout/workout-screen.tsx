@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpDown, ArrowUpToLine, Check, ChevronLeft, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { Zap, Users, ArrowUpDown, ArrowUpToLine, Check, ChevronLeft, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { DeloadOffer } from "@/components/deload-offer";
 import { ExerciseDetail } from "@/components/exercise-detail";
@@ -20,6 +20,7 @@ import { syncGymCalendar } from "@/lib/gym";
 import { useSlot } from "@/hooks/use-slot";
 import { ExerciseBlock } from "@/components/workout/exercise-block";
 import { HoldTimer } from "@/components/workout/hold-timer";
+import { FlowStateView } from "@/components/workout/flow-state-view";
 import { CurrentSetControls, FocusView, setTitle } from "@/components/workout/current-set";
 import { KeypadProvider } from "@/components/workout/keypad";
 import { GestureHint, LoggerOptions } from "@/components/workout/logger-options";
@@ -31,6 +32,9 @@ import { ProgressionSheet } from "@/components/workout/progression-sheet";
 import { RestSheet } from "@/components/workout/rest-sheet";
 import { SwapSheet } from "@/components/workout/swap-sheet";
 import { WarmupSheet } from "@/components/workout/warmup-sheet";
+import { PartnerSyncSheet } from "@/components/workout/partner-sync-sheet";
+import { FormCoachSheet } from "@/components/workout/form-coach-sheet";
+import { partnerSync } from "@/services/partnerSync";
 import { VoiceLogButton } from "@/components/workout/voice-log";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -234,6 +238,9 @@ function ActiveWorkout({
   const [plates, setPlates] = useState<{ open: boolean; weight: number | null }>({ open: false, weight: null });
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [flowMode, setFlowMode] = useState(false);
+  const [partnerSyncOpen, setPartnerSyncOpen] = useState(false);
+  const [formCoachExercise, setFormCoachExercise] = useState<Exercise | null>(null);
   const [view, setViewState] = useState<View>(savedView);
   const [focusPick, setFocus] = useState<number | null>(null);
   const [restFor, setRestFor] = useState<number | null>(null);
@@ -258,6 +265,28 @@ function ActiveWorkout({
   const prefs = useLoggerPrefs();
   const slot = useSlot("bottom-bar-slot");
   const rest = useRestTimer();
+  // Sync active rest timer to partner
+  useEffect(() => {
+    if (partnerSync.isConnected && rest.timer) {
+      partnerSync.broadcastRest({
+        secondsTotal: rest.timer.duration,
+        secondsRemaining: Math.max(0, Math.round(rest.remaining)),
+        isRunning: true,
+      });
+    }
+  }, [rest.remaining, rest.timer]);
+
+  // Sync PR celebrations to partner
+  useEffect(() => {
+    if (w.record && partnerSync.isConnected) {
+      partnerSync.broadcastPr({
+        exerciseName: w.record.exercise,
+        weight: parseFloat(w.record.weight) || 0,
+        reps: w.record.reps,
+        unit,
+      });
+    }
+  }, [w.record, unit]);
   // How tall the dock is, so the last card never hides behind it.
   const dockRef = useRef<HTMLDivElement>(null);
   const [dockHeight, setDockHeight] = useState(0);
@@ -455,6 +484,7 @@ function ActiveWorkout({
           onToggleUnilateral={() => w.setUnilateral(block.order, !block.unilateral)}
           onWarmups={() => setWarmupFor(block.order)}
           onHold={() => setHoldFor(block.order)}
+          onFormCoach={() => setFormCoachExercise(block.exercise)}
         />
       </div>
     );
@@ -503,6 +533,29 @@ function ActiveWorkout({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Flow State minimal mode"
+            title="Flow State"
+            onClick={() => setFlowMode(true)}
+            className="text-primary-text hover:bg-primary/20"
+          >
+            <Zap className="size-4 fill-current" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Partner Workout Sync"
+            title={partnerSync.isConnected ? `Paired with ${partnerSync.state.partnerName || "Partner"}` : "Pair with Workout Partner"}
+            onClick={() => setPartnerSyncOpen(true)}
+            className={cn("relative hover:bg-primary/20", partnerSync.isConnected && "text-emerald-400")}
+          >
+            <Users className="size-4" />
+            {partnerSync.isConnected && (
+              <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </Button>
           <Button variant="ghost" size="icon" aria-label="Logger display options" onClick={() => setOptions(true)}>
             <SlidersHorizontal />
           </Button>
@@ -512,6 +565,27 @@ function ActiveWorkout({
         </div>
       </header>
 
+      {flowMode && (
+        <FlowStateView
+          blocks={blocks}
+          currentBlock={focus}
+          currentSet={nextSet}
+          onExit={() => setFlowMode(false)}
+          onSelectBlock={jumpTo}
+          onPatchSet={(order, id, patch) => w.patchSet(order, id, patch)}
+          onCommitSet={(order, id) => w.commitSet(order, id)}
+          onLogSet={logSet}
+          effort={
+            w.effortAsk && focus && w.effortAsk.order === focus.order
+              ? {
+                  scale: w.effortScale,
+                  onPick: (rpe) => w.effortAsk && w.setEffort(w.effortAsk.order, w.effortAsk.id, rpe),
+                  onSkip: w.dismissEffort,
+                }
+              : null
+          }
+        />
+      )}
       {focusMode && (
         <Button variant="secondary" className="self-center" onClick={() => setLoggerPref("focus", false)}>
           <Minimize2 /> Exit focus mode
@@ -904,6 +978,7 @@ function ActiveWorkout({
             bar={bar}
             plates={owned}
             step={weightStep(unit, false)}
+            primaryMuscle={b?.exercise.primary_muscle}
             onAdd={(sets) => b && w.addWarmups(b.order, sets)}
           />
         );
@@ -925,6 +1000,16 @@ function ActiveWorkout({
           />
         );
       })()}
+      <PartnerSyncSheet
+        open={partnerSyncOpen}
+        onOpenChange={setPartnerSyncOpen}
+        myLifterName={profile?.display_name?.split(" ")[0] || "Lifter"}
+      />
+      <FormCoachSheet
+        exercise={formCoachExercise}
+        open={!!formCoachExercise}
+        onOpenChange={(o) => !o && setFormCoachExercise(null)}
+      />
       <SwapSheet
         exercise={blocks.find((b) => b.order === swapFor)?.exercise ?? null}
         onOpenChange={(o) => !o && setSwapFor(null)}

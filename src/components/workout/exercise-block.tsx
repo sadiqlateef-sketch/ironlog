@@ -26,6 +26,7 @@ import {
   Pin,
   PlayCircle,
   Plus,
+  Sparkles,
   Split,
   StickyNote,
   Timer,
@@ -49,6 +50,23 @@ import { bestE1rm, formatClock, groupName, parseNumber, workingSetNumbers } from
 import { calculatePlates, ownedPlates } from "@/lib/plates";
 import { effortBadge, matchPrevious } from "@/lib/set-logic";
 import { cn } from "@/lib/utils";
+
+const MUSCLE_ACCENTS: Record<string, string> = {
+  chest: "from-rose-500/80 to-rose-600/40",
+  upper_back: "from-sky-500/80 to-sky-600/40",
+  lats: "from-cyan-500/80 to-cyan-600/40",
+  lower_back: "from-indigo-500/80 to-indigo-600/40",
+  front_delts: "from-amber-500/80 to-amber-600/40",
+  side_delts: "from-amber-500/80 to-amber-600/40",
+  rear_delts: "from-amber-500/80 to-amber-600/40",
+  biceps: "from-emerald-500/80 to-emerald-600/40",
+  triceps: "from-teal-500/80 to-teal-600/40",
+  quads: "from-yellow-500/80 to-yellow-600/40",
+  hamstrings: "from-orange-500/80 to-orange-600/40",
+  glutes: "from-fuchsia-500/80 to-fuchsia-600/40",
+  abs: "from-violet-500/80 to-violet-600/40",
+  calves: "from-lime-500/80 to-lime-600/40",
+};
 
 export function ExerciseBlock({
   block,
@@ -90,6 +108,7 @@ export function ExerciseBlock({
   onToggleUnilateral,
   onWarmups,
   onHold,
+  onFormCoach,
 }: {
   block: Block;
   isLast: boolean;
@@ -142,6 +161,8 @@ export function ExerciseBlock({
   onWarmups: () => void;
   /** Timed holds: open the hold stopwatch. */
   onHold: () => void;
+  /** AI Form Coach & Biomechanics guidance */
+  onFormCoach?: () => void;
 }) {
   const { unit, profile } = useAuth();
   const prefs = useLoggerPrefs();
@@ -239,6 +260,7 @@ export function ExerciseBlock({
     ...(plateLoaded ? [{ label: "Plate calculator", icon: Calculator, onSelect: plates }] : []),
     { label: "Edit available weights", icon: Dumbbell, onSelect: onEquipment },
     { label: demo ? "Hide form demo" : "Show form demo", icon: PlayCircle, onSelect: () => setDemo((d) => !d) },
+    ...(onFormCoach ? [{ label: "AI Form Coach & Tempo", icon: Sparkles, onSelect: onFormCoach }] : []),
     { label: "How-to & muscles", icon: PersonStanding, onSelect: onShowInfo },
     { label: "Edit sets", icon: Pencil, onSelect: () => setEditing(true) },
     { label: "Remove exercise", icon: Trash2, onSelect: onRemove, destructive: true },
@@ -316,11 +338,20 @@ export function ExerciseBlock({
   return (
     <section
       className={cn(
-        "glass flex flex-col gap-3 rounded-2xl p-3",
+        "glass flex flex-col gap-3 rounded-2xl p-3 relative overflow-hidden transition-all duration-300",
         block.supersetGroup != null && "border-l-set-drop border-l-4",
       )}
       data-testid="exercise-block"
     >
+      {block.supersetGroup == null && (
+        <span
+          className={cn(
+            "absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b opacity-85",
+            MUSCLE_ACCENTS[block.exercise.primary_muscle] ?? "from-primary/70 to-primary/30"
+          )}
+          aria-hidden
+        />
+      )}
       <header className="flex items-start gap-1">
         <button
           type="button"

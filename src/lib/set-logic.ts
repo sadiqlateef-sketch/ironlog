@@ -45,6 +45,8 @@ export function effortBadge(rpe: number | null, scale: EffortScale): string | nu
 
 // ---------- Warm-up sets ----------
 
+export type WarmupProtocol = "standard" | "thorough" | "express";
+
 export interface WarmupSet {
   weight: number;
   reps: number;
@@ -54,17 +56,19 @@ export interface WarmupSet {
 
 /**
  * A warm-up ramp up to your working weight.
- * Barbell-type lifts: empty bar x 10, then about 40% x 5, 60% x 3, 80% x 2,
- * each rounded down to what your plates can make. Other lifts: 50% x 8, 75% x 3,
- * rounded to the nearest step. Steps that land on the same weight, or not
- * below the working weight, are dropped.
+ * Barbell-type lifts: empty bar x 10, then ramps based on the chosen protocol:
+ * - standard: 40% x 5, 60% x 3, 80% x 2
+ * - thorough (fatigued / cold): 35% x 8, 50% x 5, 70% x 3, 85% x 1
+ * - express (short on time): 60% x 5, 80% x 2
+ * Each rounded down to what your plates can make. Non-plate lifts step to dumbbells.
  */
 export function warmupRamp(
   working: number,
-  o: { plateLoaded: boolean; bar: number; plates: number[]; step: number },
+  o: { plateLoaded: boolean; bar: number; plates: number[]; step: number; protocol?: WarmupProtocol },
 ): WarmupSet[] {
   if (!(working > 0)) return [];
   const out: WarmupSet[] = [];
+  const protocol = o.protocol ?? "standard";
   const push = (weight: number, reps: number, plates: number[] | null) => {
     const prev = out.at(-1);
     if (weight >= working - 1e-6 || weight <= 0) return;
@@ -72,24 +76,50 @@ export function warmupRamp(
     out.push({ weight: round(weight), reps, plates });
   };
 
-  if (o.plateLoaded) {
-    if (working <= o.bar) return [];
-    push(o.bar, 10, []);
-    for (const [pct, reps] of [
+  const platePercentages: Record<WarmupProtocol, readonly (readonly [number, number])[]> = {
+    standard: [
       [0.4, 5],
       [0.6, 3],
       [0.8, 2],
-    ] as const) {
+    ],
+    thorough: [
+      [0.35, 8],
+      [0.5, 5],
+      [0.7, 3],
+      [0.85, 1],
+    ],
+    express: [
+      [0.6, 5],
+      [0.8, 2],
+    ],
+  };
+
+  const genericPercentages: Record<WarmupProtocol, readonly (readonly [number, number])[]> = {
+    standard: [
+      [0.5, 8],
+      [0.75, 3],
+    ],
+    thorough: [
+      [0.4, 10],
+      [0.6, 6],
+      [0.8, 3],
+    ],
+    express: [
+      [0.65, 5],
+    ],
+  };
+
+  if (o.plateLoaded) {
+    if (working <= o.bar) return [];
+    push(o.bar, 10, []);
+    for (const [pct, reps] of platePercentages[protocol]) {
       const r = calculatePlates(working * pct, o.bar, o.plates);
       push(r.achieved, reps, r.perSide);
     }
     return out;
   }
 
-  for (const [pct, reps] of [
-    [0.5, 8],
-    [0.75, 3],
-  ] as const) {
+  for (const [pct, reps] of genericPercentages[protocol]) {
     push(Math.round((working * pct) / o.step) * o.step, reps, null);
   }
   return out;

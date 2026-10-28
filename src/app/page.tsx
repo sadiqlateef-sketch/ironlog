@@ -15,6 +15,8 @@ import { DeloadOffer, DeloadTag } from "@/components/deload-offer";
 import { CenterStartButton } from "@/components/home/center-start-button";
 import { LastSessionCard } from "@/components/home/last-session-card";
 import { NextSessionCard } from "@/components/home/next-session-card";
+import { ReadinessCard } from "@/components/home/readiness-card";
+import { SessionStack } from "@/components/home/session-stack";
 import { TodayPlanSync } from "@/components/home/today-plan-sync";
 import { RecoveryChips } from "@/components/home/recovery-chips";
 import { WeekStrip } from "@/components/home/week-strip";
@@ -80,6 +82,7 @@ function Dashboard() {
       {/* Folded: one column, last session first. Unfolded: start on the left, last session and recovery on the right. */}
       <div className="grid gap-4 md:grid-cols-[1.15fr_1fr] md:items-start">
         <div className="flex flex-col gap-4 md:col-start-2 md:row-start-1">
+          <ReadinessCard />
           <LastSessionCard session={lastSession} unit={unit} onOpen={(id) => setOpen(id)} />
           <div className="hidden md:block">
             <RecoveryChips />
@@ -120,45 +123,7 @@ function Dashboard() {
 
       {/* Previous Workouts History */}
       {pastSessions.length > 0 && (
-        <section className="mt-2 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">History</h2>
-            <Link href="/search/" className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs">
-              <Search className="size-3" /> Search
-            </Link>
-          </div>
-          <div className="flex flex-col gap-2">
-            {pastSessions.slice(0, 3).map((s) => (
-              <Card key={s.id} className="p-0 border-border/60 hover:border-primary/50 transition-colors">
-                <button
-                  type="button"
-                  onClick={() => setOpen(s.id)}
-                  aria-label={`${s.name ?? "Workout"}: view, edit or delete`}
-                  className="flex w-full items-center gap-3 p-3 text-left"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{s.name ?? "Workout"}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {new Date(s.start_time).toLocaleDateString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                      {s.end_time && ` · ${Math.round((+new Date(s.end_time) - +new Date(s.start_time)) / 60000)} min`}
-                      {s.avg_hr != null && (
-                        <span className="ml-1 inline-flex items-center gap-0.5" title={`Max ${s.max_hr} bpm`}>
-                          · <Heart className="size-3" aria-hidden /> {s.avg_hr} bpm avg
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <p className="shrink-0 num text-sm font-semibold">{formatWeight(s.volume, unit)}</p>
-                  <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
-                </button>
-              </Card>
-            ))}
-          </div>
-        </section>
+        <SessionStack sessions={pastSessions} unit={unit} onOpen={(id) => setOpen(id)} />
       )}
 
       {/* Session Detail Sheet */}

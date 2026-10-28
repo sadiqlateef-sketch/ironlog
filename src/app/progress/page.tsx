@@ -12,6 +12,8 @@ import { LiftsTab } from "@/components/progress/lifts";
 import { Section } from "@/components/progress/section";
 import { SummaryCards } from "@/components/progress/summary-cards";
 import { ProgressAnalyticsDeck } from "@/components/progress/progress-analytics-deck";
+import { WorkoutDnaCard } from "@/components/progress/workout-dna";
+import { TrophyCaseCard } from "@/components/progress/trophy-case";
 import {
   CalendarCard,
   CompareCard,
@@ -61,7 +63,7 @@ export default function ProgressPage() {
   );
 }
 
-type ProgressTab = "overview" | "lifts" | "body" | "activity";
+type ProgressTab = "overview" | "trophies" | "dna" | "lifts" | "body" | "activity";
 
 function Progress() {
   const [tab, setTab] = useState<ProgressTab>("overview");
@@ -316,7 +318,7 @@ function StrengthCard({ since }: { since: Date }) {
           )}
           {line.length > 0 ? (
             <>
-              <LineChart data={line} ariaLabel={`Estimated one rep max in ${u}`} />
+              <LineChart data={line} ariaLabel={`Estimated one rep max in ${u}`} variant="mountain" />
               <TableView>
                 <table className="w-full tabular-nums">
                   <tbody>

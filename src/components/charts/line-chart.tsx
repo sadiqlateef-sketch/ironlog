@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useId, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { ChartTooltip } from "@/components/charts/chart-tooltip";
 import { useWidth } from "@/components/charts/use-width";
 import { compact, niceTicks, shortDate } from "@/lib/chart-scale";
@@ -17,19 +17,22 @@ export interface LinePoint {
 
 const M = { top: 16, right: 44, bottom: 22, left: 36 };
 
-/** Single-series trend: 2px line, faint area wash, ringed end-dot with its value. */
+/** Single-series trend: 2px line, faint area wash, ringed end-dot with its value. Supports "mountain" gradient aesthetic. */
 export function LineChart({
   data,
   height = 200,
   ariaLabel,
   goal,
+  variant = "standard",
 }: {
   data: LinePoint[];
   height?: number;
   ariaLabel: string;
   /** Optional dashed target line, e.g. your goal weight. */
   goal?: { value: number; label: string } | null;
+  variant?: "standard" | "mountain";
 }) {
+  const gradientId = useId();
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
 
@@ -63,11 +66,20 @@ export function LineChart({
   }
 
   const last = data.length - 1;
+  const peakVal = Math.max(...data.map((d) => d.value));
 
   return (
     <div ref={ref} className="relative w-full" style={{ height }}>
       {width > 0 && data.length > 0 && (
         <svg width={width} height={height} role="img" aria-label={ariaLabel}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--primary)" stopOpacity={variant === "mountain" ? 0.45 : 0.15} />
+              <stop offset="60%" stopColor="var(--glow-2)" stopOpacity={variant === "mountain" ? 0.2 : 0.05} />
+              <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
           {ticks.map((t) => (
             <g key={t}>
               <line x1={M.left} x2={width - M.right} y1={y(t)} y2={y(t)} stroke={t === yMin ? "var(--chart-axis)" : "var(--chart-grid)"} />
@@ -92,8 +104,40 @@ export function LineChart({
               </text>
             </g>
           )}
-          {area && <path d={area} fill="var(--chart-1)" opacity={0.1} />}
-          <path d={line} fill="none" stroke="var(--chart-1)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+
+          {/* Area under curve */}
+          {area && (
+            <path
+              d={area}
+              fill={`url(#${gradientId})`}
+              opacity={variant === "mountain" ? 0.95 : 0.6}
+            />
+          )}
+
+          {/* Main Trend Line */}
+          <path
+            d={line}
+            fill="none"
+            stroke="var(--chart-1)"
+            strokeWidth={variant === "mountain" ? 2.5 : 2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {/* Mountain Peak Marker Highlights */}
+          {variant === "mountain" &&
+            data.map((d, i) => {
+              if (d.value === peakVal && d.value > 0) {
+                return (
+                  <g key={`peak-${i}`}>
+                    <circle cx={x(i)} cy={y(d.value)} r={10} fill="var(--primary)" opacity={0.25} className="animate-ping" />
+                    <circle cx={x(i)} cy={y(d.value)} r={6} fill="var(--primary)" stroke="var(--card-solid)" strokeWidth={2} />
+                  </g>
+                );
+              }
+              return null;
+            })}
+
           {hover != null && (
             <line x1={x(hover)} x2={x(hover)} y1={M.top} y2={y(yMin)} stroke="var(--chart-axis)" />
           )}
@@ -105,6 +149,7 @@ export function LineChart({
               {compact(data[last].value)}
             </text>
           )}
+
           {/* Crosshair layer: snaps to the nearest workout */}
           <rect
             x={M.left - 8}

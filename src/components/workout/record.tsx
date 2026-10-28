@@ -38,6 +38,9 @@ export function RecordCelebration({ hit, onDone }: { hit: RecordHit; onDone: () 
     done.current = onDone;
   });
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ironlog:pr"));
+    }
     const id = setTimeout(() => done.current(), 4000);
     return () => clearTimeout(id);
   }, []);

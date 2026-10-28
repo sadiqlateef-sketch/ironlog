@@ -10,6 +10,7 @@ import { computeRecovery, LOOKBACK_HOURS, type MuscleRecovery } from "@/lib/reco
 import { formatWeight, type UnitSystem } from "@/lib/units";
 import { useOverloadSettings } from "@/lib/overload-settings";
 import { calculatePeriodizedTarget, getPhaseForWeek } from "@/lib/periodization";
+import { SimulationSheet } from "@/components/workout/simulation-sheet";
 import {
   getMuscleSets,
   getRoutineTargets,
@@ -30,6 +31,7 @@ export function NextSessionCard({ program, unit }: NextSessionCardProps) {
   const [exercises, setExercises] = useState<Map<string, Exercise>>(new Map());
   const [recovery, setRecovery] = useState<MuscleRecovery[]>([]);
   const [loading, setLoading] = useState(false);
+  const [simOpen, setSimOpen] = useState(false);
 
   useEffect(() => {
     // 1. Fetch muscle recovery
@@ -140,6 +142,18 @@ export function NextSessionCard({ program, unit }: NextSessionCardProps) {
         </span>
       </div>
 
+      {/* What-If Simulation Trigger */}
+      <button
+        type="button"
+        onClick={() => setSimOpen(true)}
+        className="mt-2 flex w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary-text hover:bg-primary/20 transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          <Sparkles className="size-3.5" /> What-If: Simulate Fatigue Impact
+        </span>
+        <ChevronRight className="size-3.5 opacity-80" />
+      </button>
+
       {/* Progressive Overload Exercise Targets */}
       <div className="mt-3 flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -211,6 +225,22 @@ export function NextSessionCard({ program, unit }: NextSessionCardProps) {
           )}
         </div>
       </div>
+
+      {/* Simulation Sheet Modal */}
+      <SimulationSheet
+        open={simOpen}
+        onOpenChange={setSimOpen}
+        routineName={nextTitle}
+        exercises={targets.map((t) => {
+          const ex = exercises.get(t.exercise_id);
+          return {
+            name: ex?.name ?? "Exercise",
+            primary_muscle: ex?.primary_muscle ?? "chest",
+            secondary_muscles: ex?.secondary_muscles ?? [],
+            sets: t.target_sets ?? 3,
+          };
+        })}
+      />
     </Card>
   );
 }
