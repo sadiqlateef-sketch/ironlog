@@ -1,5 +1,7 @@
 "use client";
 
+import { AmbientRestArc } from "@/components/ambient-rest-arc";
+
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -1081,6 +1083,12 @@ function ActiveWorkout({
           </div>
         </DialogContent>
       </Dialog>
+      <AmbientRestArc
+        remainingSeconds={rest.remaining}
+        totalSeconds={rest.timer?.duration ?? 0}
+        onAddThirtySeconds={() => rest.adjust(30)}
+        onSkip={rest.stop}
+      />
       <LoggerOptions open={options} onOpenChange={setOptions} />
     </div>
     </KeypadProvider>

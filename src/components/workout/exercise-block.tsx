@@ -1,5 +1,8 @@
 "use client";
 
+import { PlateStackVisualizer } from "@/components/plate-stack-visualizer";
+import { AnatomyTargetOrb } from "@/components/anatomy-target-orb";
+
 import { useState } from "react";
 import {
   ArrowDown,
@@ -558,9 +561,18 @@ export function ExerciseBlock({
         <span className="text-muted-foreground text-xs font-semibold">Add</span>
       </button>
       {plateLine && (
-        <p className="text-primary-text px-1 text-sm font-semibold" data-testid="plate-line">
-          Plates: {plateLine}
-        </p>
+        <div className="flex flex-col gap-1 px-1 py-1">
+          <p className="text-primary-text text-sm font-semibold" data-testid="plate-line">
+            Plates: {plateLine}
+          </p>
+          <PlateStackVisualizer
+            targetWeight={parseNumber(nextUndone?.weight ?? "") ?? parseNumber(weightHint(block.sets.indexOf(nextUndone!))) ?? 0}
+            barWeight={ownedPlates(profile, unit).bar}
+            availablePlates={ownedPlates(profile, unit).plates}
+            unit={unit}
+            compact
+          />
+        </div>
       )}
 
       <ActionSheet open={menu} onOpenChange={setMenu} title={block.exercise.name} actions={actions} />

@@ -1,5 +1,7 @@
 "use client";
 
+import { RadialDialKeypad } from "@/components/workout/radial-dial-keypad";
+
 import { createContext, use, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Delete, Minus, Plus } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -41,6 +43,7 @@ export function KeypadProvider({ children }: { children: ReactNode }) {
   const prefs = useLoggerPrefs();
   const { unit } = useAuth();
   const [field, setField] = useState<KeypadField | null>(null);
+  const [dialMode, setDialMode] = useState(false);
   const fresh = useRef(true);
 
   const open = useCallback((f: KeypadField) => {
@@ -104,11 +107,28 @@ export function KeypadProvider({ children }: { children: ReactNode }) {
                   ))}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => setDialMode((d) => !d)}
+                className="text-xs font-mono font-medium px-2 py-1 rounded bg-secondary text-foreground hover:bg-accent"
+              >
+                {dialMode ? "Pad" : "Dial"}
+              </button>
               <button type="button" onClick={done} className="text-primary-text flex h-11 items-center gap-1 rounded-xl px-3 text-sm font-semibold">
                 <ChevronDown className="size-5" aria-hidden /> Done
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            {dialMode && field.kind === "weight" ? (
+              <RadialDialKeypad
+                currentValue={parseFloat(field.get() || field.placeholder() || "0")}
+                unit={unit === "imperial" ? "lb" : "kg"}
+                onChange={(v) => {
+                  field.set(String(v));
+                }}
+                onClose={done}
+              />
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
               {(["1", "2", "3"] as const).map((k) => (
                 <Key key={k} onPress={() => press(k)}>{k}</Key>
               ))}
@@ -141,6 +161,7 @@ export function KeypadProvider({ children }: { children: ReactNode }) {
                 </Key>
               )}
             </div>
+            )}
           </div>
         </>
       )}

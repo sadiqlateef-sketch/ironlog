@@ -1,5 +1,7 @@
 "use client";
 
+import { PlateMicroStack } from "@/components/workout/plate-micro-stack";
+
 import { useEffect, useRef, useState, type Ref } from "react";
 import { Check, StickyNote, Trash2, Undo2, X } from "lucide-react";
 import type { UiSet } from "@/hooks/use-workout";
@@ -172,12 +174,17 @@ export function SetRow({
         </button>
 
         {!sides && (
-          <span
-            className="num text-muted-foreground truncate text-center text-sm font-semibold"
-            title={set.type === "warmup" ? "Plates per side" : "Last time"}
-          >
-            <LastTime text={previousText} tight />
-          </span>
+          <div className="flex flex-col items-center justify-center min-w-0 gap-0.5">
+            <span
+              className="num text-muted-foreground truncate text-center text-sm font-semibold"
+              title={set.type === "warmup" ? "Plates per side" : "Last time"}
+            >
+              <LastTime text={previousText} tight />
+            </span>
+            {Number(set.weight) > 0 && tracking === "weight_reps" && (
+              <PlateMicroStack weight={Number(set.weight)} unit={weightUnit === "kg" ? "metric" : "imperial"} />
+            )}
+          </div>
         )}
 
         {tracking === "distance_time" ? (
