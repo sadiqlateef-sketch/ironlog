@@ -429,4 +429,242 @@ export const TEMPLATES: Template[] = [
       },
     ],
   },
+  {
+    id: "phul-4day",
+    name: "PHUL: Power Hypertrophy (4-Day)",
+    description: "Power Hypertrophy Upper Lower split. 2 heavy strength compound days followed by 2 targeted hypertrophy accessory days for peak strength and size.",
+    categories: ["muscle", "strength", "upper-lower"],
+    weeks: 8,
+    level: "Intermediate",
+    days: [
+      {
+        name: "Upper Power",
+        items: [
+          x("bench-press", 4, 3, 5, 180, 2),
+          x("incline-dumbbell-press", 4, 6, 8, 120),
+          x("barbell-row", 4, 4, 6, 150, 1),
+          x("lat-pulldown", 3, 6, 8, 120),
+          x("barbell-curl", 3, 6, 8, 90),
+          x("ez-bar-skullcrusher", 3, 6, 8, 90),
+        ],
+      },
+      {
+        name: "Lower Power",
+        items: [
+          x("back-squat", 4, 3, 5, 180, 2),
+          x("romanian-deadlift", 4, 5, 8, 150, 1),
+          x("leg-press", 3, 6, 8, 120),
+          x("standing-calf-raise", 4, 6, 10, 90),
+        ],
+      },
+      {
+        name: "Upper Hypertrophy",
+        items: [
+          x("incline-bench-press", 4, 8, 12, 120, 1),
+          x("cable-crossover", 3, 10, 15, 60),
+          x("seated-cable-row", 4, 8, 12, 90),
+          x("dumbbell-row", 3, 8, 12, 90),
+          x("lateral-raise", 4, 12, 15, 60),
+          x("preacher-curl", 3, 8, 12, 60),
+          x("triceps-pushdown", 3, 10, 15, 60),
+        ],
+      },
+      {
+        name: "Lower Hypertrophy",
+        items: [
+          x("front-squat", 4, 8, 12, 150, 1),
+          x("bulgarian-split-squat", 3, 8, 12, 90),
+          x("leg-extension", 4, 10, 15, 60),
+          x("leg-curl", 4, 10, 15, 60),
+          x("seated-calf-raise", 4, 12, 15, 60),
+          x("hanging-leg-raise", 3, 12, 15, 60),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wendler-531-bbb",
+    name: "5/3/1 Boring But Big (4-Day)",
+    description: "Jim Wendler's legendary strength and mass protocol. One heavy core compound per day (3x5) followed immediately by 5x10 high-volume sets of the same lift.",
+    categories: ["strength", "muscle"],
+    weeks: 6,
+    level: "Intermediate",
+    days: [
+      {
+        name: "Squat Day",
+        items: [
+          x("back-squat", 3, 5, undefined, 180, 3),
+          x("back-squat", 5, 10, undefined, 120),
+          x("leg-curl", 4, 10, 12, 60),
+          x("hanging-leg-raise", 4, 12, 15, 60),
+        ],
+      },
+      {
+        name: "Bench Press Day",
+        items: [
+          x("bench-press", 3, 5, undefined, 180, 3),
+          x("bench-press", 5, 10, undefined, 120),
+          x("dumbbell-row", 5, 10, 12, 90),
+          x("face-pull", 4, 12, 15, 60),
+        ],
+      },
+      {
+        name: "Deadlift Day",
+        items: [
+          x("conventional-deadlift", 3, 5, undefined, 180, 3),
+          x("conventional-deadlift", 5, 10, undefined, 150),
+          x("bulgarian-split-squat", 3, 10, 12, 90),
+          x("ab-roller", 4, 10, 12, 60),
+        ],
+      },
+      {
+        name: "Overhead Press Day",
+        items: [
+          x("overhead-press", 3, 5, undefined, 180, 3),
+          x("overhead-press", 5, 10, undefined, 120),
+          x("pull-up", 5, 8, 10, 90),
+          x("dips-triceps-version", 4, 10, 12, 75),
+        ],
+      },
+    ],
+  },
+  {
+    id: "ppl-high-frequency-6day",
+    name: "Push / Pull / Legs Hypertrophy (6-Day)",
+    description: "Elite 6-day split alternating heavy compound focus (A) with tension/isolation stretch focus (B) for maximized weekly muscle stimulus.",
+    categories: ["muscle", "ppl"],
+    weeks: 8,
+    level: "Intermediate",
+    days: [
+      {
+        name: "Push A (Chest Heavy)",
+        items: [
+          x("bench-press", 4, 6, 8, 150, 2),
+          x("overhead-press", 3, 6, 8, 120),
+          x("incline-dumbbell-press", 3, 8, 10, 90),
+          x("lateral-raise", 4, 12, 15, 60),
+          x("triceps-pushdown", 3, 10, 15, 60),
+        ],
+      },
+      {
+        name: "Pull A (Back Width)",
+        items: [
+          x("pull-up", 4, 6, 10, 120, 1),
+          x("barbell-row", 4, 6, 8, 150, 1),
+          x("lat-pulldown", 3, 8, 12, 90),
+          x("face-pull", 4, 12, 15, 60),
+          x("barbell-curl", 3, 8, 10, 60),
+        ],
+      },
+      {
+        name: "Legs A (Quad Dominant)",
+        items: [
+          x("back-squat", 4, 5, 8, 180, 2),
+          x("leg-press", 3, 8, 12, 120),
+          x("leg-extension", 4, 12, 15, 60),
+          x("romanian-deadlift", 3, 8, 10, 120),
+          x("standing-calf-raise", 4, 10, 15, 60),
+        ],
+      },
+      {
+        name: "Push B (Shoulders & Upper Chest)",
+        items: [
+          x("incline-bench-press", 4, 8, 10, 120, 1),
+          x("dumbbell-shoulder-press", 3, 8, 12, 90),
+          x("cable-crossover", 3, 10, 15, 60),
+          x("lateral-raise", 4, 12, 15, 60),
+          x("ez-bar-skullcrusher", 3, 8, 12, 60),
+        ],
+      },
+      {
+        name: "Pull B (Back Thickness)",
+        items: [
+          x("conventional-deadlift", 3, 5, 6, 180, 2),
+          x("seated-cable-row", 4, 8, 12, 90),
+          x("dumbbell-row", 3, 8, 12, 90),
+          x("cable-rear-delt-fly", 4, 12, 15, 60),
+          x("hammer-curls", 3, 8, 12, 60),
+        ],
+      },
+      {
+        name: "Legs B (Posterior Chain & Glutes)",
+        items: [
+          x("front-squat", 3, 6, 10, 150, 1),
+          x("bulgarian-split-squat", 3, 8, 12, 90),
+          x("leg-curl", 4, 10, 15, 60),
+          x("hip-thrust", 3, 8, 12, 90),
+          x("seated-calf-raise", 4, 12, 15, 60),
+        ],
+      },
+    ],
+  },
+  {
+    id: "calisthenics-mastery",
+    name: "Calisthenics & Bodyweight Mastery",
+    description: "Full-body bodyweight progression developing gymnastic pressing strength, pulling power, and hollow-body core endurance.",
+    categories: ["home", "full-body", "abs"],
+    weeks: 6,
+    level: "Beginner",
+    days: [
+      {
+        name: "Push & Core",
+        items: [
+          x("pushups", 4, 12, 15, 60),
+          x("dips-triceps-version", 4, 8, 12, 75),
+          x("push-ups-with-feet-elevated", 3, 10, 15, 60),
+          x("plank", 3, 45, 60, 45),
+          x("hanging-leg-raise", 3, 10, 15, 60),
+        ],
+      },
+      {
+        name: "Pull & Grip",
+        items: [
+          x("pull-up", 4, 6, 10, 90),
+          x("chin-up", 4, 6, 10, 90),
+          x("seated-cable-row", 3, 10, 12, 60),
+          x("russian-twist", 3, 20, 30, 30),
+          x("ab-roller", 3, 8, 12, 60),
+        ],
+      },
+      {
+        name: "Legs & Posterior",
+        items: [
+          x("goblet-squat", 4, 15, 20, 60),
+          x("bulgarian-split-squat", 4, 10, 12, 60),
+          x("dumbbell-lunges", 3, 12, 15, 60),
+          x("butt-lift-bridge", 3, 15, 20, 45),
+          x("standing-calf-raise", 4, 15, 20, 45),
+        ],
+      },
+    ],
+  },
+  {
+    id: "posterior-hypertrophy",
+    name: "Posterior Chain & Glute Hypertrophy",
+    description: "Specialized 2-day routine prioritizing glutes, hamstrings, and erectors through heavy hip extension and knee flexion mechanics.",
+    categories: ["muscle", "strength"],
+    weeks: 4,
+    level: "Intermediate",
+    days: [
+      {
+        name: "Heavy Hinge & Glute Drive",
+        items: [
+          x("conventional-deadlift", 4, 5, 8, 180, 2),
+          x("hip-thrust", 4, 8, 12, 90),
+          x("bulgarian-split-squat", 3, 10, 12, 90),
+          x("standing-calf-raise", 4, 12, 15, 60),
+        ],
+      },
+      {
+        name: "Hamstring Stretch & Knee Flexion",
+        items: [
+          x("romanian-deadlift", 4, 8, 10, 120, 1),
+          x("seated-leg-curl", 4, 10, 12, 75),
+          x("leg-curl", 3, 12, 15, 60),
+          x("butt-lift-bridge", 3, 15, 20, 45),
+          x("hanging-leg-raise", 3, 12, 15, 60),
+        ],
+      },
+    ],
+  },
 ];
