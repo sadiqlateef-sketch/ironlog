@@ -132,6 +132,16 @@ dependencies {
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
     // Health Services returns Guava ListenableFutures but doesn't put Guava on our classpath
     implementation("com.google.guava:guava:33.7.1-android")
+    // Wear OS Tiles & ProtoLayout
+    implementation("androidx.wear.tiles:tiles:1.4.1")
+    implementation("androidx.wear.tiles:tiles-material:1.4.1")
+    implementation("androidx.wear.protolayout:protolayout:1.2.1")
+    implementation("androidx.wear.protolayout:protolayout-material:1.2.1")
+    implementation("androidx.wear.protolayout:protolayout-expression:1.2.1")
+
+    // Wear OS Watch Face Complications Data Source
+    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

@@ -7,7 +7,12 @@ import com.facebook.react.uimanager.ViewManager
 
 class HeartRatePackage : ReactPackage {
   override fun createNativeModules(context: ReactApplicationContext): List<NativeModule> =
-    listOf(HeartRateModule(context), VoiceModule(context), WearableBridgeModule(context))
+    listOf(
+      HeartRateModule(context),
+      VoiceModule(context),
+      WearableBridgeModule(context),
+      IronLogTileModule(context)
+    )
 
   override fun createViewManagers(context: ReactApplicationContext): List<ViewManager<*, *>> = emptyList()
 }

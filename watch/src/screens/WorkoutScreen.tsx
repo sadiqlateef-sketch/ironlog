@@ -21,6 +21,7 @@ import { canListen, listen } from "../voice";
 import { parseSpokenSet } from "../voiceSet";
 import { uuid } from "../queue";
 import { watchBridge } from "../wearableBridge";
+import { tileBridge } from "../tileBridge";
 import { Btn, C, Screen, Stepper, T, ZONE } from "../ui";
 
 type View_ = { kind: "log" } | { kind: "rest"; endsAt: number; duration: number; next: string } | { kind: "done" };
@@ -164,6 +165,34 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
     }
   }, [now, restEnds]);
 
+  // Sync ambient Wear OS Tile and Watch Face Complication
+  useEffect(() => {
+    if (!w) {
+      tileBridge.clear();
+      return;
+    }
+    const isRest = view.kind === "rest";
+    const remaining = isRest ? Math.max(0, Math.ceil((view.endsAt - now) / 1000)) : 0;
+    const currentEx = group?.name ?? w.name ?? "Workout";
+    const currentSetNum = (pos?.set ?? 0) + 1;
+    const totalSetsNum = group?.sets.length ?? 0;
+    const unitStr = unit === "imperial" ? "lb" : "kg";
+
+    tileBridge.update({
+      hasActiveWorkout: true,
+      workoutName: w.name ?? "IronLog",
+      exerciseName: currentEx,
+      setIndexText: `Set ${currentSetNum} of ${totalSetsNum}`,
+      targetWeightText: `${displayWeight(draft.weight, unit)} ${unitStr}`,
+      targetRepsText: `${draft.reps} reps`,
+      isRestActive: isRest,
+      restSecondsRemaining: remaining,
+      totalRestSeconds: isRest ? view.duration : 120,
+      restPercent: isRest && view.duration > 0 ? Math.min(100, Math.round(((view.duration - remaining) / view.duration) * 100)) : 0,
+      heartRate: bpm ?? 0,
+    });
+  }, [w, draft, view, now, bpm, group, pos, unit]);
+
   if (w === undefined) {
     return (
       <Screen center scroll={false}>
@@ -306,6 +335,7 @@ export function WorkoutScreen({ profile, onExit }: { profile: Profile; onExit: (
   }
 
   function finish() {
+    tileBridge.clear();
     finishWorkout(workout);
     watchBridge.sendWorkoutFinished(workout.id).catch(() => {});
     keepScreenOn(false);
