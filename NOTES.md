@@ -1,34 +1,26 @@
-# IronLog notes
-
-Full review (2026-10-25): see `REVIEW.md`. Mockups and screenshots: project files `ironlog-review/`.
+# IronLog notes (2026-11-01). Full detail: `HANDOFF.md`. Older review: `REVIEW.md`, `FIX_PLAN.md`.
 
 ## Decisions
-- Personal app: one user, Galaxy Z Fold8 (folded + unfolded) and Galaxy Watch.
-- Nothing from the review gets built until Sadiq approves it item by item (REVIEW.md section 7).
-- 2026-10-25: Sadiq chose cloud-backed again (Supabase), with offline logging kept. The app has been phone-only since Oct 23 (mock backend).
-- Theme is now ruby/gold "Cosmic Ruby" (replaced the Oct 14 navy glass look).
+- Personal use only: one user, Galaxy Z Fold8 (folded and unfolded) and Galaxy Watch, sideloaded.
+- Fix before features: the finish-workout fix lands and is verified on the phone before any feature work.
+- The 21 approved features are the ceiling. Nothing new without Sadiq's say-so (Oct 28-29 additions await his ruling).
+- Cloud-backed (Supabase) with offline logging (2026-10-25). Weights stored in kg. Release builds use the Bujo key from the PC.
+- Never orphan workout history in a schema change. Install with `adb install -r`, never uninstall.
 
 ## Verified on my phone
-- (Nothing verified from this review yet. Add items here after testing on the Fold8.)
-
-## Done (awaiting phone check)
-- D1 cloud-backed again, D2 previous-day workout, D3 one open workout, D8 lint/typecheck, D10 APK build.
-- D5 watch weight, D6 periodization off by default, D7 warm-up rows, D4 failed saves shown (in PR, not yet on the phone).
-- Batch 3 (Phases 11-18, merged): logger dock, header volume, plates, set notes, AMRAP + tempo (database deployed 2026-10-25), Home header, "Programs" naming, Progress colours. Phase 11 needs a one-handed phone check.
-- Batch 4 (merged): P1 two-column Home when unfolded (Phase 19), P2 Progress summary first (20), P3 two missed sessions drop the weight 10% (21), P4 circuit mode (23), P7 old agent files archived to `docs/archive/` (25). Check Home and Progress folded and unfolded on the Fold8.
+- Watch links to the phone (Sadiq, 2026-10-25, phone 2.0.0 / watch 1.0.0).
+- Nothing else on the current build. Headless-browser results are under bugs below.
 
 ## Known bugs / half-finished
-- Keystore password still written in the Gradle files (D9, FIX_PLAN Phase 10, needs Sadiq's OK).
-- Open PRs not on main: #22 deload weeks (#18 reset email and #20 Health Connect are merged; they need the Supabase redirect URL and an APK rebuild).
-- Local PC builds need real Supabase settings in `.env.production.local` (placeholders cause "Failed to fetch").
+- Finish-workout bug (Sadiq, Oct 22/23): fixes merged (8ee1e56, a3afa77, 78b4db1), NOT verified on the phone.
+- Server still has an open workout from 2026-10-28 (0 sets ticked). Ask Sadiq.
+- Possible remaining causes: the outbox drops refused changes; starting offline while another workout is open (INFERRED).
+- Lint: 7 errors from the Oct 28-29 commits. Tests 303/303, build, typecheck, smoke 36/36 pass (browser only, not phone).
+- Volume mismatches: Bujo total counts warm-ups; one-side sets differ between live header and saved total.
+- Watch offline plan has fake exercise ids. Watch set → phone not tested. 11 unused lib modules.
+- Installed build on the Fold8: unknown since 2026-10-29 (last known 010e968). Version stuck at 2.0.0.
+- Oct 23-25 phone-only workouts: upload never confirmed. No backup file known to exist.
+- Fold8 layouts and the Oct 16 checklist: all still NEEDS-DEVICE-TEST (HANDOFF section 9).
 
 ## Next
-- Phase 10 (keystore password out of the Gradle files) is skipped until Sadiq says go.
-- Phase 24 (below) waits for Sadiq's yes before anything is built.
-
-### Bujo Tasks reads "today's plan" from IronLog (Phase 24, built)
-Today IronLog only pushes finished workouts out. This adds the reverse: Bujo Tasks can show what IronLog plans for today.
-- **Table:** a new `today_plan` table in `IronLogContentProvider` (one row per date): `date`, `routineName`, `programName`, `week`, `day`, `exercisesJson` (name, sets, reps, weight), `updatedAt`. The provider's `DB_VERSION` must be bumped, because `onUpgrade` only re-runs `CREATE TABLE IF NOT EXISTS`. New URI: `content://com.ironlog.app.provider/today_plan`.
-- **Writing:** Home pushes the plan whenever the active program changes (and when the app opens) through `IronLogEcosystemPlugin`, like `upsertWorkoutRecord`: a new plugin method `upsertTodayPlan` called from `src/services/ironlogEcosystemSync.ts`. It sends `program.next_routine_name`, the week and day, and the exercise list from `getRoutineTargets`. A rest day or no program writes a row with an empty list.
-- **Reading:** Bujo Tasks queries the URI (read-only, same signature permission as the other tables). It shows today's workout name on the Gym task and lists the exercises in the task's detail. Nothing is written back; finishing the workout still uses `completeBujoWorkoutAndWaterOak`.
-- **Decisions (defaults, easy to change):** weights are included (`weightLb`, null when the routine has none). Older rows are deleted each time a new day is written, so a skipped day never shows up; Bujo should only read the row whose `date` is today. Needs an APK rebuild; `DB_VERSION` is now 2.
+- Prove or fix the finish-workout lifecycle on the Fold8 (HANDOFF section 11). No feature work before that.
