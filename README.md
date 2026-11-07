@@ -628,6 +628,7 @@ Authentication > Providers > Email while you're developing.
 | `npm run build`     | Build the static site into `out/`                   |
 | `npm run typecheck` | Check TypeScript                                    |
 | `npm test`          | Run unit tests (plate math, set logic)              |
+| `npm run test:db`   | Finish-workout tests against a real local Supabase (`npx supabase start` first; set `SUPABASE_TEST_URL` and `SUPABASE_TEST_KEY` from `npx supabase status`) |
 | `npm run lint`      | Lint                                                |
 | `npm run db:reset`  | Rebuild the local database from migrations + seed   |
 | `npx supabase migration up` | Apply new migrations without wiping data    |

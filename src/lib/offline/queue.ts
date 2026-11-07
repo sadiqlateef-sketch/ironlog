@@ -25,6 +25,8 @@ export type Op =
 interface Entry {
   seq: number;
   op: Op;
+  /** Set when the server said no. The change is kept (never thrown away) until you retry or discard it. */
+  refused?: string;
 }
 
 export interface SyncStatus {
@@ -34,10 +36,15 @@ export interface SyncStatus {
   syncing: boolean;
   /** A change the server refused (shown once, then the workout reloads). */
   error: string | null;
+  /**
+   * The server refused the next change, so syncing is paused on it (in order,
+   * so nothing later is sent ahead of it). Retry or discard it from the banner.
+   */
+  refused: string | null;
 }
 
 const KEY = "outbox";
-let status: SyncStatus = { pending: 0, online: true, syncing: false, error: null };
+let status: SyncStatus = { pending: 0, online: true, syncing: false, error: null, refused: null };
 const listeners = new Set<() => void>();
 let loaded: Promise<Entry[]> | null = null;
 let entries: Entry[] = [];
@@ -64,7 +71,7 @@ async function load(): Promise<Entry[]> {
   if (!loaded) {
     loaded = kvGet<Entry[]>(KEY).then((e) => {
       entries = e ?? [];
-      emit({ pending: entries.length });
+      emit({ pending: entries.length, refused: entries[0]?.refused ?? null });
       return entries;
     });
   }
@@ -78,6 +85,22 @@ async function save() {
   emit({ pending: entries.length, ...(saved ? {} : { error: SAVE_FAILED_MESSAGE }) });
 }
 
+/** The sign-in needs refreshing: wait and try again, it isn't the change's fault. */
+export function isAuthError(e: unknown): boolean {
+  const msg = String((e as { message?: string })?.message ?? e);
+  return /jwt|invalid claim|not authenticated|refresh token|401|unauthori[sz]ed/i.test(msg);
+}
+
+/** The server's reason, in words you can act on. */
+export function explainRefusal(message: string): string {
+  if (/one_active_per_user|duplicate key.*end_time/i.test(message))
+    return "Another workout is still open on the server. Finish or delete it, then tap Retry.";
+  if (/finish_missing/.test(message)) return "This workout isn't on the server, so it couldn't be marked finished.";
+  if (/foreign key/i.test(message)) return "A set couldn't be saved because its workout isn't on the server yet.";
+  if (/row-level security/i.test(message)) return "The server wouldn't accept this change for your account.";
+  return message;
+}
+
 /** Errors that mean "no signal", as opposed to the server saying no. */
 export function isNetworkError(e: unknown): boolean {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
@@ -87,7 +110,15 @@ export function isNetworkError(e: unknown): boolean {
 }
 
 export async function hasPending(): Promise<boolean> {
-  return (await load()).length > 0;
+  // Read `entries`, not load()'s result: that's the list as it was at app start.
+  await load();
+  return entries.length > 0;
+}
+
+/** Workouts you've finished on this phone whose Finish hasn't reached the server yet. */
+export async function pendingFinishIds(): Promise<Set<string>> {
+  await load();
+  return new Set(entries.flatMap((e) => (e.op.kind === "finish" ? [e.op.sessionId] : [])));
 }
 
 export async function enqueue(...ops: Op[]): Promise<void> {
@@ -133,13 +164,20 @@ async function sendOnce(op: Op): Promise<void> {
         end_time: op.endTime,
         ...(op.volume != null ? { volume: op.volume } : {}),
       };
-      return check(
-        await db
-          .from("workout_sessions")
-          .update(patch as unknown as Database["public"]["Tables"]["workout_sessions"]["Update"])
-          .eq("id", op.sessionId)
-          .is("end_time", null)
-      );
+      const res = await db
+        .from("workout_sessions")
+        .update(patch as unknown as Database["public"]["Tables"]["workout_sessions"]["Update"])
+        .eq("id", op.sessionId)
+        .is("end_time", null)
+        .select("id");
+      check(res);
+      if (res.data?.length) return;
+      // Nothing was updated. Fine if it was already finished (a retry); otherwise the
+      // workout never reached the server, and saying "done" would be a lie.
+      const after = await db.from("workout_sessions").select("id, end_time").eq("id", op.sessionId).maybeSingle();
+      check(after);
+      if (!after.data?.end_time) throw new Error("finish_missing: workout not on the server");
+      return;
     }
     case "adjust": {
       const { error } = await db.functions.invoke("suggest-adjustments", { body: { session_id: op.sessionId } });
@@ -154,7 +192,8 @@ let flushing: Promise<boolean> | null = null;
 
 /**
  * Send everything waiting, in order. Resolves true once nothing is left.
- * A change the server refuses is dropped (and reported) so it can't block the rest.
+ * A change the server refuses is kept and syncing pauses on it, with a banner
+ * to retry or discard it. Nothing is ever thrown away without you choosing to.
  */
 export function flush(): Promise<boolean> {
   // Already sending: wait for it, then pick up anything added meanwhile.
@@ -179,12 +218,23 @@ export function flush(): Promise<boolean> {
             emit({ online: false });
             return false;
           }
-          emit({ error: (e as Error).message ?? String(e) });
+          if (isAuthError(e)) {
+            // Supabase refreshes the sign-in on its own; try again shortly.
+            await getSupabase().auth.refreshSession().catch(() => {});
+            emit({ online: true });
+            return false;
+          }
+          const reason = explainRefusal((e as Error).message ?? String(e));
+          const first = next.refused == null;
+          entries = entries.map((x) => (x.seq === next.seq ? { ...x, refused: reason } : x));
+          await save();
+          emit({ online: true, refused: reason, ...(first ? { error: reason } : {}) });
+          return false;
         }
         entries = entries.filter((x) => x.seq !== next.seq);
         await save();
       }
-      emit({ online: true });
+      emit({ online: true, refused: null });
       return true;
     } finally {
       if (status.syncing) emit({ syncing: false });
@@ -194,11 +244,22 @@ export function flush(): Promise<boolean> {
   return flushing;
 }
 
+/** Throw away the one change the server refused, then carry on syncing the rest. */
+export async function discardRefused(): Promise<void> {
+  await load();
+  if (entries[0]?.refused == null) return;
+  entries = entries.slice(1);
+  await save();
+  emit({ refused: null, error: null });
+  await flush();
+}
+
 /** Drop everything waiting (only when signing out). */
 export async function discardPending(): Promise<void> {
   await load();
   entries = [];
   await save();
+  emit({ refused: null, error: null });
 }
 
 // Retry when the connection comes back, the app returns to the screen, and
@@ -208,8 +269,10 @@ if (typeof window !== "undefined") {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") void flush();
   });
+  // A refused change isn't retried on the timer (it would just be refused again);
+  // it is retried when the app opens, comes back on screen, or you tap Retry.
   setInterval(() => {
-    if (entries.length && !flushing) void flush();
+    if (entries.length && !flushing && entries[0].refused == null) void flush();
   }, 20_000);
   void load().then(() => (entries.length ? flush() : true));
 }
