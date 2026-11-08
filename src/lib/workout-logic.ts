@@ -474,6 +474,19 @@ export function watchSetPatch(
  * in the same unit the weights are typed in (so no conversion is needed).
  * One-sided sets count both sides.
  */
+/**
+ * One set's volume, counted the way the database saves it: weight x reps, and
+ * for a one-side-at-a-time set the weaker side's reps (the database stores
+ * reps as the smaller of left and right). One rule, so the header, the saved
+ * workout and what's sent to Bujo always agree.
+ */
+export function setVolume(weight: string, reps: string, repsLeft?: string): number {
+  const w = parseNumber(weight) ?? 0;
+  const right = parseNumber(reps) ?? 0;
+  const left = parseNumber(repsLeft ?? "");
+  return w * (left != null ? Math.min(left, right) : right);
+}
+
 export function liveVolume(
   blocks: { sets: { done: boolean; type: SetType; weight: string; reps: string; repsLeft?: string }[] }[],
 ): number {
@@ -481,8 +494,7 @@ export function liveVolume(
   for (const b of blocks)
     for (const s of b.sets) {
       if (!s.done || s.type === "warmup") continue;
-      const weight = parseNumber(s.weight) ?? 0;
-      total += weight * ((parseNumber(s.reps) ?? 0) + (parseNumber(s.repsLeft ?? "") ?? 0));
+      total += setVolume(s.weight, s.reps, s.repsLeft);
     }
   return Math.round(total * 10) / 10;
 }
