@@ -21,6 +21,9 @@ jobs:
         working-directory: watch
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the version number is the commit count.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

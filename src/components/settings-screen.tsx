@@ -265,6 +265,7 @@ export function SettingsScreen() {
       <Button variant="secondary" size="lg" className="text-destructive" onClick={signOut}>
         <LogOut /> Sign out
       </Button>
+      <p className="text-muted-foreground text-center text-xs">Ironlog version {process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}</p>
 
       <EquipmentSheet open={sheet === "weights"} onOpenChange={(o) => !o && setSheet(null)} />
       <ShiftsSheet open={sheet === "shifts"} onOpenChange={(o) => !o && setSheet(null)} />

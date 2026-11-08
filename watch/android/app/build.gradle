@@ -72,6 +72,20 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Every build gets its own version number, so Settings (and Android's app info)
+// tell you exactly which build is installed. It's the number of commits on the
+// branch: it only goes up, so Android always accepts the update over the old one.
+def gitCommitCount = { ->
+    try {
+        def proc = ['git', 'rev-list', '--count', 'HEAD'].execute(null, rootDir)
+        def n = proc.text.trim()
+        proc.waitFor()
+        return n.isInteger() ? Math.max(n.toInteger(), 3) : 3
+    } catch (ignored) {
+        return 3
+    }
+}()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -82,8 +96,8 @@ android {
         applicationId "com.ironlog.watch"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode gitCommitCount
+        versionName "1.1.${gitCommitCount}"
     }
     signingConfigs {
         debug {

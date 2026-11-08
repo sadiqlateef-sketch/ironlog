@@ -1,6 +1,20 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 
+// Every build gets its own version number, so Settings (and Android's app info)
+// tell you exactly which build is installed. It's the number of commits on the
+// branch: it only goes up, so Android always accepts the update over the old one.
+def gitCommitCount = { ->
+    try {
+        def proc = ['git', 'rev-list', '--count', 'HEAD'].execute(null, rootDir)
+        def n = proc.text.trim()
+        proc.waitFor()
+        return n.isInteger() ? Math.max(n.toInteger(), 3) : 3
+    } catch (ignored) {
+        return 3
+    }
+}()
+
 android {
     namespace = "com.ironlog.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,8 +22,8 @@ android {
         applicationId "com.ironlog.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "2.0.0"
+        versionCode gitCommitCount
+        versionName "2.1.${gitCommitCount}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
