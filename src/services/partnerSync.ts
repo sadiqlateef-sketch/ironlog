@@ -4,6 +4,7 @@
 // Uses Supabase Realtime broadcast channels with an automatic fallback to
 // browser BroadcastChannel (for offline/local tab testing).
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabase } from "../lib/supabase/client.ts";
 
 export type PartnerEventType =
@@ -84,7 +85,7 @@ export class PartnerSyncManager {
   private myName: string = "Lifter";
   private listeners = new Set<(event: PartnerEvent) => void>();
   private broadcastChannel: BroadcastChannel | null = null;
-  private supabaseChannel: any = null;
+  private supabaseChannel: RealtimeChannel | null = null;
   private partnerState: PartnerState = {
     roomCode: null,
     partnerName: null,

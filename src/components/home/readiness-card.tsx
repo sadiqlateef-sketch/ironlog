@@ -219,7 +219,7 @@ export function ReadinessCard() {
           <DialogHeader>
             <DialogTitle>Readiness Inputs</DialogTitle>
             <DialogDescription>
-              Adjust your sleep duration and resting vitals to tailor today's readiness score.
+              Adjust your sleep duration and resting vitals to tailor today&apos;s readiness score.
             </DialogDescription>
           </DialogHeader>
 

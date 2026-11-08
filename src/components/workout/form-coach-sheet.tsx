@@ -243,7 +243,7 @@ export function FormCoachSheet({ exercise, open, onOpenChange }: FormCoachSheetP
                 </span>
                 <span className="text-muted-foreground font-mono text-lg">/ {phaseDetails.totalSec}s</span>
               </div>
-              <p className="text-muted-foreground text-xs italic">"{phaseDetails.cueText}"</p>
+              <p className="text-muted-foreground text-xs italic">&ldquo;{phaseDetails.cueText}&rdquo;</p>
 
               {/* Reps counter */}
               <div className="mt-4 flex items-center gap-2 rounded-full bg-background/80 px-3 py-1 text-xs">
