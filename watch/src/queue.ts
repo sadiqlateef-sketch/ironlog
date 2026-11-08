@@ -97,6 +97,20 @@ export class OpQueue {
     this.flush();
   }
 
+  /** Changes the server refused, kept for recovery instead of thrown away. */
+  async refused(): Promise<Op[]> {
+    try {
+      return JSON.parse((await this.kv.getItem(`${this.key}.refused`)) ?? "[]") as Op[];
+    } catch {
+      return [];
+    }
+  }
+
+  private async keepRefused(op: Op): Promise<void> {
+    const list = [...(await this.refused()), op].slice(-100);
+    await this.kv.setItem(`${this.key}.refused`, JSON.stringify(list));
+  }
+
   /** Send waiting changes in order, stopping at the first one that must be retried. Returns how many are left. */
   flush(): Promise<number> {
     if (!this.flushing) {
@@ -117,7 +131,9 @@ export class OpQueue {
         outcome = "retry";
       }
       if (outcome === "retry") break;
-      ops.shift();
+      const done = ops.shift();
+      // Never lose a refused change silently: keep it (the newest 100) so it can be recovered.
+      if (outcome === "drop" && done) await this.keepRefused(done);
       await this.save();
     }
     return ops.length;

@@ -98,10 +98,16 @@ export function HomeScreen({ onOpenWorkout, onSignedOut }: { onOpenWorkout: () =
           <T center muted small>
             Start a routine
           </T>
-          {!plan?.routines.length && (
+          {!plan ? (
             <T center muted small>
-              Make a routine or program on your phone first.
+              Your plan downloads the first time the watch has signal.
             </T>
+          ) : (
+            !plan.routines.length && (
+              <T center muted small>
+                Make a routine or program on your phone first.
+              </T>
+            )
           )}
           {plan?.routines.map((r) => (
             <Btn key={r.id} kind="secondary" label={busy === r.id ? "Starting…" : r.name} disabled={!!busy} onPress={() => start(r.routine)} />

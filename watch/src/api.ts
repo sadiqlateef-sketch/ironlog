@@ -149,179 +149,15 @@ export interface WatchPlan {
   routines: (RoutineSummary & { routine: PlanRoutine })[];
 }
 
-export const DEFAULT_OFFLINE_PLAN: WatchPlan = {
-  upNext: {
-    routineId: "r-full-body-a",
-    week: 1,
-    day: 1,
-    weeks: 8,
-    name: "Full Body A",
-    fullName: "Full Body A (Squat & Bench)",
-    program: "IronLog Strength",
-    routine: {
-      id: "r-full-body-a",
-      name: "Full Body A (Squat & Bench)",
-      items: [
-        {
-          exerciseId: "e1000000-0000-0000-0000-000000000001",
-          name: "Back Squat",
-          mechanic: "compound",
-          supersetGroup: null,
-          sets: 3,
-          warmups: 2,
-          weightKg: 100,
-          rest: 120,
-          reps: 5,
-        },
-        {
-          exerciseId: "e1000000-0000-0000-0000-000000000002",
-          name: "Bench Press",
-          mechanic: "compound",
-          supersetGroup: null,
-          sets: 3,
-          warmups: 2,
-          weightKg: 80,
-          rest: 120,
-          reps: 5,
-        },
-        {
-          exerciseId: "e1000000-0000-0000-0000-000000000003",
-          name: "Barbell Row",
-          mechanic: "compound",
-          supersetGroup: null,
-          sets: 3,
-          warmups: 1,
-          weightKg: 70,
-          rest: 90,
-          reps: 8,
-        },
-        {
-          exerciseId: "e1000000-0000-0000-0000-000000000004",
-          name: "Overhead Press",
-          mechanic: "compound",
-          supersetGroup: null,
-          sets: 3,
-          warmups: 1,
-          weightKg: 50,
-          rest: 90,
-          reps: 8,
-        },
-      ],
-    },
-  },
-  routines: [
-    {
-      id: "r-full-body-a",
-      name: "Full Body A (Squat & Bench)",
-      exercises: 4,
-      routine: {
-        id: "r-full-body-a",
-        name: "Full Body A (Squat & Bench)",
-        items: [
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000001",
-            name: "Back Squat",
-            mechanic: "compound",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 2,
-            weightKg: 100,
-            rest: 120,
-            reps: 5,
-          },
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000002",
-            name: "Bench Press",
-            mechanic: "compound",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 2,
-            weightKg: 80,
-            rest: 120,
-            reps: 5,
-          },
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000003",
-            name: "Barbell Row",
-            mechanic: "compound",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 1,
-            weightKg: 70,
-            rest: 90,
-            reps: 8,
-          },
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000004",
-            name: "Overhead Press",
-            mechanic: "compound",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 1,
-            weightKg: 50,
-            rest: 90,
-            reps: 8,
-          },
-        ],
-      },
-    },
-    {
-      id: "r-full-body-b",
-      name: "Full Body B (Deadlift & Press)",
-      exercises: 4,
-      routine: {
-        id: "r-full-body-b",
-        name: "Full Body B (Deadlift & Press)",
-        items: [
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000005",
-            name: "Deadlift",
-            mechanic: "compound",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 2,
-            weightKg: 120,
-            rest: 180,
-            reps: 5,
-          },
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000004",
-            name: "Overhead Press",
-            mechanic: "compound",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 2,
-            weightKg: 50,
-            rest: 120,
-            reps: 5,
-          },
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000006",
-            name: "Pull Up",
-            mechanic: "compound",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 0,
-            weightKg: 0,
-            rest: 90,
-            reps: 8,
-          },
-          {
-            exerciseId: "e1000000-0000-0000-0000-000000000007",
-            name: "Hanging Leg Raise",
-            mechanic: "isolation",
-            supersetGroup: null,
-            sets: 3,
-            warmups: 0,
-            weightKg: 0,
-            rest: 60,
-            reps: 12,
-          },
-        ],
-      },
-    },
-  ],
-};
+/**
+ * Older builds saved a made-up sample plan (exercise ids that don't exist on
+ * the server, a 100 kg squat). A workout started from it could never sync.
+ */
+export function isSamplePlan(plan: WatchPlan | null): boolean {
+  if (!plan) return false;
+  const items = [plan.upNext?.routine, ...plan.routines.map((r) => r.routine)].flatMap((r) => r?.items ?? []);
+  return items.some((it) => it.exerciseId.startsWith("e1000000-0000-0000-0000-"));
+}
 
 async function readJson<T>(key: string): Promise<T | null> {
   try {
@@ -331,12 +167,14 @@ async function readJson<T>(key: string): Promise<T | null> {
   }
 }
 
-/** The plan as last saved on the watch (seeds default plan if none exists). */
+/** Your real plan as last downloaded from the server (null until the watch has had signal once). */
 export async function savedPlan(): Promise<WatchPlan | null> {
   const existing = await readJson<WatchPlan>(PLAN_KEY);
-  if (existing) return existing;
-  await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(DEFAULT_OFFLINE_PLAN));
-  return DEFAULT_OFFLINE_PLAN;
+  if (isSamplePlan(existing)) {
+    await AsyncStorage.removeItem(PLAN_KEY);
+    return null;
+  }
+  return existing;
 }
 
 /** Fetch Up next and your routines with everything needed to start them, and save a copy. Throws when offline. */

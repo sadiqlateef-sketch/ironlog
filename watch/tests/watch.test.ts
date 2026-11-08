@@ -34,11 +34,12 @@ test("queue sends in order and keeps everything while offline", async () => {
   assert.deepEqual(sent, ["1", "2"]);
 });
 
-test("queue stops at a retry so order is kept, and drops refused changes", async () => {
+test("queue stops at a retry so order is kept, and sets refused changes aside (kept, not lost)", async () => {
   const outcomes: Outcome[] = ["ok", "drop", "retry"];
   const q = new OpQueue(new MemoryKV(), async () => outcomes.shift() ?? "ok");
   for (const n of [1, 2, 3, 4]) await q.push(op(n)).catch(() => {});
   assert.equal(await q.pending(), 0);
+  assert.deepEqual(await q.refused(), [op(2)]);
 });
 
 test("a thrown error counts as offline", async () => {
