@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Zap, Users, ArrowUpDown, ArrowUpToLine, Check, ChevronLeft, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { Zap, ArrowUpDown, ArrowUpToLine, Check, ChevronLeft, ChevronRight, CloudOff, Flag, MapPin, MessageSquareText, Minimize2, NotebookPen, Play, Plus, SlidersHorizontal, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { DeloadOffer } from "@/components/deload-offer";
 import { ExerciseDetail } from "@/components/exercise-detail";
@@ -34,9 +34,7 @@ import { ProgressionSheet } from "@/components/workout/progression-sheet";
 import { RestSheet } from "@/components/workout/rest-sheet";
 import { SwapSheet } from "@/components/workout/swap-sheet";
 import { WarmupSheet } from "@/components/workout/warmup-sheet";
-import { PartnerSyncSheet } from "@/components/workout/partner-sync-sheet";
 import { FormCoachSheet } from "@/components/workout/form-coach-sheet";
-import { partnerSync } from "@/services/partnerSync";
 import { VoiceLogButton } from "@/components/workout/voice-log";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -241,7 +239,6 @@ function ActiveWorkout({
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [flowMode, setFlowMode] = useState(false);
-  const [partnerSyncOpen, setPartnerSyncOpen] = useState(false);
   const [formCoachExercise, setFormCoachExercise] = useState<Exercise | null>(null);
   const [view, setViewState] = useState<View>(savedView);
   const [focusPick, setFocus] = useState<number | null>(null);
@@ -267,28 +264,6 @@ function ActiveWorkout({
   const prefs = useLoggerPrefs();
   const slot = useSlot("bottom-bar-slot");
   const rest = useRestTimer();
-  // Sync active rest timer to partner
-  useEffect(() => {
-    if (partnerSync.isConnected && rest.timer) {
-      partnerSync.broadcastRest({
-        secondsTotal: rest.timer.duration,
-        secondsRemaining: Math.max(0, Math.round(rest.remaining)),
-        isRunning: true,
-      });
-    }
-  }, [rest.remaining, rest.timer]);
-
-  // Sync PR celebrations to partner
-  useEffect(() => {
-    if (w.record && partnerSync.isConnected) {
-      partnerSync.broadcastPr({
-        exerciseName: w.record.exercise,
-        weight: parseFloat(w.record.weight) || 0,
-        reps: w.record.reps,
-        unit,
-      });
-    }
-  }, [w.record, unit]);
   // How tall the dock is, so the last card never hides behind it.
   const dockRef = useRef<HTMLDivElement>(null);
   const [dockHeight, setDockHeight] = useState(0);
@@ -544,19 +519,6 @@ function ActiveWorkout({
             className="text-primary-text hover:bg-primary/20"
           >
             <Zap className="size-4 fill-current" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Partner Workout Sync"
-            title={partnerSync.isConnected ? `Paired with ${partnerSync.state.partnerName || "Partner"}` : "Pair with Workout Partner"}
-            onClick={() => setPartnerSyncOpen(true)}
-            className={cn("relative hover:bg-primary/20", partnerSync.isConnected && "text-emerald-400")}
-          >
-            <Users className="size-4" />
-            {partnerSync.isConnected && (
-              <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            )}
           </Button>
           <Button variant="ghost" size="icon" aria-label="Logger display options" onClick={() => setOptions(true)}>
             <SlidersHorizontal />
@@ -1002,11 +964,6 @@ function ActiveWorkout({
           />
         );
       })()}
-      <PartnerSyncSheet
-        open={partnerSyncOpen}
-        onOpenChange={setPartnerSyncOpen}
-        myLifterName={profile?.display_name?.split(" ")[0] || "Lifter"}
-      />
       <FormCoachSheet
         exercise={formCoachExercise}
         open={!!formCoachExercise}
