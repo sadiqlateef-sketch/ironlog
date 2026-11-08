@@ -7,7 +7,7 @@
 import { getSupabase, isLocalBackend } from "../supabase/client.ts";
 import { kvGet, kvSet } from "./kv.ts";
 import { warmupWeightsKg } from "../set-logic.ts";
-import { enqueue, flush, hasPending, isNetworkError, type Op } from "./queue.ts";
+import { enqueue, flush, hasPending, isNetworkError, pendingFinishIds, type Op } from "./queue.ts";
 import type { Database } from "../../types/database.ts";
 import type { WorkoutSession, WorkoutSet } from "../workout-api.ts";
 
@@ -177,6 +177,8 @@ export async function getStaleSession(): Promise<WorkoutSession | null> {
         .limit(1)
     );
     const s = sessions[0] ?? null;
+    // Finished here, just not synced yet: it isn't unfinished, don't ask about it.
+    if (s && (await pendingFinishIds()).has(s.id)) return null;
     if (s && !isSessionCompleted(s) && !(await isOpen(s))) {
       return s;
     }
