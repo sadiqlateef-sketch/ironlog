@@ -37,6 +37,12 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Catch code errors and broken tests before building, so they can't pile up unseen.
+      - name: Lint and test
+        run: |
+          npm run lint
+          npm test
+
       - name: Point the app at your Supabase project
         run: |
           URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"

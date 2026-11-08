@@ -135,9 +135,9 @@ export function PartnerSyncSheet({ open, onOpenChange, myLifterName = "Lifter" }
 
             {/* Join Section */}
             <div className="rounded-xl border border-border/70 bg-card p-4">
-              <h4 className="text-foreground text-xs font-bold uppercase tracking-wider">Join Partner's Room</h4>
+              <h4 className="text-foreground text-xs font-bold uppercase tracking-wider">Join Partner&apos;s Room</h4>
               <p className="text-muted-foreground mt-1 text-xs">
-                Enter your gym partner's 4-character code or full room code:
+                Enter your gym partner&apos;s 4-character code or full room code:
               </p>
 
               <div className="mt-3 flex items-center gap-2">

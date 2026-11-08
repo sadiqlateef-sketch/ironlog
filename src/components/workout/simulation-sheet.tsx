@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Flame, Sparkles, Zap } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { simulateWorkout, type SimulatedExercise, type WorkoutSimulationResult } from "@/lib/simulation";
 import { getMuscleSets } from "@/lib/workout-api";
-import { LOOKBACK_HOURS, type MuscleSet } from "@/lib/recovery";
+import { LOOKBACK_HOURS } from "@/lib/recovery";
 import { MUSCLE_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -23,22 +23,30 @@ export function SimulationSheet({
   exercises: SimulatedExercise[];
   onStart?: () => void;
 }) {
-  const [history, setHistory] = useState<MuscleSet[]>([]);
-  const [result, setResult] = useState<WorkoutSimulationResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  // The parent builds a new exercises array on every render, so run the
+  // simulation only when the exercises themselves change (not on every render,
+  // which re-fetched in a loop while the sheet was open).
+  const key = JSON.stringify(exercises);
+  const latest = useRef(exercises);
+  useEffect(() => {
+    latest.current = exercises;
+  });
+  const [done, setDone] = useState<{ key: string; result: WorkoutSimulationResult } | null>(null);
+  const result = done?.key === key ? done.result : null;
+  const loading = open && exercises.length > 0 && !result;
 
   useEffect(() => {
-    if (!open || exercises.length === 0) return;
-    setLoading(true);
+    if (!open || latest.current.length === 0) return;
+    let live = true;
     getMuscleSets(new Date(Date.now() - LOOKBACK_HOURS * 3_600_000))
       .then((sets) => {
-        setHistory(sets);
-        const sim = simulateWorkout(exercises, sets, new Date());
-        setResult(sim);
+        if (live) setDone({ key, result: simulateWorkout(latest.current, sets, new Date()) });
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [open, exercises]);
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [open, key]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
