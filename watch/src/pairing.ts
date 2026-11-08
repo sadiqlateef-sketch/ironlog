@@ -1,7 +1,6 @@
 // Watch side of linking (server: supabase/functions/watch-pair).
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SUPABASE_KEY, SUPABASE_URL, supabase } from "./supabase";
-import { DEFAULT_OFFLINE_PLAN, PLAN_KEY } from "./api";
 
 export interface Pairing {
   pairing_id: string;
@@ -18,11 +17,8 @@ export async function isOfflineMode(): Promise<boolean> {
 }
 
 export async function enableOfflineMode(): Promise<void> {
+  // No made-up sample plan: the watch shows your real plan once it has had signal.
   await AsyncStorage.setItem(OFFLINE_KEY, "true");
-  const existing = await AsyncStorage.getItem(PLAN_KEY);
-  if (!existing) {
-    await AsyncStorage.setItem(PLAN_KEY, JSON.stringify(DEFAULT_OFFLINE_PLAN));
-  }
 }
 
 async function call<T>(body: object): Promise<T> {

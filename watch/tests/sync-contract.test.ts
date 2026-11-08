@@ -1,13 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { OpQueue, classify, uuid, type Op, type Outcome } from "../src/queue.ts";
-import {
-  groupSets,
-  currentPosition,
-  prefill,
-  type WatchSet,
-  type ExerciseGroup,
-} from "../src/logic.ts";
+import { OpQueue, classify, uuid, type Op } from "../src/queue.ts";
+import { groupSets, type WatchSet } from "../src/logic.ts";
 
 class MemoryKV {
   data = new Map<string, string>();
@@ -101,7 +95,7 @@ test("concurrent set completion: phone and watch update distinct sets without cl
   const serverDb = new Map<string, WatchSet>(initialSets.map((s) => [s.id, { ...s }]));
 
   // Phone completes set 1
-  function phoneCompleteSet(id: string, weight: number, reps: number, completedAt: string) {
+  function phoneCompleteSet(id: string, weight: number, reps: number, _completedAt: string) {
     const s = serverDb.get(id);
     if (s) {
       serverDb.set(id, { ...s, weight, reps, is_completed: true });
