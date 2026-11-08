@@ -44,7 +44,7 @@ import { syncHealthConnect } from "@/lib/health";
 import { buzz, cancelRecoveryReminder, scheduleRecoveryReminder } from "@/lib/native";
 import { nextMorning, recoveryMessage } from "@/lib/recovery-reminder";
 import { cueSetSaved } from "@/lib/cues";
-import { bestE1rm, matchTargets, nextSetType, parseNumber, shouldStartRest, watchSetPatch } from "@/lib/workout-logic";
+import { bestE1rm, matchTargets, nextSetType, parseNumber, setVolume, shouldStartRest, watchSetPatch } from "@/lib/workout-logic";
 import { formatDuration, parseDuration, toDistanceDisplay, toMetres } from "@/lib/cardio";
 import { PLATE_LOADED } from "@/lib/labels";
 import { matchPrevious, sideReps, suggestWeight, weightStep, getOverloadIncrement, type Suggestion } from "@/lib/set-logic";
@@ -471,12 +471,10 @@ export function useWorkout() {
       };
             try {
         const durationSec = Math.max(1, Math.round((endedAt - new Date(session.start_time).getTime()) / 1000));
-        const totalVolLb = done.reduce((sum, s) => {
-          const wNum = parseNumber(s.weight) || 0;
-          const rNum = parseNumber(s.reps) || 0;
-          const lb = unit === "imperial" ? wNum : wNum * 2.20462;
-          return sum + (lb * rNum);
-        }, 0);
+        // Same count as the saved workout: working sets only (no warm-ups).
+        const totalVolLb = done
+          .filter((x) => x.type !== "warmup")
+          .reduce((sum, x) => sum + setVolume(x.weight, x.reps, x.repsLeft) * (unit === "imperial" ? 1 : 2.20462), 0);
         IronLogEcosystemSync.onWorkoutCompleted({
           id: session.id,
           title: session.name ?? "Workout",

@@ -9,6 +9,7 @@ import {
   nextInRound,
   formatClock,
   liveVolume,
+  setVolume,
   matchTargets,
   moveUnit,
   workingOn,
@@ -305,4 +306,13 @@ test("in a circuit you go round: A, B, C, then rest after C", () => {
   // exercise 2 has no sets left: skip it
   const skipped = blocks.map((b) => (b.order === 2 ? { ...b, sets: sets([true, true]) } : b));
   assert.equal(nextInRound(1, skipped)?.next, 3);
+});
+
+test("one-side sets count like the database saves them: weaker side x weight", () => {
+  const blocks = [{ sets: [{ type: "normal" as const, weight: "50", reps: "10", repsLeft: "8", done: true }] }];
+  // The database stores reps = min(left, right) = 8, so the saved volume is 400.
+  assert.equal(liveVolume(blocks), 400);
+  assert.equal(setVolume("50", "10", "8"), 400);
+  assert.equal(setVolume("50", "10"), 500);
+  assert.equal(setVolume("50", "10", ""), 500);
 });
