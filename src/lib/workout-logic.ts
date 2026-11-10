@@ -2,6 +2,7 @@
 
 import type { SetType } from "../types/database";
 import { weightInput, type UnitSystem } from "./units.ts";
+import { epley } from "./one-rm.ts";
 
 export const SET_TYPE_ORDER: SetType[] = ["normal", "warmup", "drop", "failure", "amrap"];
 
@@ -198,11 +199,11 @@ export function smartSwaps<T extends SwapCandidate>(
 }
 
 /** Best Epley estimate across sets (weights in any one unit). 0 when nothing logged. */
-export function bestE1rm(sets: { weight: number; reps: number }[]): number {
+export function bestE1rm(sets: { weight: number; reps: number; rpe?: number | null }[]): number {
   let best = 0;
   for (const s of sets) {
     if (s.weight <= 0 || s.reps <= 0) continue;
-    const e = s.reps === 1 ? s.weight : s.weight * (1 + s.reps / 30);
+    const e = epley(s.weight, s.reps, s.rpe);
     if (e > best) best = e;
   }
   return best;
@@ -252,6 +253,7 @@ export interface HistorySet {
   completed_at: string | null;
   duration_seconds?: number | null;
   distance_m?: number | null;
+  rpe?: number | null;
 }
 
 export interface HistoryDay {

@@ -632,7 +632,7 @@ export async function startTemplateWorkout(day: TemplateLike["days"][number]): P
 
 // ---------- Progress overview ----------
 
-export type StatsSet = Pick<WorkoutSet, "session_id" | "exercise_id" | "set_type" | "weight" | "reps" | "completed_at">;
+export type StatsSet = Pick<WorkoutSet, "session_id" | "exercise_id" | "set_type" | "weight" | "reps" | "rpe" | "completed_at">;
 
 /** Every finished set since a date, paged so long histories aren't cut off at 1,000 rows. */
 export async function listFinishedSetsSince(since: Date): Promise<StatsSet[]> {
@@ -642,7 +642,7 @@ export async function listFinishedSetsSince(since: Date): Promise<StatsSet[]> {
     const rows: StatsSet[] = unwrap(
       await getSupabase()
         .from("workout_sets")
-        .select("session_id, exercise_id, set_type, weight, reps, completed_at")
+        .select("session_id, exercise_id, set_type, weight, reps, rpe, completed_at")
         .eq("is_completed", true)
         .gte("completed_at", since.toISOString())
         .order("completed_at")

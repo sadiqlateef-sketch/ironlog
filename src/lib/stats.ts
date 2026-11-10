@@ -19,6 +19,7 @@ export interface StatSet {
   weight: number;
   reps: number;
   completed_at: string | null;
+  rpe?: number | null;
 }
 
 const DAY = 86_400_000;
