@@ -54,7 +54,6 @@ export function deriveVariationGroup(exercise: {
 
 import type { Exercise } from "./workout-api.ts";
 import { MUSCLE_LABELS } from "./labels.ts";
-import type { EquipmentType } from "../types/database";
 
 export interface SwapExplanation {
   exercise: Exercise;

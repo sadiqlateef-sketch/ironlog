@@ -729,6 +729,12 @@ const RAW_DEFAULT_EXERCISES = [
     updated_at: "2026-01-01T00:00:00.000Z",
   },
 ];
+
+const DEFAULT_EXERCISES = RAW_DEFAULT_EXERCISES.map((e) => ({
+  ...e,
+  variation_group: deriveVariationGroup(e),
+}));
+
 export const LOCAL_EXERCISES = DEFAULT_EXERCISES;
 
 const DEFAULT_ROUTINES = [
