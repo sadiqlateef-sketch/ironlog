@@ -222,6 +222,9 @@ export interface PlannedExercise {
   warmups?: number;
   superset_group?: number | null;
   weight_kg?: number | null;
+  target_reps?: number | null;
+  target_weight?: number | null;
+  target_rpe?: number | null;
 }
 
 /** Start a workout with these exercises' sets laid out, ready to fill in. Works offline. */
@@ -263,9 +266,9 @@ export async function startPlannedSession(
   const inserts: SetInsert[] = [];
   items.forEach((item, i) => {
     let n = 1;
-    const base = { session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, superset_group: item.superset_group ?? null, reps: 0 };
+    const base = { session_id: session.id, exercise_id: item.exercise_id, exercise_order: i + 1, superset_group: item.superset_group ?? null, reps: 0, target_reps: item.target_reps ?? null, target_weight: item.target_weight ?? item.weight_kg ?? null, target_rpe: item.target_rpe ?? null };
     const warmupKg = warmupWeightsKg(item.weight_kg ?? 0, item.warmups ?? 0);
-    for (let w = 0; w < (item.warmups ?? 0); w++) inserts.push({ ...base, set_number: n++, set_type: "warmup", weight: warmupKg[w] });
+    for (let w = 0; w < (item.warmups ?? 0); w++) inserts.push({ ...base, set_number: n++, set_type: "warmup", weight: warmupKg[w], target_reps: null, target_weight: null, target_rpe: null });
     for (let s = 0; s < item.sets; s++) inserts.push({ ...base, set_number: n++, set_type: "normal", weight: item.weight_kg ?? 0 });
   });
   const sets = inserts.map((s) => toRow(s, uid));
@@ -412,6 +415,9 @@ function toRow(s: SetInsert, uid: string): WorkoutSet {
     distance_m: s.distance_m ?? null,
     reps_left: s.reps_left ?? null,
     reps_right: s.reps_right ?? null,
+    target_reps: s.target_reps ?? null,
+    target_weight: s.target_weight ?? null,
+    target_rpe: s.target_rpe ?? null,
     created_at: t,
     updated_at: t,
   };
@@ -422,11 +428,14 @@ function toRow(s: SetInsert, uid: string): WorkoutSet {
  * reps go only when used, so logging still works before the database update.
  */
 function insertable(r: WorkoutSet): Record<string, unknown> {
-  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m, reps_left, reps_right } = r;
+  const { id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m, reps_left, reps_right, target_reps, target_weight, target_rpe } = r;
   return {
     id, session_id, exercise_id, exercise_order, set_number, set_type, weight, reps, rpe, superset_group, parent_set_id, is_completed, notes, duration_seconds, distance_m,
     ...(reps_left != null && { reps_left }),
     ...(reps_right != null && { reps_right }),
+    ...(target_reps != null && { target_reps }),
+    ...(target_weight != null && { target_weight }),
+    ...(target_rpe != null && { target_rpe }),
   };
 }
 

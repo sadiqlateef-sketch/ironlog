@@ -362,6 +362,9 @@ export type Database = {
           distance_m: number | null;
           reps_left: number | null;
           reps_right: number | null;
+          target_reps: number | null;
+          target_weight: number | null;
+          target_rpe: number | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -384,6 +387,9 @@ export type Database = {
           distance_m?: number | null;
           reps_left?: number | null;
           reps_right?: number | null;
+          target_reps?: number | null;
+          target_weight?: number | null;
+          target_rpe?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_sets"]["Insert"]>;
         Relationships: [

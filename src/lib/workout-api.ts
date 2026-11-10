@@ -170,6 +170,9 @@ export async function startSession(routine?: Routine): Promise<WorkoutSession> {
           warmups: x.warmup_sets,
           superset_group: x.superset_group,
           weight_kg: x.target_weight_kg,
+          target_reps: x.target_reps,
+          target_weight: x.target_weight_kg,
+          target_rpe: x.target_rpe,
         }),
       )
     : [];
