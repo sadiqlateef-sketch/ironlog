@@ -144,6 +144,7 @@ interface SwapCandidate {
   mechanic: string;
   /** Curated exercises carry other names; they're the everyday staples. */
   aliases?: string[];
+  variation_group?: string | null;
 }
 
 const EVERYDAY_EQUIPMENT = ["barbell", "dumbbell", "machine", "cable", "smith_machine", "bodyweight"];
@@ -154,13 +155,15 @@ const EVERYDAY_EQUIPMENT = ["barbell", "dumbbell", "machine", "cable", "smith_ma
  * shared helper muscles, then name).
  */
 export function similarExercises<T extends SwapCandidate>(current: SwapCandidate, all: T[], limit = 12): T[] {
+  const sameGroup = (e: T) => Boolean(current.variation_group && e.variation_group && current.variation_group === e.variation_group);
   const score = (e: T) =>
+    (sameGroup(e) ? 25 : 0) +
     (e.mechanic === current.mechanic ? 10 : 0) +
     (e.aliases?.length ? 5 : 0) +
     (EVERYDAY_EQUIPMENT.includes(e.equipment) ? 3 : 0) +
     e.secondary_muscles.filter((m) => current.secondary_muscles.includes(m)).length;
   return all
-    .filter((e) => e.id !== current.id && e.primary_muscle === current.primary_muscle)
+    .filter((e) => e.id !== current.id && (e.primary_muscle === current.primary_muscle || sameGroup(e)))
     .sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name))
     .slice(0, limit);
 }
@@ -177,11 +180,13 @@ export function smartSwaps<T extends SwapCandidate>(
   opts: { allowed?: (e: T) => boolean; exclude?: Set<string>; limit?: number } = {},
 ): T[] {
   const mine = new Set(current.secondary_muscles);
+  const sameGroup = (e: T) => Boolean(current.variation_group && e.variation_group && current.variation_group === e.variation_group);
   const score = (e: T) => {
     const shared = e.secondary_muscles.filter((m) => mine.has(m)).length;
     const extra = e.secondary_muscles.length - shared;
     const missing = mine.size - shared;
     return (
+      (sameGroup(e) ? 25 : 0) +
       (e.mechanic === current.mechanic ? 10 : 0) +
       shared * 3 -
       (extra + missing) +
@@ -191,7 +196,13 @@ export function smartSwaps<T extends SwapCandidate>(
     );
   };
   return all
-    .filter((e) => e.id !== current.id && e.primary_muscle === current.primary_muscle && !opts.exclude?.has(e.id) && (opts.allowed?.(e) ?? true))
+    .filter(
+      (e) =>
+        e.id !== current.id &&
+        (e.primary_muscle === current.primary_muscle || sameGroup(e)) &&
+        !opts.exclude?.has(e.id) &&
+        (opts.allowed?.(e) ?? true),
+    )
     .map((e) => ({ e, s: score(e) }))
     .sort((a, b) => b.s - a.s || a.e.name.localeCompare(b.e.name))
     .slice(0, opts.limit ?? 12)

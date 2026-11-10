@@ -117,6 +117,7 @@ export type Database = {
           unilateral: boolean;
           /** Caption under the form demo, e.g. when the photos show a similar movement. */
           demo_note?: string | null;
+          variation_group: string | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -133,6 +134,7 @@ export type Database = {
           image_urls?: string[];
           tracking?: Tracking;
           unilateral?: boolean;
+          variation_group?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["exercises"]["Insert"]>;
         Relationships: [];

@@ -1,3 +1,4 @@
+import { deriveVariationGroup } from "../substitution-engine.ts";
 /**
  * Offline / Local Supabase mock engine for Ironlog.
  * Enables zero-cloud authentication, profile caching, exercise library browsing,
@@ -92,7 +93,7 @@ const DEFAULT_PROFILE = {
   updated_at: new Date().toISOString(),
 };
 
-const DEFAULT_EXERCISES = [
+const RAW_DEFAULT_EXERCISES = [
   {
     id: "e1000000-0000-0000-0000-000000000001",
     name: "Back Squat",
