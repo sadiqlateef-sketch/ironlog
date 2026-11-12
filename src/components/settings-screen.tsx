@@ -11,6 +11,7 @@ import { ClaudeConnectSheet } from "@/components/claude-connect-sheet";
 import { ModifyProgramSheet } from "@/components/modify-program-sheet";
 import { OverloadSettingsSheet } from "@/components/overload-settings-sheet";
 import { BackupButton } from "@/components/import/backup-button";
+import { NutritionSettings } from "@/components/food/nutrition-settings";
 import { EquipmentSheet } from "@/components/equipment-sheet";
 import { GymSheet } from "@/components/gym-sheet";
 import { HealthSheet } from "@/components/health-sheet";
@@ -133,6 +134,10 @@ export function SettingsScreen() {
 
       <Section id="appearance" title="Appearance" description="Saved on this phone. Dark is easiest to read under bright gym lights.">
         <AppearanceSettings />
+      </Section>
+
+      <Section id="nutrition" title="Nutrition" description="Your food day, meals and the USDA key.">
+        <NutritionSettings />
       </Section>
 
       <Section id="about" title="About you" description="Used for BMI and the body fat estimate. Only you can see it.">
