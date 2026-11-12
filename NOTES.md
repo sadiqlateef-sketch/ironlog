@@ -5,6 +5,7 @@
 - Fix before features: the finish-workout fix lands and is verified on the phone before any feature work.
 - The 21 approved features are the ceiling. Nothing new without Sadiq's say-so (Oct 28-29 additions await his ruling).
 - Cloud-backed (Supabase) with offline logging (2026-10-25). Weights stored in kg. Release builds use the Bujo key from the PC.
+- 2026-11-12: nutrition N2 (food diary) is built locally and smoke-tested. Its migration `20261112000000_nutrition_diary.sql` is NOT deployed; the owner deploys it via the manual GitHub workflow. Until then food changes stay on the phone with a "database hasn't been updated" message. See `IRONLOG_NUTRITION_N2_REPORT.md`.
 - Never orphan workout history in a schema change. Install with `adb install -r`, never uninstall.
 
 ## Verified on my phone

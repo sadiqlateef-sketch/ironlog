@@ -65,7 +65,7 @@ async function run(label, viewport) {
   if (await skip.count()) await skip.first().click();
 
   // Every screen opens without a crash.
-  for (const route of ["/", "/workout/", "/progress/", "/more/", "/plans/", "/exercises/", "/settings/", "/search/", "/log/", "/import/"]) {
+  for (const route of ["/", "/workout/", "/progress/", "/more/", "/plans/", "/exercises/", "/settings/", "/search/", "/log/", "/import/", "/food/", "/food/add/"]) {
     const before = errors.length;
     await page.goto(base + route);
     await page.waitForTimeout(1800);
@@ -117,6 +117,64 @@ async function run(label, viewport) {
   await page.waitForTimeout(2500);
   check(`${label}: Workout tab shows the start screen after finishing`, (await page.getByTestId("finish-button").count()) === 0);
   await shot("workout-after-finish");
+
+  // Food diary: quick add, reload, offline add, reconnect, custom food, Home card, Settings.
+  await page.goto(`${base}/food/`);
+  await page.waitForTimeout(2000);
+  const quickAdd = async (name, kcal) => {
+    await page.getByRole("button", { name: "More food options" }).click();
+    await page.getByRole("button", { name: "Quick add" }).click();
+    await page.waitForTimeout(500);
+    await page.getByPlaceholder("What was it?").fill(name);
+    await page.getByLabel("Calories (kcal)").fill(String(kcal));
+    await page.getByRole("button", { name: /^Add to / }).click();
+    await page.waitForTimeout(1200);
+  };
+  await quickAdd("Smoke snack", 200);
+  check(`${label}: food quick add is listed`, (await text()).includes("Smoke snack"));
+  check(`${label}: food diary total shows 200`, (await page.getByTestId("food-total-energy").innerText()).includes("200"));
+  await shot("food");
+  await page.reload();
+  await page.waitForTimeout(2000);
+  check(`${label}: food entry survives a reload`, (await text()).includes("Smoke snack"));
+  await ctx.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await quickAdd("Offline snack", 50);
+  const offlineText = await text();
+  check(`${label}: offline food entry is listed at once`, offlineText.includes("Offline snack"));
+  check(`${label}: offline food sync chip shows no error`, !/couldn'?t|refused|database hasn/i.test(offlineText), offlineText.match(/\d+ food change[^.]{0,40}/)?.[0] ?? "no chip");
+  await ctx.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await page.waitForTimeout(3000);
+  check(`${label}: food changes finish syncing`, !/food changes? waiting/.test(await text()));
+  check(`${label}: both food entries remain`, (await page.getByTestId("food-entry").count()) === 2);
+
+  await page.goto(`${base}/food/add/`);
+  await page.waitForTimeout(1500);
+  await shot("food-add");
+  await page.getByRole("button", { name: /Add your own food/ }).click();
+  await page.waitForTimeout(500);
+  await page.getByPlaceholder("What is it?").fill("Smoke oats");
+  for (const [lbl, v] of [["Calories (kcal)", "400"], ["Protein (g)", "10"], ["Carbs (g)", "60"], ["Fat (g)", "8"]]) await page.getByLabel(lbl).first().fill(v);
+  await page.getByRole("button", { name: /Save and choose amount/ }).click();
+  await page.waitForTimeout(1000);
+  await page.getByLabel("Amount").fill("50");
+  await page.getByRole("button", { name: /^Add to / }).click();
+  await page.waitForTimeout(2500);
+  check(`${label}: custom food lands in the diary`, (await text()).includes("Smoke oats"));
+  check(`${label}: diary total adds the custom food (250 + 200 = 450)`, (await page.getByTestId("food-total-energy").innerText()).includes("450"));
+
+  await page.goto(`${base}/`);
+  await page.waitForTimeout(2000);
+  check(`${label}: Home shows the nutrition card`, (await page.getByTestId("home-nutrition").count()) > 0);
+  await shot("home-nutrition");
+  await page.goto(`${base}/settings/`);
+  await page.waitForTimeout(1800);
+  check(`${label}: Settings has a Nutrition section`, (await page.locator("#nutrition").count()) > 0 && (await text()).includes("day starts at"));
+  await page.locator("#nutrition").scrollIntoViewIfNeeded();
+  await page.evaluate(() => document.getElementById("nutrition")?.scrollIntoView({ block: "start" }));
+  await page.waitForTimeout(300);
+  await shot("settings-nutrition");
 
   check(`${label}: no page errors`, errors.length === 0, errors.join(" | ").slice(0, 200));
   await ctx.close();
