@@ -89,6 +89,8 @@ const DEFAULT_PROFILE = {
   active_kit_id: null,
   work_shifts: [],
   effort_scale: "rpe",
+  nutrition_prefs: {},
+  nutrition_goals: {},
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: new Date().toISOString(),
 };

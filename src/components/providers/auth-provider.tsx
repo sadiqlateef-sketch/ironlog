@@ -7,6 +7,7 @@ import { listenForGoogleSignIn } from "@/lib/google-sign-in";
 import { cachedRead } from "@/lib/offline/cache";
 import { kvClear, kvSet } from "@/lib/offline/kv";
 import { discardPending, flush, getSyncStatus } from "@/lib/offline/queue";
+import { flushNutrition, getNutritionSyncStatus, resetNutritionOutbox } from "@/lib/offline/nutrition-outbox";
 import type { Tables, UnitSystem } from "@/types/database";
 
 type Profile = Tables<"users">;
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (fake && !isLocalBackend()) {
         await supabase.auth.signOut({ scope: "local" });
         await discardPending();
+        await resetNutritionOutbox();
         await kvClear();
         setSession(null);
         return;
@@ -100,13 +102,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    // Send any workout changes still waiting for signal before they're forgotten.
-    if (!(await flush())) {
-      const n = getSyncStatus().pending;
-      if (n > 0 && !confirm(`${n} workout ${n === 1 ? "change hasn't" : "changes haven't"} synced yet. Sign out anyway and lose ${n === 1 ? "it" : "them"}?`)) return;
+    // Send any workout and food changes still waiting for signal before they're forgotten.
+    const workoutSent = await flush();
+    const foodSent = await flushNutrition();
+    if (!workoutSent || !foodSent) {
+      const n = workoutSent ? 0 : getSyncStatus().pending;
+      const m = foodSent ? 0 : getNutritionSyncStatus().pending;
+      if (n + m > 0) {
+        const parts = [
+          ...(n > 0 ? [`${n} workout ${n === 1 ? "change" : "changes"}`] : []),
+          ...(m > 0 ? [`${m} food ${m === 1 ? "change" : "changes"}`] : []),
+        ];
+        const total = n + m;
+        if (!confirm(`${parts.join(" and ")} ${total === 1 ? "hasn't" : "haven't"} synced yet. Sign out anyway and lose ${total === 1 ? "it" : "them"}?`)) return;
+      }
     }
     await getSupabase().auth.signOut();
     await discardPending();
+    // Forget the food outbox in memory too, or the next person to sign in could send this one's food.
+    await resetNutritionOutbox();
     await kvClear();
   }, []);
 
