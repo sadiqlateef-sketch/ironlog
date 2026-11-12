@@ -1,0 +1,110 @@
+{
+  "_provenance": "EDITED real record: same food as usda-energy-957.json (GET .../food/2003591?format=abridged fetched 2026-11-12) with the 957 energy row removed (no real Foundation food with neither 208 nor 957 but with 203/204/205 turned up). Not a verbatim FDC record.",
+  "fdcId": 2003591,
+  "description": "Orange juice, no pulp, not fortified, from concentrate, refrigerated",
+  "dataType": "Foundation",
+  "foodNutrients": [
+    {
+      "number": "303",
+      "name": "Iron, Fe",
+      "amount": 0.0646,
+      "unitName": "MG"
+    },
+    {
+      "number": "304",
+      "name": "Magnesium, Mg",
+      "amount": 10.6,
+      "unitName": "MG"
+    },
+    {
+      "number": "305",
+      "name": "Phosphorus, P",
+      "amount": 18.2,
+      "unitName": "MG"
+    },
+    {
+      "number": "306",
+      "name": "Potassium, K",
+      "amount": 180,
+      "unitName": "MG"
+    },
+    {
+      "number": "307",
+      "name": "Sodium, Na",
+      "amount": 5.23,
+      "unitName": "MG"
+    },
+    {
+      "number": "309",
+      "name": "Zinc, Zn",
+      "amount": 0.0319,
+      "unitName": "MG"
+    },
+    {
+      "number": "312",
+      "name": "Copper, Cu",
+      "amount": 0.0322,
+      "unitName": "MG"
+    },
+    {
+      "number": "401",
+      "name": "Vitamin C, total ascorbic acid",
+      "amount": 26.9,
+      "unitName": "MG"
+    },
+    {
+      "number": "315",
+      "name": "Manganese, Mn",
+      "amount": 0.0299,
+      "unitName": "MG"
+    },
+    {
+      "number": "404",
+      "name": "Thiamin",
+      "amount": 0.0701,
+      "unitName": "MG"
+    },
+    {
+      "number": "406",
+      "name": "Niacin",
+      "amount": 0.0403,
+      "unitName": "MG"
+    },
+    {
+      "number": "415",
+      "name": "Vitamin B-6",
+      "amount": 0.0429,
+      "unitName": "MG"
+    },
+    {
+      "number": "417",
+      "name": "Folate, total",
+      "amount": 29.8,
+      "unitName": "UG"
+    },
+    {
+      "number": "204",
+      "name": "Total lipid (fat)",
+      "amount": 0.325,
+      "unitName": "G"
+    },
+    {
+      "number": "301",
+      "name": "Calcium, Ca",
+      "amount": 12.8,
+      "unitName": "MG"
+    },
+    {
+      "number": "203",
+      "name": "Protein",
+      "amount": 0.734,
+      "unitName": "G"
+    },
+    {
+      "number": "205",
+      "name": "Carbohydrate, by difference",
+      "amount": 10.3,
+      "unitName": "G"
+    }
+  ]
+}

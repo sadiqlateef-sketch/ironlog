@@ -1,0 +1,124 @@
+{
+  "_provenance": "Real response, GET https://api.nal.usda.gov/fdc/v1/foods/search?query=cheddar cheese&pageSize=25&pageNumber=1 fetched 2026-11-12; trimmed to hit 2340698 (Vitamin D number 324 reported in IU) and to the consumed fields and mapped nutrient rows.",
+  "totalHits": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "foods": [
+    {
+      "fdcId": 2340698,
+      "description": "CHEDDAR CHEESE",
+      "dataType": "Branded",
+      "brandOwner": "Safeway, Inc.",
+      "gtinUpc": "021130044672",
+      "servingSize": 28,
+      "servingSizeUnit": "g",
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "nutrientNumber": "203",
+          "nutrientName": "Protein",
+          "value": 21.4,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientNumber": "204",
+          "nutrientName": "Total lipid (fat)",
+          "value": 32.1,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientNumber": "205",
+          "nutrientName": "Carbohydrate, by difference",
+          "value": 3.57,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientNumber": "208",
+          "nutrientName": "Energy",
+          "value": 393,
+          "unitName": "KCAL"
+        },
+        {
+          "nutrientId": 2000,
+          "nutrientNumber": "269",
+          "nutrientName": "Total Sugars",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientNumber": "291",
+          "nutrientName": "Fiber, total dietary",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1087,
+          "nutrientNumber": "301",
+          "nutrientName": "Calcium, Ca",
+          "value": 536,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1089,
+          "nutrientNumber": "303",
+          "nutrientName": "Iron, Fe",
+          "value": 0,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1092,
+          "nutrientNumber": "306",
+          "nutrientName": "Potassium, K",
+          "value": 0,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1093,
+          "nutrientNumber": "307",
+          "nutrientName": "Sodium, Na",
+          "value": 643,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1110,
+          "nutrientNumber": "324",
+          "nutrientName": "Vitamin D (D2 + D3), International Units",
+          "value": 29,
+          "unitName": "IU"
+        },
+        {
+          "nutrientId": 1235,
+          "nutrientNumber": "539",
+          "nutrientName": "Sugars, added",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1253,
+          "nutrientNumber": "601",
+          "nutrientName": "Cholesterol",
+          "value": 107,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1257,
+          "nutrientNumber": "605",
+          "nutrientName": "Fatty acids, total trans",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1258,
+          "nutrientNumber": "606",
+          "nutrientName": "Fatty acids, total saturated",
+          "value": 17.9,
+          "unitName": "G"
+        }
+      ]
+    }
+  ]
+}

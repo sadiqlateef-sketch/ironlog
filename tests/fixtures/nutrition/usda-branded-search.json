@@ -1,0 +1,198 @@
+{
+  "_provenance": "Real response, GET https://api.nal.usda.gov/fdc/v1/foods/search?query=cheddar cheese&pageSize=25&pageNumber=1 fetched 2026-11-12; foods trimmed to hits 2095236 (servingSizeUnit g) and 2596517 (servingSizeUnit GRM) and to the consumed fields and mapped nutrient rows. nutrientId values are the real FDC ids and differ from nutrientNumber.",
+  "totalHits": 60863,
+  "currentPage": 1,
+  "totalPages": 2435,
+  "foods": [
+    {
+      "fdcId": 2095236,
+      "description": "CHEDDAR CHEESE",
+      "dataType": "Branded",
+      "brandOwner": "MDS Foods Inc.",
+      "gtinUpc": "828653282457",
+      "servingSize": 28,
+      "servingSizeUnit": "g",
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "nutrientNumber": "203",
+          "nutrientName": "Protein",
+          "value": 25,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientNumber": "204",
+          "nutrientName": "Total lipid (fat)",
+          "value": 35.7,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientNumber": "205",
+          "nutrientName": "Carbohydrate, by difference",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientNumber": "208",
+          "nutrientName": "Energy",
+          "value": 432,
+          "unitName": "KCAL"
+        },
+        {
+          "nutrientId": 2000,
+          "nutrientNumber": "269",
+          "nutrientName": "Total Sugars",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientNumber": "291",
+          "nutrientName": "Fiber, total dietary",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1093,
+          "nutrientNumber": "307",
+          "nutrientName": "Sodium, Na",
+          "value": 686,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1253,
+          "nutrientNumber": "601",
+          "nutrientName": "Cholesterol",
+          "value": 107,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1257,
+          "nutrientNumber": "605",
+          "nutrientName": "Fatty acids, total trans",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1258,
+          "nutrientNumber": "606",
+          "nutrientName": "Fatty acids, total saturated",
+          "value": 21.4,
+          "unitName": "G"
+        }
+      ]
+    },
+    {
+      "fdcId": 2596517,
+      "description": "CHEDDAR CHEESE",
+      "dataType": "Branded",
+      "brandOwner": "",
+      "gtinUpc": "0041711093004",
+      "servingSize": 28,
+      "servingSizeUnit": "GRM",
+      "foodNutrients": [
+        {
+          "nutrientId": 1003,
+          "nutrientNumber": "203",
+          "nutrientName": "Protein",
+          "value": 17.9,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1004,
+          "nutrientNumber": "204",
+          "nutrientName": "Total lipid (fat)",
+          "value": 25,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1005,
+          "nutrientNumber": "205",
+          "nutrientName": "Carbohydrate, by difference",
+          "value": 10.7,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1008,
+          "nutrientNumber": "208",
+          "nutrientName": "Energy",
+          "value": 357,
+          "unitName": "KCAL"
+        },
+        {
+          "nutrientId": 2000,
+          "nutrientNumber": "269",
+          "nutrientName": "Total Sugars",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1079,
+          "nutrientNumber": "291",
+          "nutrientName": "Fiber, total dietary",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1087,
+          "nutrientNumber": "301",
+          "nutrientName": "Calcium, Ca",
+          "value": 357,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1089,
+          "nutrientNumber": "303",
+          "nutrientName": "Iron, Fe",
+          "value": 0,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1092,
+          "nutrientNumber": "306",
+          "nutrientName": "Potassium, K",
+          "value": 250,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1093,
+          "nutrientNumber": "307",
+          "nutrientName": "Sodium, Na",
+          "value": 714,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1235,
+          "nutrientNumber": "539",
+          "nutrientName": "Sugars, added",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1253,
+          "nutrientNumber": "601",
+          "nutrientName": "Cholesterol",
+          "value": 71,
+          "unitName": "MG"
+        },
+        {
+          "nutrientId": 1257,
+          "nutrientNumber": "605",
+          "nutrientName": "Fatty acids, total trans",
+          "value": 0,
+          "unitName": "G"
+        },
+        {
+          "nutrientId": 1258,
+          "nutrientNumber": "606",
+          "nutrientName": "Fatty acids, total saturated",
+          "value": 14.3,
+          "unitName": "G"
+        }
+      ]
+    }
+  ]
+}
