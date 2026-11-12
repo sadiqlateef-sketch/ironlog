@@ -89,8 +89,14 @@ function mapRows(rows: Row[]): { nutrients: Nutrients; droppedUnits: string[] } 
   const seen = new Set<string>();
   let energy208: number | null = null;
   let energy957: number | null = null;
+  // 328 is FDC's vitamin D in micrograms; used only when 324 gave no usable value (324 usually arrives in IU).
+  let vitaminD328: number | null = null;
 
   for (const row of rows) {
+    if (row.number === "328") {
+      vitaminD328 ??= toGrams(row.amount, row.unit);
+      continue;
+    }
     if (row.number === "208") {
       energy208 ??= row.amount;
       continue;
@@ -108,6 +114,12 @@ function mapRows(rows: Row[]): { nutrients: Nutrients; droppedUnits: string[] } 
       continue;
     }
     nutrients[key] = complete(grams);
+  }
+
+  if (nutrients.vitaminD.state !== "complete" && vitaminD328 !== null) {
+    nutrients.vitaminD = complete(vitaminD328);
+    const i = droppedUnits.indexOf("vitaminD");
+    if (i !== -1) droppedUnits.splice(i, 1);
   }
 
   const energy = energy208 ?? energy957;

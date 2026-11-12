@@ -488,6 +488,34 @@ test("USDA F6 IU nutrient stays incomplete and is listed in droppedUnits", () =>
   assert.equal(food.nutrients.calcium.state, "complete");
 });
 
+test("USDA vitamin D falls back to 328 (µg) when 324 is IU", () => {
+  const food = mapUsdaDetailFood({
+    fdcId: 1,
+    description: "Test fish",
+    foodNutrients: [
+      { number: "324", amount: 400, unitName: "IU" },
+      { number: "328", amount: 10, unitName: "µg" },
+    ],
+  });
+  assert.ok(food);
+  assert.equal(food.nutrients.vitaminD.state, "complete");
+  assert.ok(Math.abs(food.nutrients.vitaminD.value - 0.00001) < 1e-12);
+  assert.deepEqual(food.droppedUnits, []);
+});
+
+test("USDA vitamin D prefers a usable 324 over 328", () => {
+  const food = mapUsdaDetailFood({
+    fdcId: 2,
+    description: "Test milk",
+    foodNutrients: [
+      { number: "328", amount: 1, unitName: "UG" },
+      { number: "324", amount: 2, unitName: "UG" },
+    ],
+  });
+  assert.ok(food);
+  assert.ok(Math.abs(food.nutrients.vitaminD.value - 0.000002) < 1e-12);
+});
+
 test("USDA always-empty nutrients are incomplete even with every row present", () => {
   const food = mapUsdaDetailFood(f5a);
   assert.ok(food);

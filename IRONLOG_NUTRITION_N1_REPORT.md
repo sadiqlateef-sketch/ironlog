@@ -101,3 +101,7 @@ a. USDA nutrient 324 (vitamin D) arrives in IU in real data, so it is always dro
 b. USDA `getFood` on 404 throws `not-found`, while OFF `getProduct` on 404 returns null. Callers must handle the two differently.
 c. OFF `search.pl` returned 503 repeatedly (while recording fixtures and again in the live probe). OFF search should be treated as unreliable; the merged search already degrades to the other source with an `errors` entry.
 d. Commit trailers name a different model than the brief specified. Cosmetic.
+
+## Addendum — vitamin D fallback (owner-approved 2026-11-12)
+
+Finding (a) is resolved: the USDA mapper now reads nutrient 328 (vitamin D, µg) when 324 gives no usable value (324 usually arrives in IU). A usable 324 still wins, and when 328 fills vitamin D it is removed from `droppedUnits`. Two new tests; `npm test` is now 365/365, typecheck still shows only the 3 pre-existing errors, and lint is clean on the nutrition files.
