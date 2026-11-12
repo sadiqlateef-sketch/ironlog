@@ -2,6 +2,7 @@
 // To add a screen to More, add one entry to MORE_SECTIONS.
 
 import {
+  Apple,
   Calculator,
   Compass,
   Camera,
@@ -32,7 +33,7 @@ export const TABS: Tab[] = [
   { href: "/", label: "Home", icon: House },
   { href: "/workout/", label: "Workout", icon: Dumbbell, also: ["/log/"] },
   { href: "/progress/", label: "Progress", icon: ChartLine },
-  { href: "/more/", label: "More", icon: Menu, also: ["/exercises/", "/plans/", "/settings/", "/link-watch/", "/search/", "/import/"] },
+  { href: "/more/", label: "More", icon: Menu, also: ["/exercises/", "/plans/", "/settings/", "/link-watch/", "/search/", "/import/", "/food/"] },
 ];
 
 const strip = (p: string) => (p.length > 1 ? p.replace(/\/$/, "") : p);
@@ -63,6 +64,18 @@ export const MORE_SECTIONS: { title: string; items: MoreItem[] }[] = [
       { label: "Programs", detail: "Your plans, and building a new one with Claude", icon: Sparkles, href: "/plans/" },
       { label: "Exercise library", detail: "Every exercise, with form demos and your history", icon: ListChecks, href: "/exercises/" },
       { label: "Plate calculator", detail: "Which plates go on each side of the bar", icon: Calculator, action: "plates", keywords: "barbell plates loading" },
+    ],
+  },
+  {
+    title: "Nutrition",
+    items: [
+      {
+        label: "Food diary",
+        detail: "Log what you eat and see today's calories and macros",
+        icon: Apple,
+        href: "/food/",
+        keywords: "food calories macros meals eat diary nutrition",
+      },
     ],
   },
   {
