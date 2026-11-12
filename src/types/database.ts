@@ -73,6 +73,9 @@ export type Database = {
           active_kit_id: string | null;
           work_shifts: Json;
           effort_scale: EffortScale;
+          /** Missing until the nutrition diary migration has run. */
+          nutrition_prefs?: Json;
+          nutrition_goals?: Json;
         } & Timestamps;
         Insert: {
           id: string;
@@ -95,6 +98,8 @@ export type Database = {
           active_kit_id?: string | null;
           work_shifts?: Json;
           effort_scale?: EffortScale;
+          nutrition_prefs?: Json;
+          nutrition_goals?: Json;
         };
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
         Relationships: [];
@@ -183,6 +188,80 @@ export type Database = {
           waist_cm?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["body_measurements"]["Insert"]>;
+        Relationships: [];
+      };
+      foods: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          brand: string | null;
+          barcode: string | null;
+          liquid: boolean;
+          serving_amount: number | null;
+          package_amount: number | null;
+          nutrients: Json;
+          source: "user" | "off" | "usda" | "staple";
+          source_id: string | null;
+          source_url: string | null;
+          note: string | null;
+          archived: boolean;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          brand?: string | null;
+          barcode?: string | null;
+          liquid?: boolean;
+          serving_amount?: number | null;
+          package_amount?: number | null;
+          nutrients: Json;
+          source: "user" | "off" | "usda" | "staple";
+          source_id?: string | null;
+          source_url?: string | null;
+          note?: string | null;
+          archived?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["foods"]["Insert"]>;
+        Relationships: [];
+      };
+      food_entries: {
+        Row: {
+          id: string;
+          user_id: string;
+          food_day: string;
+          meal_id: string;
+          meal_name: string;
+          eaten_at: string;
+          food_id: string | null;
+          name: string;
+          brand: string | null;
+          quantity: number;
+          unit: "g" | "ml" | "oz" | "fl_oz" | "serving" | "package" | "quick";
+          grams: number | null;
+          food: Json | null;
+          nutrients: Json;
+          note: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          food_day: string;
+          meal_id: string;
+          meal_name: string;
+          eaten_at?: string;
+          food_id?: string | null;
+          name: string;
+          brand?: string | null;
+          quantity: number;
+          unit: "g" | "ml" | "oz" | "fl_oz" | "serving" | "package" | "quick";
+          grams?: number | null;
+          food?: Json | null;
+          nutrients: Json;
+          note?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["food_entries"]["Insert"]>;
         Relationships: [];
       };
       routines: {
