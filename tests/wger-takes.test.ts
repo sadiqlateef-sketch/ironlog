@@ -7,7 +7,7 @@ import { deriveVariationGroup, explainSubstitution } from "../src/lib/substituti
 import { startPlannedSession } from "../src/lib/offline/workout-store.ts";
 import { getSupabase } from "../src/lib/supabase/client.ts";
 import { kvGet, kvSet } from "../src/lib/offline/kv.ts";
-import type { WorkoutSet } from "../src/types/database.ts";
+import type { WorkoutSet } from "../src/lib/workout-api.ts";
 import type { Exercise } from "../src/lib/workout-api.ts";
 import type { Session } from "@supabase/supabase-js";
 

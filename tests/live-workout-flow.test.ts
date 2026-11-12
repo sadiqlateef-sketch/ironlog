@@ -117,6 +117,7 @@ test("Live Workout Flow: Template Initialization -> Warm-up Sequencer -> Dynamic
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     created_by: null,
+    variation_group: null,
   };
 
   const candidateExercise: Exercise = {
@@ -136,6 +137,7 @@ test("Live Workout Flow: Template Initialization -> Warm-up Sequencer -> Dynamic
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     created_by: null,
+    variation_group: null,
   };
 
   const swap = explainSubstitution(originalExercise, candidateExercise);
