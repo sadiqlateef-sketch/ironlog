@@ -78,3 +78,46 @@ test("scaleNutrients scales values and keeps states and rules", () => {
   assert.deepEqual(s.protein, { value: 0, state: "incomplete" });
   assert.equal(n.energy.value, 200);
 });
+
+import { NutritionError, createRateLimiter, nutritionUserAgent } from "../src/lib/nutrition/http.ts";
+
+test("createRateLimiter enforces a sliding window with an injected clock", () => {
+  let t = 1000;
+  const limiter = createRateLimiter(2, 100, () => t);
+  assert.equal(limiter.take(), true);
+  t = 1050;
+  assert.equal(limiter.take(), true);
+  assert.equal(limiter.take(), false);
+  t = 1099;
+  assert.equal(limiter.take(), false);
+  t = 1100; // first stamp (1000) has aged out
+  assert.equal(limiter.take(), true);
+  assert.equal(limiter.take(), false);
+  t = 1150; // 1050 aged out
+  assert.equal(limiter.take(), true);
+});
+
+test("refused takes do not consume window capacity", () => {
+  let t = 0;
+  const limiter = createRateLimiter(1, 10, () => t);
+  assert.equal(limiter.take(), true);
+  t = 5;
+  assert.equal(limiter.take(), false);
+  t = 10;
+  assert.equal(limiter.take(), true);
+});
+
+test("NutritionError carries code and reason", () => {
+  const e = new NutritionError("unauthorized", "API_KEY_MISSING");
+  assert.ok(e instanceof Error);
+  assert.equal(e.name, "NutritionError");
+  assert.equal(e.code, "unauthorized");
+  assert.equal(e.reason, "API_KEY_MISSING");
+  const bare = new NutritionError("rate-limited");
+  assert.equal(bare.code, "rate-limited");
+  assert.equal(bare.reason, undefined);
+});
+
+test("nutritionUserAgent has the IronLog format", () => {
+  assert.match(nutritionUserAgent(), /^IronLog\/\S+ \(personal strength-training app\)$/);
+});
