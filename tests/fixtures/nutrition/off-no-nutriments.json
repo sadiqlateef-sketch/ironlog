@@ -1,0 +1,9 @@
+{
+  "_provenance": "Real response, GET https://world.openfoodfacts.org/api/v2/product/0016000275683 with the client fields list, fetched 2026-11-12; the product genuinely has no nutriments object. Only ecoscore_tags dropped.",
+  "code": "0016000275683",
+  "status": 1,
+  "product": {
+    "code": "0016000275683",
+    "product_name": "Cocoa puffs"
+  }
+}

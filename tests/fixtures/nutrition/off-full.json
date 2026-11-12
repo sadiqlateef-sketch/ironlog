@@ -1,0 +1,30 @@
+{
+  "_provenance": "Real response, GET https://world.openfoodfacts.org/api/v2/product/0038000138416 with the client fields list, fetched 2026-11-12; nutriments trimmed to keys the mapper consumes.",
+  "code": "0038000138416",
+  "status": 1,
+  "product": {
+    "brands": "Pringles",
+    "code": "0038000138416",
+    "product_name": "Original Potato Crisps",
+    "serving_quantity": 28.349,
+    "serving_quantity_unit": "g",
+    "nutriments": {
+      "energy-kcal_100g": 536,
+      "proteins_100g": 3.5,
+      "carbohydrates_100g": 57,
+      "fat_100g": 32,
+      "saturated-fat_100g": 9,
+      "trans-fat_100g": 0.5,
+      "sugars_100g": 1,
+      "added-sugars_100g": 0,
+      "salt_100g": 1.34,
+      "sodium_100g": 0.536,
+      "fiber_100g": 4,
+      "cholesterol_100g": 0,
+      "calcium_100g": 0,
+      "iron_100g": 0.000352746128611238,
+      "potassium_100g": 0.388020741472362,
+      "vitamin-d_100g": 0
+    }
+  }
+}

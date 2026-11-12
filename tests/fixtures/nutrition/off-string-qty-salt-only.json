@@ -1,0 +1,19 @@
+{
+  "_provenance": "EDITED real record: Coca-Cola Original, GET https://world.openfoodfacts.org/api/v2/product/5449000000996 fetched 2026-11-12. Edited to exercise string tolerance: serving/package quantities rewritten as strings, sodium_100g removed (real record has both), salt_100g set to 0.25. Not a verbatim OFF record.",
+  "code": "5449000000996",
+  "status": 1,
+  "product": {
+    "brands": "COCA-COLA SERVICES SA/NV",
+    "code": "5449000000996",
+    "product_name": "Coca-Cola Original",
+    "serving_quantity": "330",
+    "serving_quantity_unit": "ml",
+    "product_quantity": "1500",
+    "product_quantity_unit": "ml",
+    "nutriments": {
+      "energy-kcal_100g": 44,
+      "sugars_100g": 10.9,
+      "salt_100g": 0.25
+    }
+  }
+}
