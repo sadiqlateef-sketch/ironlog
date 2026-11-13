@@ -234,3 +234,9 @@ test("OFF search gives up as unavailable after two 503s", async () => {
   await assert.rejects(client.search("banana"), (e: { code?: string }) => e.code === "unavailable");
   assert.equal(calls, 2);
 });
+
+test("a food with no calories ranks below matches that have them", () => {
+  const bare = { name: "Banana", nutrients: emptyNutrients() };
+  const withKcal = { name: "Banana chips", nutrients: { ...emptyNutrients(), energy: complete(519) } };
+  assert.deepEqual(rankFoods("banana", [bare, withKcal]).map((f) => f.name), ["Banana chips", "Banana"]);
+});

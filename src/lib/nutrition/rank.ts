@@ -1,6 +1,7 @@
 // Order search results by how well the name fits the query, so "banana"
 // shows Banana before "&Joy Frutas Banana + Cacau". Within a match level the
-// food that lists more nutrients comes first, then the shorter name.
+// food that lists more nutrients comes first, then the shorter name. Foods
+// with no calories at all go last.
 
 import { completeness } from "./quality.ts";
 import type { RemoteFood } from "./types.ts";
@@ -41,8 +42,10 @@ export function rankFoods<T extends Pick<RemoteFood, "name" | "nutrients">>(quer
     i,
     level: matchLevel(food.name, query),
     known: completeness(food.nutrients).known,
+    // A food with no calories listed can't be logged usefully, so it sinks below every food that has them.
+    empty: food.nutrients.energy.state === "incomplete" ? 1 : 0,
     len: normalizeName(food.name).length,
   }));
-  keyed.sort((a, b) => a.level - b.level || b.known - a.known || a.len - b.len || a.i - b.i);
+  keyed.sort((a, b) => a.empty - b.empty || a.level - b.level || b.known - a.known || a.len - b.len || a.i - b.i);
   return keyed.map((k) => k.food);
 }
