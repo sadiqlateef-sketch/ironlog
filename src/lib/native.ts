@@ -22,6 +22,8 @@ const RECOVERY_PREF = "ironlog:recovery-reminder";
 const HOME_NOTIFICATION_ID = 1003;
 const HOME_PREF = "ironlog:home-reminder";
 const RECAP_NOTIFICATION_ID = 1004;
+const CAFFEINE_NOTIFICATION_ID = 1006;
+const CAFFEINE_PREF = "ironlog:caffeine-cutoff-alert";
 
 /** Light tap when a set is ticked off. */
 export function tap(): void {
@@ -219,6 +221,53 @@ export async function scheduleRecapReminder(): Promise<void> {
     });
   } catch {
     // The recap is still on the Progress tab.
+  }
+}
+
+/** Caffeine cutoff alert on this phone (off until turned on on the food diary). */
+export function caffeineAlertOn(): boolean {
+  try {
+    return localStorage.getItem(CAFFEINE_PREF) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Turn the caffeine cutoff alert on (asks Android for notifications) or off. Returns whether it's on. */
+export async function setCaffeineAlert(on: boolean): Promise<boolean> {
+  if (on && !(await requestNotifications())) on = false;
+  try {
+    localStorage.setItem(CAFFEINE_PREF, on ? "1" : "0");
+  } catch {}
+  if (!on) await scheduleCaffeineCutoff(null);
+  return on;
+}
+
+/**
+ * "Last caffeine for today" at the cutoff the app worked out from the user's
+ * own half-life and threshold settings. Null (or a time already past) clears it.
+ * Opt-in; never asks for permission itself.
+ */
+export async function scheduleCaffeineCutoff(at: Date | null): Promise<void> {
+  if (!isNative()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: CAFFEINE_NOTIFICATION_ID }] }).catch(() => {});
+  if (!at || at.getTime() <= Date.now() + 60_000 || !caffeineAlertOn()) return;
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: CAFFEINE_NOTIFICATION_ID,
+          title: "Caffeine cutoff",
+          body: "From your caffeine settings, this is the last time for a drink like your last one.",
+          channelId: REMINDER_CHANNEL,
+          schedule: { at, allowWhileIdle: true },
+          autoCancel: true,
+        },
+      ],
+    });
+  } catch {
+    // The cutoff still shows on the food diary.
   }
 }
 

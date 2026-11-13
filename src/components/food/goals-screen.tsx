@@ -23,6 +23,8 @@ import {
   type MacroMode,
   type NutritionGoals,
   type PhaseMode,
+  type Supplement,
+  MAX_SUPPLEMENTS,
 } from "@/lib/nutrition/goals";
 
 type Draft = Record<string, string>;
@@ -56,6 +58,10 @@ export function toDraft(g: NutritionGoals): Draft {
     proteinPerMeal: str(g.proteinPerMeal),
     bankingOn: g.banking.on ? "1" : "",
     maxBoostPct: str(g.banking.maxBoostPct),
+    countDrinks: g.hydration.countDrinks ? "1" : "",
+    halfLifeH: str(g.caffeine.halfLifeH),
+    sleepAt: g.caffeine.sleepAt,
+    thresholdMg: str(g.caffeine.thresholdMg),
   };
   for (let i = 0; i < 7; i++) d[`wd${i}`] = str(g.weekdays[i]?.energy);
   return d;
@@ -99,6 +105,8 @@ export function fromDraft(prev: NutritionGoals, d: Draft, phase: { programId: st
     },
     proteinPerMeal: parse(d.proteinPerMeal) ?? null,
     banking: { on: d.bankingOn === "1", maxBoostPct: parse(d.maxBoostPct) ?? prev.banking.maxBoostPct },
+    hydration: { countDrinks: d.countDrinks === "1" },
+    caffeine: { halfLifeH: parse(d.halfLifeH) ?? prev.caffeine.halfLifeH, sleepAt: d.sleepAt || prev.caffeine.sleepAt, thresholdMg: parse(d.thresholdMg) ?? null },
   });
 }
 
@@ -127,9 +135,9 @@ function Field({
   );
 }
 
-function Section({ title, children, note }: { title: string; children: ReactNode; note?: string }) {
+function Section({ title, children, note, id }: { title: string; children: ReactNode; note?: string; id?: string }) {
   return (
-    <Card className="gap-3 p-4">
+    <Card className="scroll-mt-4 gap-3 p-4" id={id}>
       <h2 className="font-semibold">{title}</h2>
       {note && <p className="text-muted-foreground -mt-2 text-xs">{note}</p>}
       {children}
@@ -146,6 +154,8 @@ export function GoalsScreen() {
   const [starter, setStarter] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Null until changed: the saved list is shown.
+  const [suppEdits, setSupps] = useState<Supplement[] | null>(null);
 
   if (loading) return <SkeletonList rows={4} />;
   const draft = edits ?? toDraft(goals);
@@ -156,7 +166,12 @@ export function GoalsScreen() {
   };
   const programId = progress?.program_id ?? null;
   const shownPhase = phaseMode ?? (programId ? (goals.phase.byProgram[programId] ?? "") : "");
-  const next = fromDraft(goals, draft, { programId, mode: shownPhase });
+  const supps = suppEdits ?? goals.supplements;
+  const next = fromDraft({ ...goals, supplements: supps }, draft, { programId, mode: shownPhase });
+  const editSupp = (i: number, patch: Partial<Supplement>) => {
+    setNote(null);
+    setSupps(supps.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  };
   const pctSum = next.base ? percentProblem(next.base) : null;
   const grams = next.base ? macroGrams(next.base) : null;
 
@@ -178,6 +193,7 @@ export function GoalsScreen() {
       const saved = await save(next);
       setDraft(toDraft(saved));
       setPhaseMode(null);
+      setSupps(null);
       setNote("Saved.");
     } catch {
       setNote("Couldn't save. Sign in and try again.");
@@ -314,6 +330,67 @@ export function GoalsScreen() {
           <Field label="Water" unit="ml" value={draft.water} onChange={set("water")} />
           <Field label="Protein per meal" unit="g" value={draft.proteinPerMeal} onChange={set("proteinPerMeal")} hint="Counts meals that reach it." />
         </div>
+      </Section>
+
+      <Section title="Water" id="water">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={draft.countDrinks === "1"} onChange={(e) => set("countDrinks")(e.target.checked ? "1" : "")} className="size-4" />
+          Count drinks logged as food (in ml) toward water
+        </label>
+      </Section>
+
+      <Section title="Supplements" id="supplements" note="Your own list, checked off on the diary. Times are when a dose is due (leave blank for once a day).">
+        {supps.length === 0 && <p className="text-muted-foreground text-sm">None yet.</p>}
+        {supps.map((x, i) => (
+          <div key={x.id} className="grid grid-cols-[1fr_6rem] gap-2 border-b pb-3 last:border-b-0">
+            <label className="flex flex-col gap-1 text-xs font-medium">
+              Name
+              <Input value={x.name} maxLength={60} onChange={(e) => editSupp(i, { name: e.target.value })} className="h-10" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium">
+              Dose
+              <Input value={x.dose} maxLength={40} onChange={(e) => editSupp(i, { dose: e.target.value })} className="h-10" />
+            </label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs font-medium">
+              Times (HH:MM, comma between)
+              <Input
+                value={x.times.join(", ")}
+                onChange={(e) => editSupp(i, { times: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })}
+                className="h-10"
+                placeholder="08:00, 20:00"
+              />
+            </label>
+            <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setSupps(supps.filter((_, j) => j !== i))}>
+              Remove
+            </Button>
+          </div>
+        ))}
+        {supps.length < MAX_SUPPLEMENTS && (
+          <Button
+            type="button"
+            variant="secondary"
+            className="self-start"
+            onClick={() => setSupps([...supps, { id: crypto.randomUUID().slice(0, 12), name: "", dose: "", times: [] }])}
+          >
+            Add a supplement
+          </Button>
+        )}
+      </Section>
+
+      <Section
+        title="Caffeine"
+        id="caffeine"
+        note="Settings for the caffeine estimate and cutoff on the diary. The half-life default is an app setting, not medical advice."
+      >
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Half-life" unit="h" value={draft.halfLifeH} onChange={set("halfLifeH")} />
+          <label className="flex flex-col gap-1 text-xs font-medium">
+            Usual sleep
+            <Input type="time" value={draft.sleepAt} onChange={(e) => set("sleepAt")(e.target.value)} className="h-10" />
+          </label>
+          <Field label="Level at sleep" unit="mg" value={draft.thresholdMg} onChange={set("thresholdMg")} hint="Blank: no cutoff." />
+        </div>
+        <p className="text-muted-foreground text-xs">After a night shift, sleep counts from 30 min after the shift ends.</p>
       </Section>
 
       <div className="flex items-center gap-3">

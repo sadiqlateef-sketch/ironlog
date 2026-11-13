@@ -22,6 +22,7 @@ import { afterPortion, batchToRow, rowToBatch, type Batch } from "../nutrition/b
 import { decrement, pantryToRow, rowToPantry, type PantryItem } from "../nutrition/pantry.ts";
 import { rowToUsual, usedNow, usualToRow, type Usual } from "../nutrition/usuals.ts";
 import { confirm as confirmEntry } from "../nutrition/planned.ts";
+import { logToRow, rowToLog, type NutritionLog } from "../nutrition/hydration.ts";
 import { recipeFood, recipeProblem, recipeToRow, rollup, rowToRecipe, type Recipe } from "../nutrition/recipe.ts";
 import { normalizePrefs } from "../nutrition/day.ts";
 import { normalizeGoals, type NutritionGoals } from "../nutrition/goals.ts";
@@ -115,6 +116,7 @@ const RECIPES_KEY = "nutrition-recipes";
 const BATCHES_KEY = "nutrition-batches";
 const PANTRY_KEY = "nutrition-pantry";
 const USUALS_KEY = "nutrition-usuals";
+const LOGS_KEY = "nutrition-logs";
 const dayKey = (day: string) => `nutrition-day:${day}`;
 
 export function createNutritionStore(deps: StoreDeps) {
@@ -789,6 +791,24 @@ export function createNutritionStore(deps: StoreDeps) {
     { beforePromote: (items) => promoteFoodsFor(items.map((p) => p.foodId)) },
   );
 
+  // Water and supplement check-offs: one list, newest first, read per food day.
+  const logs = createCollection<NutritionLog>(
+    {
+      table: "nutrition_logs",
+      kvKey: LOGS_KEY,
+      toRow: logToRow,
+      fromRow: rowToLog,
+      order: (a, b) => (a.loggedAt < b.loggedAt ? 1 : a.loggedAt > b.loggedAt ? -1 : 0),
+    },
+    internals,
+  );
+
+  /** Logs on one food day, or every log the phone has (for streaks) without a day. */
+  async function listLogs(day?: string): Promise<Stored<NutritionLog>[]> {
+    const all = await logs.list();
+    return day ? all.filter((l) => l.foodDay === day) : all;
+  }
+
   return {
     internals,
     discardWaiting,
@@ -828,6 +848,9 @@ export function createNutritionStore(deps: StoreDeps) {
     logUsual,
     canPlan,
     confirmPlanned,
+    listLogs,
+    addLog: (l: NutritionLog) => logs.save(l),
+    removeLog: (id: string) => logs.remove(id),
   };
 }
 
@@ -948,3 +971,6 @@ export const removeUsual = instance.removeUsual;
 export const logUsual = instance.logUsual;
 export const canPlan = instance.canPlan;
 export const confirmPlanned = instance.confirmPlanned;
+export const listLogs = instance.listLogs;
+export const addLog = instance.addLog;
+export const removeLog = instance.removeLog;

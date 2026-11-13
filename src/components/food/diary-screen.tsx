@@ -23,6 +23,10 @@ import { TotalsCard } from "@/components/food/totals-card";
 import { useMinuteClock, useNutritionDay } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { useDayGoal } from "@/hooks/use-day-goal";
+import { useNutritionLogs } from "@/hooks/use-nutrition-logs";
+import { WaterCard } from "@/components/food/water-card";
+import { SupplementsCard } from "@/components/food/supplements-card";
+import { CaffeineFastingCard } from "@/components/food/caffeine-fasting-card";
 import { proteinSplit } from "@/lib/nutrition/goals";
 import { dayLabel, foodDay, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
 import { dayTotals, isPlanned, plannedTotals } from "@/lib/nutrition/entry-math";
@@ -61,6 +65,7 @@ export function DiaryScreen() {
   const { entries, loading } = useNutritionDay(day);
   const isCurrent = day === current;
   const dayGoal = useDayGoal(day, prefs.day_start);
+  const logs = useNutritionLogs();
   const [dayTypeMenu, setDayTypeMenu] = useState(false);
   const split = useMemo(() => {
     const byMeal: Record<string, DiaryEntry[]> = {};
@@ -232,6 +237,9 @@ export function DiaryScreen() {
               />
             ))}
           </div>
+          <WaterCard day={day} entries={entries} logs={logs} goals={dayGoal.goals} />
+          <SupplementsCard day={day} logs={logs} goals={dayGoal.goals} now={now} isToday={isCurrent} />
+          {isCurrent && <CaffeineFastingCard day={day} entries={entries} goals={dayGoal.goals} now={now} />}
         </>
       )}
 

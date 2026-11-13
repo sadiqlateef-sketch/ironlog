@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useMinuteClock, useNutritionDay } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { useDayGoal } from "@/hooks/use-day-goal";
+import { useNutritionLogs } from "@/hooks/use-nutrition-logs";
+import { waterMl } from "@/lib/nutrition/hydration";
 import { useNutritionSync } from "@/hooks/use-nutrition-sync";
 import { foodDay } from "@/lib/nutrition/day";
 import { dayTotals } from "@/lib/nutrition/entry-math";
@@ -23,6 +25,9 @@ export function NutritionCard() {
   const ready = !loading && day !== null;
   const dg = useDayGoal(day, prefs.day_start);
   const target = dg.allowance?.allowance ?? dg.goal?.energy;
+  const logs = useNutritionLogs();
+  const water = day ? waterMl(logs, entries, day, dg.goals.hydration.countDrinks) : 0;
+  const waterGoal = dg.goals.micros.water ?? null;
   const left = ready && target !== undefined ? Math.round(target - t.energy.value) : null;
 
   return (
@@ -56,6 +61,7 @@ export function NutritionCard() {
             </p>
           )}
         </div>
+        {ready && (waterGoal || water > 0) && <WaterRing ml={water} goal={waterGoal} />}
         <ChevronRight className="text-muted-foreground size-5 shrink-0" aria-hidden />
       </Link>
       <Button asChild variant="secondary">
@@ -64,5 +70,22 @@ export function NutritionCard() {
         </Link>
       </Button>
     </Card>
+  );
+}
+
+/** Water so far as a small ring (full at the user's goal; just the number without one). */
+function WaterRing({ ml, goal }: { ml: number; goal: number | null }) {
+  const r = 16;
+  const c = 2 * Math.PI * r;
+  const frac = goal ? Math.min(1, ml / goal) : 0;
+  const label = ml >= 1000 ? `${(ml / 1000).toFixed(1)}L` : `${ml}`;
+  return (
+    <div className="relative grid size-11 shrink-0 place-items-center" role="img" aria-label={`Water ${ml} ml${goal ? ` of ${goal} ml` : ""}`} data-testid="home-water">
+      <svg viewBox="0 0 40 40" className="absolute inset-0 size-full -rotate-90" aria-hidden>
+        <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" className="stroke-secondary" />
+        {goal ? <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" strokeLinecap="round" className="stroke-primary" strokeDasharray={c} strokeDashoffset={c * (1 - frac)} /> : null}
+      </svg>
+      <span className="text-[10px] font-semibold tabular-nums">{label}</span>
+    </div>
   );
 }
