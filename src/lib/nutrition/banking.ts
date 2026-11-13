@@ -80,3 +80,16 @@ export function todayAllowance(
     incomplete: b.incomplete,
   };
 }
+
+/** The Monday-to-Sunday week (as "YYYY-MM-DD" days) that `day` falls in. */
+export function weekDays(day: string): string[] {
+  const [y, m, d] = day.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const back = (date.getDay() + 6) % 7;
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const x = new Date(y, m - 1, d - back + i);
+    out.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`);
+  }
+  return out;
+}

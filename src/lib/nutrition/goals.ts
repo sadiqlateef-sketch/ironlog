@@ -7,6 +7,8 @@
 // are app settings the user can change, not advice.
 // Pure, no app imports.
 
+import type { DiaryEntry } from "./diary-types.ts";
+
 export type MacroMode = "grams" | "percent";
 export type PhaseMode = "bulk" | "cut" | "maintain";
 
@@ -272,4 +274,33 @@ export function resolveDayGoal(goals: NutritionGoals, day: string, ctx: DayGoalC
     phase,
     weekdayOverride: !!override,
   };
+}
+
+export interface ProteinSplit {
+  /** Meals with any logged food. */
+  meals: number;
+  /** Of those, meals that reached the per-meal target. */
+  reached: number;
+  target: number;
+}
+
+/**
+ * How many of the day's meals reached the user's own per-meal protein target.
+ * Null when no target is set. `entriesByMeal`: logged entries grouped by meal.
+ */
+export function proteinSplit(
+  entriesByMeal: Readonly<Record<string, readonly Pick<DiaryEntry, "nutrients" | "status">[]>>,
+  perMealTarget: number | null,
+): ProteinSplit | null {
+  if (!perMealTarget || perMealTarget <= 0) return null;
+  let meals = 0;
+  let reached = 0;
+  for (const list of Object.values(entriesByMeal)) {
+    const eaten = list.filter((e) => e.status !== "planned");
+    if (!eaten.length) continue;
+    meals++;
+    const p = eaten.reduce((s, e) => s + (e.nutrients.protein?.value ?? 0), 0);
+    if (p + 1e-9 >= perMealTarget) reached++;
+  }
+  return { meals, reached, target: perMealTarget };
 }

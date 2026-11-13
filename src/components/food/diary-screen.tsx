@@ -5,7 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Apple, Bookmark, BookmarkPlus, ChefHat, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Plus, Settings } from "lucide-react";
+import { Apple, Bookmark, BookmarkPlus, ChefHat, Dumbbell, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Moon, Plus, RotateCcw, Settings, Target } from "lucide-react";
 import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -22,6 +22,8 @@ import { UsualsSheet, type UsualsMode } from "@/components/food/usuals-sheet";
 import { TotalsCard } from "@/components/food/totals-card";
 import { useMinuteClock, useNutritionDay } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
+import { useDayGoal } from "@/hooks/use-day-goal";
+import { proteinSplit } from "@/lib/nutrition/goals";
 import { dayLabel, foodDay, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
 import { dayTotals, isPlanned, plannedTotals } from "@/lib/nutrition/entry-math";
 import { showNutrient } from "@/lib/nutrition/display";
@@ -58,6 +60,13 @@ export function DiaryScreen() {
   const day = prefsLoading ? null : (picked ?? current);
   const { entries, loading } = useNutritionDay(day);
   const isCurrent = day === current;
+  const dayGoal = useDayGoal(day, prefs.day_start);
+  const [dayTypeMenu, setDayTypeMenu] = useState(false);
+  const split = useMemo(() => {
+    const byMeal: Record<string, DiaryEntry[]> = {};
+    for (const e of entries) (byMeal[e.mealId] ??= []).push(e);
+    return proteinSplit(byMeal, dayGoal.goals.proteinPerMeal);
+  }, [entries, dayGoal.goals.proteinPerMeal]);
 
   const go = (next: string) => {
     const clamped = next > current ? current : next;
@@ -169,7 +178,25 @@ export function DiaryScreen() {
         <SkeletonList rows={3} />
       ) : (
         <>
-          <TotalsCard totals={dayTotals(entries)} />
+          {dayGoal.goals.base && (
+            <div className="-mb-2 flex items-center gap-2">
+              <button
+                type="button"
+                className="bg-secondary text-foreground flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+                onClick={() => setDayTypeMenu(true)}
+                data-testid="food-day-type"
+              >
+                {dayGoal.training ? <Dumbbell className="size-3.5" aria-hidden /> : <Moon className="size-3.5" aria-hidden />}
+                {dayGoal.training ? "Training day" : "Rest day"}
+                {dayGoal.override ? " · set by you" : dayGoal.reason === "logged" ? " · workout logged" : ""}
+              </button>
+              {dayGoal.goal?.phase && dayGoal.goal.phase !== "maintain" && (
+                <span className="text-muted-foreground text-xs">{dayGoal.goal.phase === "bulk" ? "Bulk" : "Cut"} phase</span>
+              )}
+              {dayGoal.phase.deload && dayGoal.goal?.phase === "maintain" && <span className="text-muted-foreground text-xs">Deload week: maintain</span>}
+            </div>
+          )}
+          <TotalsCard totals={dayTotals(entries)} goal={dayGoal.loading ? undefined : dayGoal.goal} allowance={dayGoal.allowance} split={split} />
           {plannedKcal && (
             <p className="text-muted-foreground -mt-2 px-1 text-xs" data-testid="food-planned">
               Planned, not counted yet: {showNutrient("energy", plannedKcal)} kcal
@@ -214,6 +241,7 @@ export function DiaryScreen() {
         title="Food"
         actions={[
           { label: "Quick add", icon: Plus, onSelect: () => setQuick(true) },
+          { label: "Goals", icon: Target, onSelect: () => router.push("/food/goals/") },
           { label: "Recipes", icon: ChefHat, onSelect: () => router.push("/food/recipes/") },
           { label: "Pantry", icon: Refrigerator, onSelect: () => router.push("/food/pantry/") },
           { label: "Edit meals", icon: ListChecks, onSelect: () => setMeals(true) },
@@ -235,6 +263,16 @@ export function DiaryScreen() {
               ]
             : []
         }
+      />
+      <ActionSheet
+        open={dayTypeMenu}
+        onOpenChange={setDayTypeMenu}
+        title="This day counts as"
+        actions={[
+          { label: "Training day", icon: Dumbbell, onSelect: () => void dayGoal.setOverride("training") },
+          { label: "Rest day", icon: Moon, onSelect: () => void dayGoal.setOverride("rest") },
+          { label: "Automatic (from logged workouts)", icon: RotateCcw, onSelect: () => void dayGoal.setOverride(null) },
+        ]}
       />
       <FoodToast toast={toast} onDone={clearToast} />
       <UsualsSheet mode={usualsMode} onOpenChange={(o) => !o && setUsualsMode(null)} onDone={(text) => showToast(text)} />

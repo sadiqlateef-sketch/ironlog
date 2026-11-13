@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useMinuteClock, useNutritionDay } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
+import { useDayGoal } from "@/hooks/use-day-goal";
 import { useNutritionSync } from "@/hooks/use-nutrition-sync";
 import { foodDay } from "@/lib/nutrition/day";
 import { dayTotals } from "@/lib/nutrition/entry-math";
@@ -20,6 +21,9 @@ export function NutritionCard() {
   const sync = useNutritionSync();
   const t = dayTotals(entries);
   const ready = !loading && day !== null;
+  const dg = useDayGoal(day, prefs.day_start);
+  const target = dg.allowance?.allowance ?? dg.goal?.energy;
+  const left = ready && target !== undefined ? Math.round(target - t.energy.value) : null;
 
   return (
     <Card className="gap-3 p-4" data-testid="home-nutrition">
@@ -30,6 +34,7 @@ export function NutritionCard() {
         <div className="min-w-0 flex-1">
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
             Food today
+            {dg.goal && <span className="normal-case tracking-normal font-medium">· {dg.training ? "Training day" : "Rest day"}</span>}
             {sync.pending > 0 && <span className="bg-primary h-1 w-1 rounded-full" role="img" aria-label="Changes waiting to sync" />}
           </p>
           {ready ? (
@@ -39,6 +44,11 @@ export function NutritionCard() {
             </p>
           ) : (
             <p className="text-2xl font-bold">&nbsp;</p>
+          )}
+          {left !== null && (
+            <p className="text-sm font-medium tabular-nums" data-testid="home-nutrition-left">
+              {left >= 0 ? `${left} kcal left` : `${-left} kcal over`}
+            </p>
           )}
           {ready && entries.length > 0 && (
             <p className="text-muted-foreground text-xs tabular-nums">
