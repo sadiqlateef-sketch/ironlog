@@ -89,12 +89,20 @@ export function sumNutrients(list: readonly Nutrients[]): Nutrients {
   return list.reduce((acc, n) => addNutrients(acc, n), zeroNutrients());
 }
 
+/** Planned entries are meant, not eaten: they never count toward totals until confirmed. */
+export const isPlanned = (e: Pick<DiaryEntry, "status">): boolean => e.status === "planned";
+
 export function dayTotals(entries: readonly DiaryEntry[]): Nutrients {
-  return sumNutrients(entries.map((e) => e.nutrients));
+  return sumNutrients(entries.filter((e) => !isPlanned(e)).map((e) => e.nutrients));
 }
 
 export function mealTotals(entries: readonly DiaryEntry[]): Nutrients {
-  return sumNutrients(entries.map((e) => e.nutrients));
+  return sumNutrients(entries.filter((e) => !isPlanned(e)).map((e) => e.nutrients));
+}
+
+/** What the planned entries would add if eaten. */
+export function plannedTotals(entries: readonly DiaryEntry[]): Nutrients {
+  return sumNutrients(entries.filter(isPlanned).map((e) => e.nutrients));
 }
 
 function round2(n: number): number {
@@ -144,6 +152,7 @@ export function makeEntry(input: MakeEntryInput): DiaryEntry {
     food: snapshot,
     nutrients: entryNutrients(snapshot.per100, base.base),
     note: input.note ?? null,
+    status: "logged",
   };
 }
 
@@ -188,6 +197,7 @@ export function makeQuickEntry(input: MakeQuickEntryInput): DiaryEntry {
     food: null,
     nutrients: nutrientsFromPartial(input.values),
     note: input.note ?? null,
+    status: "logged",
   };
 }
 

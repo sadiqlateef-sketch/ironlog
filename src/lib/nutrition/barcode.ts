@@ -105,7 +105,7 @@ export function offLookupCodes(code: string): string[] {
   return [digits];
 }
 
-const SOURCE_RANK: Record<FoodSource, number> = { user: 0, staple: 1, off: 2, usda: 3 };
+const SOURCE_RANK: Record<FoodSource, number> = { user: 0, recipe: 0, staple: 1, off: 2, usda: 3 };
 
 /** First non-archived food with the same barcode; user foods beat staples, then OFF, then USDA. */
 export function findLocalByBarcode(foods: readonly Food[], code: string): Food | null {

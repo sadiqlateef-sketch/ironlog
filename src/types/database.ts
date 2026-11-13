@@ -201,11 +201,13 @@ export type Database = {
           serving_amount: number | null;
           package_amount: number | null;
           nutrients: Json;
-          source: "user" | "off" | "usda" | "staple";
+          source: "user" | "off" | "usda" | "staple" | "recipe";
           source_id: string | null;
           source_url: string | null;
           note: string | null;
           archived: boolean;
+          price_cents: number | null;
+          price_amount: number | null;
         } & Timestamps;
         Insert: {
           id?: string;
@@ -217,11 +219,13 @@ export type Database = {
           serving_amount?: number | null;
           package_amount?: number | null;
           nutrients: Json;
-          source: "user" | "off" | "usda" | "staple";
+          source: "user" | "off" | "usda" | "staple" | "recipe";
           source_id?: string | null;
           source_url?: string | null;
           note?: string | null;
           archived?: boolean;
+          price_cents?: number | null;
+          price_amount?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["foods"]["Insert"]>;
         Relationships: [];
@@ -243,6 +247,7 @@ export type Database = {
           food: Json | null;
           nutrients: Json;
           note: string | null;
+          status: "logged" | "planned";
         } & Timestamps;
         Insert: {
           id?: string;
@@ -260,8 +265,121 @@ export type Database = {
           food?: Json | null;
           nutrients: Json;
           note?: string | null;
+          status?: "logged" | "planned";
         };
         Update: Partial<Database["public"]["Tables"]["food_entries"]["Insert"]>;
+        Relationships: [];
+      };
+      recipes: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          servings: number;
+          cooked_weight: number | null;
+          liquid: boolean;
+          note: string | null;
+          items: Json;
+          food_id: string | null;
+          archived: boolean;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          servings: number;
+          cooked_weight?: number | null;
+          liquid?: boolean;
+          note?: string | null;
+          items?: Json;
+          food_id?: string | null;
+          archived?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["recipes"]["Insert"]>;
+        Relationships: [];
+      };
+      batches: {
+        Row: {
+          id: string;
+          user_id: string;
+          recipe_id: string | null;
+          food_id: string;
+          name: string;
+          made_on: string;
+          portions: number;
+          portions_left: number;
+          portion_amount: number;
+          use_by: string | null;
+          finished: boolean;
+          note: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          recipe_id?: string | null;
+          food_id: string;
+          name: string;
+          made_on: string;
+          portions: number;
+          portions_left: number;
+          portion_amount: number;
+          use_by?: string | null;
+          finished?: boolean;
+          note?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["batches"]["Insert"]>;
+        Relationships: [];
+      };
+      usuals: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          place: string | null;
+          meal_id: string | null;
+          items: Json;
+          use_count: number;
+          last_used_at: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          place?: string | null;
+          meal_id?: string | null;
+          items?: Json;
+          use_count?: number;
+          last_used_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["usuals"]["Insert"]>;
+        Relationships: [];
+      };
+      pantry_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          food_id: string;
+          quantity: number;
+          unit: "g" | "ml" | "serving" | "package";
+          location: "fridge" | "freezer" | "cupboard";
+          added_on: string;
+          opened_on: string | null;
+          use_by: string | null;
+          note: string | null;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          food_id: string;
+          quantity: number;
+          unit: "g" | "ml" | "serving" | "package";
+          location?: "fridge" | "freezer" | "cupboard";
+          added_on?: string;
+          opened_on?: string | null;
+          use_by?: string | null;
+          note?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["pantry_items"]["Insert"]>;
         Relationships: [];
       };
       routines: {

@@ -8,16 +8,20 @@
 import { getSupabase } from "../supabase/client.ts";
 import { kvGet, kvSet } from "./kv.ts";
 import { explainRefusal, isAuthError, isNetworkError, SAVE_FAILED_MESSAGE } from "./queue.ts";
+import { shapeForServer } from "./nutrition-schema.ts";
 
-type Table = "foods" | "food_entries" | "users";
+/** Kitchen tables (recipes and the rest) hold whole items, kept on the phone like foods. */
+export type CollectionTable = "recipes" | "batches" | "usuals" | "pantry_items";
+export type RowTable = "foods" | "food_entries" | CollectionTable;
+export type Table = RowTable | "users";
 type Row = Record<string, unknown>;
 
 // `days` (diary changes only) names the food days the change touched on the phone. It is
 // never sent; discarding uses it to reload those days from the server.
 export type NOp =
-  | { kind: "insert"; table: "foods" | "food_entries"; rows: Row[]; days?: string[] }
+  | { kind: "insert"; table: RowTable; rows: Row[]; days?: string[] }
   | { kind: "update"; table: Table; ids: string[]; patch: Row; days?: string[] }
-  | { kind: "delete"; table: "foods" | "food_entries"; ids: string[]; days?: string[] };
+  | { kind: "delete"; table: RowTable; ids: string[]; days?: string[] };
 
 interface Entry {
   seq: number;
@@ -51,6 +55,8 @@ export interface OutboxDeps {
   hasSession: () => Promise<boolean>;
   refreshSession: () => Promise<unknown>;
   isOnline?: () => boolean;
+  /** Last look at a change before it is sent (drops columns the server doesn't have yet). */
+  shapeOp?: (op: NOp) => Promise<NOp>;
 }
 
 export const NUTRITION_OUTBOX_KEY = "nutrition-outbox";
@@ -115,7 +121,10 @@ export function createNutritionOutbox(deps: OutboxDeps) {
     }
   }
 
-  async function send(op: NOp): Promise<void> {
+  async function send(queued: NOp): Promise<void> {
+    const op = deps.shapeOp ? await deps.shapeOp(queued) : queued;
+    // Nothing left the server can store (only columns it doesn't have yet): done.
+    if (op.kind === "update" && Object.keys(op.patch).length === 0) return;
     try {
       return await sendOnce(op);
     } catch (e) {
@@ -254,6 +263,7 @@ const instance = createNutritionOutbox({
   getDb: () => getSupabase() as unknown as DbLike,
   hasSession: async () => !!(await getSupabase().auth.getSession()).data.session,
   refreshSession: () => getSupabase().auth.refreshSession(),
+  shapeOp: shapeForServer,
 });
 
 export const enqueueNutrition = instance.enqueue;

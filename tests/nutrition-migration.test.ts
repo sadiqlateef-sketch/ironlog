@@ -19,11 +19,11 @@ function policy(table: string): string {
   return m[1];
 }
 
-test("sorts after every other migration", () => {
+test("sorts after the workout migrations it builds on", () => {
   const names = readdirSync(dir).filter((f) => f.endsWith(".sql"));
   assert.ok(names.includes(NAME));
   const sorted = [...names].sort();
-  assert.equal(sorted[sorted.length - 1], NAME);
+  // Later nutrition migrations (kitchen, logs) sort after this one.
   assert.ok(sorted.indexOf(NAME) > sorted.indexOf("20261109010000_exercise_variation_group.sql"));
 });
 

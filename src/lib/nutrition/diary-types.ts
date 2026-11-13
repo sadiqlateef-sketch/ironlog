@@ -6,7 +6,9 @@ import type { Tables } from "../../types/database.ts";
 import type { Nutrients } from "./nutrients.ts";
 
 export type EntryUnit = "g" | "ml" | "oz" | "fl_oz" | "serving" | "package" | "quick";
-export type FoodSource = "user" | "off" | "usda" | "staple";
+export type FoodSource = "user" | "off" | "usda" | "staple" | "recipe";
+/** "planned": meant to be eaten, not counted until confirmed. */
+export type EntryStatus = "logged" | "planned";
 
 /** A meal slot with a time window ("HH:MM"). start == end means all day. */
 export interface MealSlot {
@@ -41,6 +43,9 @@ export interface Food {
   sourceUrl: string | null;
   note: string | null;
   archived: boolean;
+  /** What the food cost, in cents, for `priceAmount` g (ml). Optional; absent means unknown. */
+  priceCents?: number | null;
+  priceAmount?: number | null;
 }
 
 /** What an entry remembers about its food, so later edits never rewrite history. */
@@ -70,6 +75,8 @@ export interface DiaryEntry {
   /** Totals for this entry. */
   nutrients: Nutrients;
   note: string | null;
+  /** Absent means "logged" (entries saved before planning existed). */
+  status?: EntryStatus;
 }
 
 type FoodRow = Tables<"foods">;
@@ -100,6 +107,8 @@ function snapshotFromJson(raw: unknown): FoodSnapshot | null {
 }
 
 export function rowToFood(row: FoodRow): Food {
+  const priceCents = num(row.price_cents);
+  const priceAmount = num(row.price_amount);
   return {
     id: row.id,
     name: row.name,
@@ -114,6 +123,8 @@ export function rowToFood(row: FoodRow): Food {
     sourceUrl: row.source_url,
     note: row.note,
     archived: row.archived,
+    // Only foods with a price carry the keys (rows from before prices existed have none).
+    ...(priceCents !== null || priceAmount !== null ? { priceCents, priceAmount } : {}),
   };
 }
 
@@ -132,6 +143,8 @@ export function foodToRow(food: Food): FoodWriteRow {
     source_url: food.sourceUrl,
     note: food.note,
     archived: food.archived,
+    price_cents: food.priceCents ?? null,
+    price_amount: food.priceAmount ?? null,
   };
 }
 
@@ -151,6 +164,7 @@ export function rowToEntry(row: EntryRow): DiaryEntry {
     food: snapshotFromJson(row.food),
     nutrients: row.nutrients as unknown as Nutrients,
     note: row.note,
+    status: row.status === "planned" ? "planned" : "logged",
   };
 }
 
@@ -180,5 +194,6 @@ export function entryToRow(entry: DiaryEntry): EntryWriteRow {
       : null,
     nutrients: entry.nutrients as unknown as EntryRow["nutrients"],
     note: entry.note,
+    status: entry.status ?? "logged",
   };
 }

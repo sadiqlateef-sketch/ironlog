@@ -12,8 +12,11 @@ import {
   enqueueNutrition,
   flushNutrition,
   hasNutritionPending,
+  type CollectionTable,
   type NOp,
+  type Table,
 } from "./nutrition-outbox.ts";
+import { schemaGate } from "./nutrition-schema.ts";
 import { normalizePrefs } from "../nutrition/day.ts";
 import {
   entryToRow,
@@ -47,7 +50,7 @@ export interface RecentFood {
 }
 
 export interface ReadQuery {
-  table: "users" | "foods" | "food_entries";
+  table: Table;
   columns: string;
   eq?: Record<string, unknown>;
   order?: { col: string; asc: boolean };
@@ -70,6 +73,26 @@ export interface StoreDeps {
   now?: () => Date;
   newId?: () => string;
   staples?: { list: readonly StapleSeed[]; version: number };
+  /** Does the server have this table yet? Always yes when absent. */
+  schema?: { probeTable(table: string): Promise<boolean>; probeColumn(table: string, column: string): Promise<boolean> };
+}
+
+/** What kitchen collections (nutrition-collections.ts) share with the diary store: one lock, one commit. */
+export interface StoreInternals {
+  locked<T>(fn: () => Promise<T>): Promise<T>;
+  commit(...ops: NOp[]): Promise<void>;
+  /** Tell listeners the phone's copy changed (commit already does). */
+  changed(): void;
+  tryRead(q: ReadQuery): Promise<unknown | undefined>;
+  kv: StoreDeps["kv"];
+  outbox: StoreDeps["outbox"];
+  /** Bumped on every commit; a read that saw it change is stale. */
+  writes(): number;
+  newId(): string;
+  now(): Date;
+  schema: NonNullable<StoreDeps["schema"]>;
+  /** Called by discardWaiting for each collection table the dropped changes touched, with the ids they added. */
+  onDiscard(table: CollectionTable, reload: (added: Set<string>) => Promise<void>): void;
 }
 
 export type EntryPatch = Partial<
@@ -86,6 +109,8 @@ export function createNutritionStore(deps: StoreDeps) {
   const { kv, outbox, db } = deps;
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const staples = deps.staples ?? { list: STAPLES, version: STAPLES_VERSION };
+  const schema = deps.schema ?? { probeTable: async () => true, probeColumn: async () => true };
+  const reloaders = new Map<CollectionTable, (added: Set<string>) => Promise<void>>();
 
   // Changes to the phone's copy run one at a time, so two quick taps can't overwrite each other.
   let chain: Promise<unknown> = Promise.resolve();
@@ -297,6 +322,7 @@ export function createNutritionStore(deps: StoreDeps) {
           // Signed out: nothing to reload.
         }
       }
+      for (const [table, added] of t.collections) await reloaders.get(table)?.(added);
       changed();
       return dropped.length;
     });
@@ -460,7 +486,22 @@ export function createNutritionStore(deps: StoreDeps) {
     });
   }
 
+  const internals: StoreInternals = {
+    locked,
+    commit,
+    changed,
+    tryRead,
+    kv,
+    outbox,
+    writes: () => writes,
+    newId,
+    now: deps.now ?? (() => new Date()),
+    schema,
+    onDiscard: (table, reload) => void reloaders.set(table, reload),
+  };
+
   return {
+    internals,
     discardWaiting,
     loadPrefs,
     savePrefs,
@@ -487,11 +528,26 @@ export function touchedBy(ops: readonly NOp[]): {
   prefs: boolean;
   addedEntries: Set<string>;
   addedFoods: Set<string>;
+  /** Kitchen tables touched, each with the ids its inserts added. */
+  collections: Map<CollectionTable, Set<string>>;
 } {
-  const out = { days: new Set<string>(), foods: false, prefs: false, addedEntries: new Set<string>(), addedFoods: new Set<string>() };
+  const out = {
+    days: new Set<string>(),
+    foods: false,
+    prefs: false,
+    addedEntries: new Set<string>(),
+    addedFoods: new Set<string>(),
+    collections: new Map<CollectionTable, Set<string>>(),
+  };
   for (const op of ops) {
     if (op.table === "users") {
       out.prefs = true;
+      continue;
+    }
+    if (op.table !== "foods" && op.table !== "food_entries") {
+      const added = out.collections.get(op.table) ?? new Set<string>();
+      out.collections.set(op.table, added);
+      if (op.kind === "insert") for (const row of op.rows) if (typeof row.id === "string") added.add(row.id);
       continue;
     }
     const added = op.table === "foods" ? out.addedFoods : out.addedEntries;
@@ -538,6 +594,7 @@ const instance = createNutritionStore({
     if (!data.session) throw new Error("Sign in first");
     return data.session.user.id;
   },
+  schema: schemaGate,
 });
 
 export const discardWaitingFood = instance.discardWaiting;
