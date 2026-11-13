@@ -382,6 +382,28 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["pantry_items"]["Insert"]>;
         Relationships: [];
       };
+      nutrition_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: "water" | "supplement";
+          food_day: string;
+          amount: number;
+          ref: string | null;
+          logged_at: string;
+        } & Timestamps;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          kind: "water" | "supplement";
+          food_day: string;
+          amount: number;
+          ref?: string | null;
+          logged_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["nutrition_logs"]["Insert"]>;
+        Relationships: [];
+      };
       routines: {
         Row: {
           id: string;

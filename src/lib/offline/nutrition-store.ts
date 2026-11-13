@@ -24,6 +24,7 @@ import { rowToUsual, usedNow, usualToRow, type Usual } from "../nutrition/usuals
 import { confirm as confirmEntry } from "../nutrition/planned.ts";
 import { recipeFood, recipeProblem, recipeToRow, rollup, rowToRecipe, type Recipe } from "../nutrition/recipe.ts";
 import { normalizePrefs } from "../nutrition/day.ts";
+import { normalizeGoals, type NutritionGoals } from "../nutrition/goals.ts";
 import {
   entryToRow,
   foodToRow,
@@ -106,6 +107,7 @@ export type EntryPatch = Partial<
 >;
 
 const PREFS_KEY = "nutrition-prefs";
+const GOALS_KEY = "nutrition-goals";
 const FOODS_KEY = "nutrition-foods";
 const RECENTS_KEY = "nutrition-recents";
 const SCANS_KEY = "nutrition-scans";
@@ -182,6 +184,43 @@ export function createNutritionStore(deps: StoreDeps) {
     return locked(async () => {
       await kv.set(PREFS_KEY, clean);
       await commit({ kind: "update", table: "users", ids: [uid], patch: { nutrition_prefs: clean } });
+      return clean;
+    });
+  }
+
+  // ---------- Goals (users.nutrition_goals, same path as prefs) ----------
+
+  async function readGoalsRow(): Promise<NutritionGoals | undefined> {
+    let uid: string;
+    try {
+      uid = await deps.userId();
+    } catch {
+      return undefined;
+    }
+    const row = await tryRead({ table: "users", columns: "nutrition_goals", eq: { id: uid }, single: true });
+    if (row === undefined || row === null) return undefined;
+    return normalizeGoals((row as { nutrition_goals?: unknown }).nutrition_goals);
+  }
+
+  async function loadGoals(): Promise<NutritionGoals> {
+    const local = await kv.get<unknown>(GOALS_KEY);
+    if (await outbox.hasPending()) return normalizeGoals(local);
+    const before = writes;
+    const goals = await readGoalsRow();
+    if (!goals) return normalizeGoals(local);
+    return locked(async () => {
+      if (writes !== before || (await outbox.hasPending())) return normalizeGoals(await kv.get<unknown>(GOALS_KEY));
+      await kv.set(GOALS_KEY, goals);
+      return goals;
+    });
+  }
+
+  async function saveGoals(goals: NutritionGoals): Promise<NutritionGoals> {
+    const clean = normalizeGoals(goals);
+    const uid = await deps.userId();
+    return locked(async () => {
+      await kv.set(GOALS_KEY, clean);
+      await commit({ kind: "update", table: "users", ids: [uid], patch: { nutrition_goals: clean } });
       return clean;
     });
   }
@@ -347,6 +386,10 @@ export function createNutritionStore(deps: StoreDeps) {
         } catch {
           // Signed out: nothing to reload.
         }
+      }
+      if (t.goals) {
+        const goals = await readGoalsRow();
+        if (goals) await kv.set(GOALS_KEY, goals);
       }
       for (const [table, added] of t.collections) await reloaders.get(table)?.(added);
       changed();
@@ -751,6 +794,8 @@ export function createNutritionStore(deps: StoreDeps) {
     discardWaiting,
     loadPrefs,
     savePrefs,
+    loadGoals,
+    saveGoals,
     listDay,
     addEntry,
     updateEntry,
@@ -791,6 +836,7 @@ export function touchedBy(ops: readonly NOp[]): {
   days: Set<string>;
   foods: boolean;
   prefs: boolean;
+  goals: boolean;
   addedEntries: Set<string>;
   addedFoods: Set<string>;
   /** Kitchen tables touched, each with the ids its inserts added. */
@@ -800,13 +846,16 @@ export function touchedBy(ops: readonly NOp[]): {
     days: new Set<string>(),
     foods: false,
     prefs: false,
+    goals: false,
     addedEntries: new Set<string>(),
     addedFoods: new Set<string>(),
     collections: new Map<CollectionTable, Set<string>>(),
   };
   for (const op of ops) {
     if (op.table === "users") {
-      out.prefs = true;
+      const patch = op.kind === "update" ? op.patch : {};
+      if ("nutrition_goals" in patch) out.goals = true;
+      if ("nutrition_prefs" in patch || !("nutrition_goals" in patch)) out.prefs = true;
       continue;
     }
     if (op.table !== "foods" && op.table !== "food_entries") {
@@ -865,6 +914,8 @@ const instance = createNutritionStore({
 export const discardWaitingFood = instance.discardWaiting;
 export const loadPrefs = instance.loadPrefs;
 export const savePrefs = instance.savePrefs;
+export const loadGoals = instance.loadGoals;
+export const saveGoals = instance.saveGoals;
 export const listDay = instance.listDay;
 export const addEntry = instance.addEntry;
 export const updateEntry = instance.updateEntry;

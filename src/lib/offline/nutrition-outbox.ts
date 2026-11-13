@@ -10,8 +10,8 @@ import { kvGet, kvSet } from "./kv.ts";
 import { explainRefusal, isAuthError, isNetworkError, SAVE_FAILED_MESSAGE } from "./queue.ts";
 import { shapeForServer } from "./nutrition-schema.ts";
 
-/** Kitchen tables (recipes and the rest) hold whole items, kept on the phone like foods. */
-export type CollectionTable = "recipes" | "batches" | "usuals" | "pantry_items";
+/** Kitchen tables (recipes and the rest) and day logs (water, supplements) hold whole items, kept on the phone like foods. */
+export type CollectionTable = "recipes" | "batches" | "usuals" | "pantry_items" | "nutrition_logs";
 export type RowTable = "foods" | "food_entries" | CollectionTable;
 export type Table = RowTable | "users";
 type Row = Record<string, unknown>;
