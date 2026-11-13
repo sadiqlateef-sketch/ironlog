@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useNutritionSync } from "@/hooks/use-nutrition-sync";
-import { discardRefusedNutrition, flushNutrition } from "@/lib/offline/nutrition-outbox";
+import { flushNutrition } from "@/lib/offline/nutrition-outbox";
+import { discardWaitingFood } from "@/lib/offline/nutrition-store";
+import { discardPrompt } from "@/lib/nutrition/display";
 
 /** Food changes waiting to sync. Shows nothing when everything is saved. */
 export function NutritionSyncChip() {
@@ -19,10 +21,12 @@ export function NutritionSyncChip() {
       setBusy(false);
     }
   };
+  // Discard means all of them: the phone then shows what the server has, so the two agree.
   const discard = async () => {
+    if (!window.confirm(discardPrompt(s.pending))) return;
     setBusy(true);
     try {
-      await discardRefusedNutrition();
+      await discardWaitingFood();
     } finally {
       setBusy(false);
     }
@@ -45,7 +49,7 @@ export function NutritionSyncChip() {
               Retry
             </Button>
             <Button size="sm" variant="outline" onClick={discard} disabled={busy}>
-              Discard
+              Discard all
             </Button>
           </div>
         </>

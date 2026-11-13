@@ -232,3 +232,16 @@ test("the workout outbox key is never read or written", async () => {
   assert.match(src, /NUTRITION_OUTBOX_KEY = "nutrition-outbox"/);
   assert.ok(keys.length > 0);
 });
+
+test("discardPending drops everything, refused or not, and returns what it dropped", async () => {
+  const t = setup({ fail: (c) => (firstId(c) === "a" ? 'new row violates check constraint "x"' : null) });
+  const o = t.make();
+  await o.enqueue(ins("a"), ins("b"), ins("c", "foods"));
+  assert.equal(await o.flush(), false);
+  const dropped = await o.discardPending();
+  assert.deepEqual(dropped.map((op) => (op.kind === "insert" ? op.rows[0].id : null)), ["a", "b", "c"]);
+  assert.equal(await o.pendingCount(), 0);
+  assert.equal(o.getStatus().refused, null);
+  assert.deepEqual(t.state.value, []);
+  assert.deepEqual(await o.discardPending(), []);
+});

@@ -55,3 +55,19 @@ export function parseAmount(text: string): number | null {
   const n = Number(text.trim().replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n : null;
 }
+
+/** The unit as a choice in the amount sheet: "g", or "serving (15 g)" and "package (400 g)" with their size. */
+export function unitChoiceLabel(
+  unit: EntryUnit,
+  food: { liquid: boolean; servingAmount: number | null; packageAmount: number | null },
+): string {
+  const size = unit === "serving" ? food.servingAmount : unit === "package" ? food.packageAmount : null;
+  if (size === null || !(size > 0)) return unitLabel(unit);
+  return `${unitLabel(unit)} (${Number(size.toFixed(1))} ${food.liquid ? "ml" : "g"})`;
+}
+
+/** The question asked before throwing away every waiting food change. */
+export function discardPrompt(count: number): string {
+  const n = Math.max(1, count);
+  return `Discard ${n} waiting food change${n === 1 ? "" : "s"}? They'll be removed from this phone too.`;
+}

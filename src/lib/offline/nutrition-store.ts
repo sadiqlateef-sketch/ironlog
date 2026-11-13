@@ -8,6 +8,7 @@
 import { getSupabase } from "../supabase/client.ts";
 import { kvGet, kvSet } from "./kv.ts";
 import {
+  discardPendingNutrition,
   enqueueNutrition,
   flushNutrition,
   hasNutritionPending,
@@ -60,6 +61,8 @@ export interface StoreDeps {
     enqueue(...ops: NOp[]): Promise<void>;
     flush(): Promise<boolean>;
     hasPending(): Promise<boolean>;
+    /** Drop every waiting change; returns the dropped changes. */
+    discardPending(): Promise<NOp[]>;
   };
   db: { read(q: ReadQuery): Promise<{ data: unknown; error: { message: string } | null }> };
   userId: () => Promise<string>;
@@ -186,7 +189,7 @@ export function createNutritionStore(deps: StoreDeps) {
       const list = await dayMirror(entry.foodDay);
       await kv.set(dayKey(entry.foodDay), [...list.filter((e) => e.id !== entry.id), entry].sort(byTime));
       if (entry.unit !== "quick") await bumpRecent(entry);
-      await commit({ kind: "insert", table: "food_entries", rows: [entryToRow(entry)] });
+      await commit({ kind: "insert", table: "food_entries", rows: [entryToRow(entry)], days: [entry.foodDay] });
     });
   }
 
@@ -225,7 +228,10 @@ export function createNutritionStore(deps: StoreDeps) {
         const target = await dayMirror(next.foodDay);
         await kv.set(dayKey(next.foodDay), [...target, next].sort(byTime));
       }
-      if (columns.length) await commit({ kind: "update", table: "food_entries", ids: [id], patch: rowPatch });
+      if (columns.length) {
+        const days = next.foodDay === day ? [day] : [day, next.foodDay];
+        await commit({ kind: "update", table: "food_entries", ids: [id], patch: rowPatch, days });
+      }
       return next;
     });
   }
@@ -234,7 +240,50 @@ export function createNutritionStore(deps: StoreDeps) {
     await locked(async () => {
       const list = await dayMirror(day);
       await kv.set(dayKey(day), list.filter((e) => e.id !== id));
-      await commit({ kind: "delete", table: "food_entries", ids: [id] });
+      await commit({ kind: "delete", table: "food_entries", ids: [id], days: [day] });
+    });
+  }
+
+  /**
+   * Throw away every food change still waiting to sync and put the phone's copies
+   * back in line with the server: the days, foods and settings those changes
+   * touched are read again. If the server can't be read, entries and foods the
+   * dropped changes added are at least taken off the phone. Returns how many
+   * changes were dropped.
+   */
+  async function discardWaiting(): Promise<number> {
+    return locked(async () => {
+      const dropped = await outbox.discardPending();
+      if (!dropped.length) return 0;
+      writes++;
+      const t = touchedBy(dropped);
+      for (const day of t.days) {
+        const server = await fetchDay(day);
+        if (server) await kv.set(dayKey(day), server);
+        else {
+          const local = await kv.get<DiaryEntry[]>(dayKey(day));
+          if (local) await kv.set(dayKey(day), local.filter((e) => !t.addedEntries.has(e.id)));
+        }
+      }
+      if (t.foods) {
+        const server = await fetchFoods();
+        if (server) await kv.set(FOODS_KEY, server);
+        else {
+          const local = await kv.get<Food[]>(FOODS_KEY);
+          if (local) await kv.set(FOODS_KEY, local.filter((f) => !t.addedFoods.has(f.id)));
+        }
+      }
+      if (t.prefs) {
+        try {
+          const uid = await deps.userId();
+          const row = await tryRead({ table: "users", columns: "nutrition_prefs", eq: { id: uid }, single: true });
+          if (row) await kv.set(PREFS_KEY, normalizePrefs((row as { nutrition_prefs?: unknown }).nutrition_prefs));
+        } catch {
+          // Signed out: nothing to reload.
+        }
+      }
+      changed();
+      return dropped.length;
     });
   }
 
@@ -385,6 +434,7 @@ export function createNutritionStore(deps: StoreDeps) {
   }
 
   return {
+    discardWaiting,
     loadPrefs,
     savePrefs,
     listDay,
@@ -400,6 +450,37 @@ export function createNutritionStore(deps: StoreDeps) {
   };
 }
 
+/** What a list of queued changes touched on the phone: diary days, foods, settings, and the ids they added. */
+export function touchedBy(ops: readonly NOp[]): {
+  days: Set<string>;
+  foods: boolean;
+  prefs: boolean;
+  addedEntries: Set<string>;
+  addedFoods: Set<string>;
+} {
+  const out = { days: new Set<string>(), foods: false, prefs: false, addedEntries: new Set<string>(), addedFoods: new Set<string>() };
+  for (const op of ops) {
+    if (op.table === "users") {
+      out.prefs = true;
+      continue;
+    }
+    const added = op.table === "foods" ? out.addedFoods : out.addedEntries;
+    if (op.kind === "insert") {
+      for (const row of op.rows) {
+        if (typeof row.id === "string") added.add(row.id);
+        if (op.table === "food_entries" && typeof row.food_day === "string") out.days.add(row.food_day);
+      }
+    }
+    if (op.table === "foods") {
+      out.foods = true;
+      continue;
+    }
+    for (const d of op.days ?? []) out.days.add(d);
+    if (op.kind === "update" && typeof op.patch.food_day === "string") out.days.add(op.patch.food_day);
+  }
+  return out;
+}
+
 // ---------- The app's instance ----------
 
 interface Chain {
@@ -412,7 +493,7 @@ interface Chain {
 
 const instance = createNutritionStore({
   kv: { get: kvGet, set: kvSet },
-  outbox: { enqueue: enqueueNutrition, flush: flushNutrition, hasPending: hasNutritionPending },
+  outbox: { enqueue: enqueueNutrition, flush: flushNutrition, hasPending: hasNutritionPending, discardPending: discardPendingNutrition },
   db: {
     read: async (q) => {
       let c = (getSupabase().from(q.table) as unknown as { select(cols: string): Chain }).select(q.columns);
@@ -429,6 +510,7 @@ const instance = createNutritionStore({
   },
 });
 
+export const discardWaitingFood = instance.discardWaiting;
 export const loadPrefs = instance.loadPrefs;
 export const savePrefs = instance.savePrefs;
 export const listDay = instance.listDay;

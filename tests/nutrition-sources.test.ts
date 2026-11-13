@@ -260,7 +260,7 @@ function fakeGet(status: number, data: unknown): { get: HttpGet; calls: Call[] }
 }
 
 const OFF_FIELDS_PARAM =
-  "product_name,code,nutriments,brands,serving_quantity,serving_quantity_unit,product_quantity,product_quantity_unit,url";
+  "product_name,code,nutriments,brands,serving_quantity,serving_quantity_unit,product_quantity,product_quantity_unit,serving_size,quantity,url";
 
 test("OFF getProduct requests the product URL with only the fields param", async () => {
   const { get, calls } = fakeGet(200, f1);
@@ -297,7 +297,7 @@ test("OFF search sends the exact params and maps usable products", async () => {
     search_terms: "crisps",
     page: "3",
     page_size: "50",
-    sort_by: "product_name",
+    sort_by: "unique_scans_n",
     fields: OFF_FIELDS_PARAM,
   });
   assert.ok(!("countries" in calls[0].params));

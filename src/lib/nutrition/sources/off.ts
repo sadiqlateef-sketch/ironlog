@@ -1,3 +1,4 @@
+import { decodeEntities } from "../entities.ts";
 import { capacitorGet, createRateLimiter, NutritionError } from "../http.ts";
 import type { HttpGet, HttpResponse } from "../http.ts";
 import { complete, derived, emptyNutrients } from "../nutrients.ts";
@@ -6,7 +7,7 @@ import type { RemoteFood } from "../types.ts";
 
 const OFF_BASE = "https://world.openfoodfacts.org";
 export const OFF_FIELDS =
-  "product_name,code,nutriments,brands,serving_quantity,serving_quantity_unit,product_quantity,product_quantity_unit,url";
+  "product_name,code,nutriments,brands,serving_quantity,serving_quantity_unit,product_quantity,product_quantity_unit,serving_size,quantity,url";
 
 /** Nutrient key -> key in OFF's per-100 g `nutriments` object. */
 const OFF_KEYS: Record<NutrientKey, string> = {
@@ -76,6 +77,13 @@ function toText(v: unknown): string | null {
   return t === "" ? null : t;
 }
 
+/** Shown text (name, brand): entities decoded and spaces tidied. */
+function toLabel(v: unknown): string | null {
+  const t = toText(v);
+  if (t === null) return null;
+  return toText(decodeEntities(t).replace(/\s+/g, " "));
+}
+
 type Quantity = { amount: number; unit: "g" | "ml" };
 
 function quantity(amountRaw: unknown, unitRaw: unknown): Quantity | null {
@@ -84,6 +92,37 @@ function quantity(amountRaw: unknown, unitRaw: unknown): Quantity | null {
   const unit = toText(unitRaw)?.toLowerCase() ?? "g";
   if (unit === "g" || unit === "ml") return { amount, unit };
   return null;
+}
+
+const TEXT_UNITS: Record<string, { unit: "g" | "ml"; factor: number }> = {
+  g: { unit: "g", factor: 1 },
+  gr: { unit: "g", factor: 1 },
+  kg: { unit: "g", factor: 1000 },
+  ml: { unit: "ml", factor: 1 },
+  cl: { unit: "ml", factor: 10 },
+  dl: { unit: "ml", factor: 100 },
+  l: { unit: "ml", factor: 1000 },
+};
+
+/**
+ * An amount written as text, such as "15 g", "1 portion (15 g)" or "400 g e".
+ * A bracketed amount wins over the first one ("2 biscuits (25 g)" is 25 g).
+ * Null when no gram or millilitre amount is in it.
+ */
+export function quantityFromText(raw: unknown): Quantity | null {
+  const text = toText(raw);
+  if (text === null) return null;
+  const re = /(\d+(?:[.,]\d+)?)\s*(kg|gr|g|ml|cl|dl|l)(?![a-z])/gi;
+  const found: { q: Quantity; bracketed: boolean }[] = [];
+  for (const m of text.matchAll(re)) {
+    const u = TEXT_UNITS[m[2].toLowerCase()];
+    const n = Number(m[1].replace(",", "."));
+    if (!u || !Number.isFinite(n) || n <= 0) continue;
+    const before = text.slice(0, m.index);
+    const bracketed = before.lastIndexOf("(") > before.lastIndexOf(")");
+    found.push({ q: { amount: Math.round(n * u.factor * 1000) / 1000, unit: u.unit }, bracketed });
+  }
+  return (found.find((f) => f.bracketed) ?? found[0])?.q ?? null;
 }
 
 function isMl(unitRaw: unknown): boolean {
@@ -105,21 +144,26 @@ function mapNutrients(nutriments: Record<string, unknown>): Nutrients {
 /** Map one OFF product object (not the response envelope). Null when unusable. */
 export function mapOffProduct(raw: unknown): RemoteFood | null {
   if (!isRecord(raw)) return null;
-  const name = toText(raw.product_name);
+  const name = toLabel(raw.product_name);
   if (name === null) return null;
   const code = toText(raw.code);
   if (code === null) return null;
   if (!isRecord(raw.nutriments)) return null;
 
-  const serving = quantity(raw.serving_quantity, raw.serving_quantity_unit);
-  const packageAmount = quantity(raw.product_quantity, raw.product_quantity_unit);
+  const servingNum = quantity(raw.serving_quantity, raw.serving_quantity_unit);
+  const packageNum = quantity(raw.product_quantity, raw.product_quantity_unit);
   const liquid = isMl(raw.serving_quantity_unit) || isMl(raw.product_quantity_unit);
+  // Many products only write the serving as text ("15 g"); use it when the number is missing,
+  // unless its unit disagrees with the product (grams on a drink).
+  const fits = (q: Quantity | null) => (q !== null && (q.unit === "ml") === liquid ? q : null);
+  const serving = servingNum ?? fits(quantityFromText(raw.serving_size));
+  const packageAmount = packageNum ?? fits(quantityFromText(raw.quantity));
 
   return {
     source: "off",
     sourceId: code,
     name,
-    brand: toText(raw.brands),
+    brand: toLabel(raw.brands),
     barcode: code,
     sourceUrl: toText(raw.url) ?? `${OFF_BASE}/product/${code}`,
     liquid,
@@ -167,7 +211,8 @@ export function createOffClient(opts: { get?: HttpGet; now?: () => number } = {}
         search_terms: query,
         page: String(page),
         page_size: "50",
-        sort_by: "product_name",
+        // Most-scanned first, so the 50 we rank are the products people actually buy.
+        sort_by: "unique_scans_n",
         fields: OFF_FIELDS,
       });
       checkStatus(res);

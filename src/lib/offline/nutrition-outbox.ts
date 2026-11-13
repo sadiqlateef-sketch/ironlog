@@ -12,10 +12,12 @@ import { explainRefusal, isAuthError, isNetworkError, SAVE_FAILED_MESSAGE } from
 type Table = "foods" | "food_entries" | "users";
 type Row = Record<string, unknown>;
 
+// `days` (diary changes only) names the food days the change touched on the phone. It is
+// never sent; discarding uses it to reload those days from the server.
 export type NOp =
-  | { kind: "insert"; table: "foods" | "food_entries"; rows: Row[] }
-  | { kind: "update"; table: Table; ids: string[]; patch: Row }
-  | { kind: "delete"; table: "foods" | "food_entries"; ids: string[] };
+  | { kind: "insert"; table: "foods" | "food_entries"; rows: Row[]; days?: string[] }
+  | { kind: "update"; table: Table; ids: string[]; patch: Row; days?: string[] }
+  | { kind: "delete"; table: "foods" | "food_entries"; ids: string[]; days?: string[] };
 
 interface Entry {
   seq: number;
@@ -218,12 +220,17 @@ export function createNutritionOutbox(deps: OutboxDeps) {
       emit({ refused: null, error: null });
       await flush();
     },
-    async discardPending(): Promise<void> {
+    /** Throw away every waiting change. Returns what was dropped, so the phone's copies can be reloaded. */
+    async discardPending(): Promise<NOp[]> {
       await load();
+      // Let a send in progress finish first, so what it sent isn't counted as dropped.
+      if (flushing) await flushing.catch(() => false);
       const gen = generation;
+      const dropped = entries.map((e) => e.op);
       entries = [];
       await save(gen);
       emit({ refused: null, error: null });
+      return dropped;
     },
     /** Sign-out: forget the list in memory AND on the phone so the next user can never send it. */
     async reset(): Promise<void> {

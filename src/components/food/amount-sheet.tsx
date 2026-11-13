@@ -9,7 +9,7 @@ import { MealChips } from "@/components/food/meal-chips";
 import { addEntry, saveFood } from "@/lib/offline/nutrition-store";
 import { defaultMealFor } from "@/lib/nutrition/day";
 import { allowedUnits, DISPLAY_NUTRIENTS, makeEntry } from "@/lib/nutrition/entry-math";
-import { amountText, NUTRIENT_DISPLAY, parseAmount, showNutrient, unitLabel } from "@/lib/nutrition/display";
+import { amountText, NUTRIENT_DISPLAY, parseAmount, showNutrient, unitChoiceLabel } from "@/lib/nutrition/display";
 import type { DiaryEntry, EntryUnit, Food, MealSlot } from "@/lib/nutrition/diary-types";
 import { cn } from "@/lib/utils";
 
@@ -132,7 +132,7 @@ function Form({ target, day, dayLabel, meals, mealId, now, onSaved }: Props & { 
                 unit === u ? "bg-foreground text-background border-transparent" : "text-muted-foreground bg-transparent",
               )}
             >
-              {unitLabel(u, 2)}
+              {unitChoiceLabel(u, food)}
             </button>
           ))}
         </div>
@@ -146,10 +146,14 @@ function Form({ target, day, dayLabel, meals, mealId, now, onSaved }: Props & { 
       <dl className="bg-secondary/40 border-border/50 grid grid-cols-4 gap-x-2 gap-y-3 rounded-xl border p-3" data-testid="amount-preview">
         {DISPLAY_NUTRIENTS.map((key) => {
           const d = NUTRIENT_DISPLAY[key]!;
+          const shown = preview ? showNutrient(key, preview.nutrients[key]) : "–";
           return (
             <div key={key} className="flex flex-col">
               <dt className="text-muted-foreground text-xs">{d.label}</dt>
-              <dd className="text-sm font-semibold tabular-nums">{preview ? showNutrient(key, preview.nutrients[key]) : "–"}</dd>
+              <dd className="text-sm font-semibold tabular-nums">
+                {shown}
+                {shown !== "–" && <span className="text-muted-foreground text-xs font-normal"> {d.unit}</span>}
+              </dd>
             </div>
           );
         })}

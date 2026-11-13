@@ -7,6 +7,7 @@
 // The plugin is loaded lazily so the web build never runs it.
 
 import { isNative } from "@/lib/native";
+import { isScanCancel } from "@/lib/nutrition/scan-error";
 
 export type ScanOutcome =
   | { kind: "code"; raw: string; format: string | null }
@@ -79,8 +80,8 @@ export async function scanBarcode(opts: ScanOptions = {}): Promise<ScanOutcome> 
     if (!first?.rawValue) return { kind: "cancelled" };
     return { kind: "code", raw: first.rawValue, format: first.format ?? null };
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    if (/cancel/i.test(message)) return { kind: "cancelled" };
+    // A user cancel arrives as a rejection too; only a real failure shows the message.
+    if (isScanCancel(e)) return { kind: "cancelled" };
     return { kind: "unavailable", reason: GENERIC };
   }
 }

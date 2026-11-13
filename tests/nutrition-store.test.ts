@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createNutritionStore, MAX_RECENTS, type ReadQuery, type StoreDeps } from "../src/lib/offline/nutrition-store.ts";
+import { createNutritionStore, MAX_RECENTS, touchedBy, type ReadQuery, type StoreDeps } from "../src/lib/offline/nutrition-store.ts";
 import { createNutritionOutbox, type DbLike, type NOp } from "../src/lib/offline/nutrition-outbox.ts";
 import { STAPLES } from "../src/lib/nutrition/staples.ts";
 import { complete, emptyNutrients } from "../src/lib/nutrition/nutrients.ts";
@@ -215,4 +215,48 @@ test("findFoodBySource: none is null, offline is unknown, the food itself is ign
   assert.equal(await r.store.findFoodBySource("off", "fake-99", "p1"), undefined);
   await r.store.saveFood(fakeFood({ id: "local-off", source: "off", sourceId: "fake-99" }));
   assert.equal((await r.store.findFoodBySource("off", "fake-99", "p1"))?.id, "local-off");
+});
+
+test("discardWaiting drops every waiting change and reloads the touched day from the server", async () => {
+  const serverRow = {
+    id: "srv", food_day: DAY, meal_id: "m", meal_name: "Lunch", eaten_at: NOW.toISOString(), food_id: null, name: "From server",
+    brand: null, quantity: "1.000", unit: "quick", grams: null, food: null, nutrients: emptyNutrients(), note: null,
+  };
+  const r = rig({ serverDays: { [DAY]: [serverRow], "2026-11-11": [] } });
+  await r.store.addEntry(makeQuickEntry({ name: "Local", values: { energy: 100 }, foodDay: DAY, meal, now: NOW, id: "loc" }));
+  await r.store.addEntry(makeQuickEntry({ name: "Moved", values: { energy: 5 }, foodDay: DAY, meal, now: NOW, id: "mv" }));
+  await r.store.updateEntry("mv", { foodDay: "2026-11-11" }, DAY);
+  assert.equal(await r.outbox.pendingCount(), 3);
+  r.setOnline(true);
+  assert.equal(await r.store.discardWaiting(), 3);
+  assert.equal(await r.outbox.pendingCount(), 0);
+  // The phone copy now matches the server, also offline.
+  r.setOnline(false);
+  assert.deepEqual((await r.store.listDay(DAY)).map((e) => e.id), ["srv"]);
+  assert.deepEqual((await r.store.listDay("2026-11-11")).map((e) => e.id), []);
+});
+
+test("discardWaiting offline still takes the dropped new entries and foods off the phone", async () => {
+  const r = rig();
+  const food = await r.store.saveFood(fakeFood({ id: "new-food" }));
+  await r.store.addEntry(makeEntry({ food, quantity: 50, unit: "g", foodDay: DAY, meal, now: NOW, id: "e1" }));
+  assert.equal(await r.store.discardWaiting(), 2);
+  assert.deepEqual(await r.store.listDay(DAY), []);
+  assert.deepEqual(await r.store.listFoods(), []);
+  assert.equal(await r.store.discardWaiting(), 0);
+});
+
+test("touchedBy lists days, foods, settings and added ids; days metadata is never sent", async () => {
+  const t = touchedBy([
+    { kind: "insert", table: "food_entries", rows: [{ id: "a", food_day: "2026-11-10" }], days: ["2026-11-10"] },
+    { kind: "update", table: "food_entries", ids: ["b"], patch: { food_day: "2026-11-12" }, days: ["2026-11-11"] },
+    { kind: "delete", table: "food_entries", ids: ["c"] },
+    { kind: "insert", table: "foods", rows: [{ id: "f" }] },
+    { kind: "update", table: "users", ids: ["u"], patch: { nutrition_prefs: {} } },
+  ]);
+  assert.deepEqual([...t.days].sort(), ["2026-11-10", "2026-11-11", "2026-11-12"]);
+  assert.deepEqual([...t.addedEntries], ["a"]);
+  assert.deepEqual([...t.addedFoods], ["f"]);
+  assert.equal(t.foods, true);
+  assert.equal(t.prefs, true);
 });

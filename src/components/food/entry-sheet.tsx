@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { MealChips } from "@/components/food/meal-chips";
 import { deleteEntry, updateEntry } from "@/lib/offline/nutrition-store";
 import { allowedUnits, DISPLAY_NUTRIENTS, recomputeEntry } from "@/lib/nutrition/entry-math";
-import { amountText, NUTRIENT_DISPLAY, parseAmount, showNutrient, unitLabel } from "@/lib/nutrition/display";
+import { amountText, NUTRIENT_DISPLAY, parseAmount, showNutrient, unitChoiceLabel } from "@/lib/nutrition/display";
 import type { DiaryEntry, EntryUnit, MealSlot } from "@/lib/nutrition/diary-types";
 import { cn } from "@/lib/utils";
 
@@ -125,7 +125,7 @@ function Editor({ entry, meals, onClose }: { entry: DiaryEntry; meals: readonly 
                   unit === u ? "bg-foreground text-background border-transparent" : "text-muted-foreground bg-transparent",
                 )}
               >
-                {unitLabel(u, 2)}
+                {unitChoiceLabel(u, entry.food!)}
               </button>
             ))}
           </div>
@@ -135,10 +135,14 @@ function Editor({ entry, meals, onClose }: { entry: DiaryEntry; meals: readonly 
       <dl className="bg-secondary/40 border-border/50 grid grid-cols-4 gap-x-2 gap-y-3 rounded-xl border p-3" data-testid="entry-preview">
         {DISPLAY_NUTRIENTS.map((key) => {
           const d = NUTRIENT_DISPLAY[key]!;
+          const shown = preview ? showNutrient(key, preview.nutrients[key]) : "–";
           return (
             <div key={key} className="flex flex-col">
               <dt className="text-muted-foreground text-xs">{d.label}</dt>
-              <dd className="text-sm font-semibold tabular-nums">{preview ? showNutrient(key, preview.nutrients[key]) : "–"}</dd>
+              <dd className="text-sm font-semibold tabular-nums">
+                {shown}
+                {shown !== "–" && <span className="text-muted-foreground text-xs font-normal"> {d.unit}</span>}
+              </dd>
             </div>
           );
         })}

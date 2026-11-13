@@ -1,4 +1,5 @@
 import { NutritionError } from "./http.ts";
+import { rankFoods } from "./rank.ts";
 import type { OffClient } from "./sources/off.ts";
 import type { UsdaClient } from "./sources/usda.ts";
 import type { RemoteFood } from "./types.ts";
@@ -65,7 +66,7 @@ export async function searchFoods(query: string, options: SearchOptions): Promis
       } else {
         foods = (await off.search(q)).foods;
       }
-      return dedupe(foods).slice(0, offLimit);
+      return rankFoods(q, dedupe(foods)).slice(0, offLimit);
     } catch (e) {
       errors.push({ source: "off", error: toNutritionError(e) });
       return [];
@@ -76,7 +77,7 @@ export async function searchFoods(query: string, options: SearchOptions): Promis
     if (!usda) return [];
     try {
       const { foods } = await usda.client.search(q, usda.apiKey);
-      return dedupe(foods).slice(0, usdaLimit);
+      return rankFoods(q, dedupe(foods)).slice(0, usdaLimit);
     } catch (e) {
       errors.push({ source: "usda", error: toNutritionError(e) });
       return [];
