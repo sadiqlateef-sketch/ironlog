@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Plus, Search } from "lucide-react";
+import { ChevronLeft, Plus, ScanBarcode, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SkeletonList } from "@/components/ui/skeleton";
@@ -14,8 +14,11 @@ import type { AmountTarget } from "@/components/food/amount-sheet";
 import { CustomFoodSheet } from "@/components/food/custom-food-sheet";
 import { FoodResultRow, tagFor } from "@/components/food/food-result-row";
 import { NutritionSyncChip } from "@/components/food/nutrition-sync-chip";
+import { ScanSheet } from "@/components/food/scan-sheet";
+import type { ScannedCode } from "@/components/food/scan-sheet";
 import { useMinuteClock } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
+import { onRestoredScan } from "@/lib/barcode-scanner";
 import { listFoods, listRecents, NUTRITION_EVENT, saveFood } from "@/lib/offline/nutrition-store";
 import type { RecentFood } from "@/lib/offline/nutrition-store";
 import { dayLabel, foodDay } from "@/lib/nutrition/day";
@@ -91,6 +94,8 @@ export function AddFoodScreen() {
   const [remote, setRemote] = useState<Remote | null>(null);
   const [target, setTarget] = useState<AmountTarget | null>(null);
   const [custom, setCustom] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [restored, setRestored] = useState<ScannedCode | null>(null);
 
   const loadLocal = useCallback(() => {
     listFoods()
@@ -105,6 +110,17 @@ export function AddFoodScreen() {
     window.addEventListener(NUTRITION_EVENT, loadLocal);
     return () => window.removeEventListener(NUTRITION_EVENT, loadLocal);
   }, [loadLocal]);
+
+  // Android may restart the app while its scanner is open; the scan then arrives here.
+  useEffect(
+    () =>
+      onRestoredScan((out) => {
+        if (out.kind !== "code") return;
+        setRestored({ raw: out.raw, format: out.format });
+        setScanOpen(true);
+      }),
+    [],
+  );
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), DEBOUNCE_MS);
@@ -149,6 +165,16 @@ export function AddFoodScreen() {
     setTarget({ food, isNew: false, last: last ? { quantity: last.quantity, unit: last.unit } : null });
   const pickRemote = (r: RemoteFood) => setTarget({ food: remoteToFood(r), isNew: true });
 
+  const closeScan = (open: boolean) => {
+    setScanOpen(open);
+    if (!open) setRestored(null);
+  };
+  // Not found or offline: put the code in the search box. Creating from a barcode comes next.
+  const scanToSearch = (code: string) => {
+    closeScan(false);
+    setQuery(code);
+  };
+
   const finish = () => {
     setTarget(null);
     if (window.history.length > 1) router.back();
@@ -185,17 +211,22 @@ export function AddFoodScreen() {
 
       <NutritionSyncChip />
 
-      <div className="relative">
-        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden />
-        <Input
-          type="search"
-          aria-label="Search foods"
-          placeholder="Search foods or type a barcode"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
-          autoComplete="off"
-        />
+      <div className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden />
+          <Input
+            type="search"
+            aria-label="Search foods"
+            placeholder="Search foods or type a barcode"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+            autoComplete="off"
+          />
+        </div>
+        <Button type="button" variant="outline" size="icon" aria-label="Scan a barcode" onClick={() => setScanOpen(true)}>
+          <ScanBarcode className="size-5" />
+        </Button>
       </div>
 
       {!online && (
@@ -260,7 +291,14 @@ export function AddFoodScreen() {
               )}
             </Group>
           )}
-          {barcodeMiss && <p className="text-muted-foreground text-sm">No food with that barcode yet. Barcode scanning arrives in a later update.</p>}
+          {barcodeMiss && (
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground text-sm">No food with that barcode yet. Scan it, or create the food.</p>
+              <Button type="button" onClick={() => setCustom(true)}>
+                <Plus /> Create food
+              </Button>
+            </div>
+          )}
           {!waitingRemote && local.length === 0 && shownRemote.length === 0 && !barcodeMiss && (
             <p className="text-muted-foreground text-sm">
               {online && !remoteFailed ? "Nothing found." : "Nothing on this phone matches."} You can add it yourself.
@@ -306,6 +344,22 @@ export function AddFoodScreen() {
         mealId={params.meal}
         now={now}
         onSaved={finish}
+      />
+      <ScanSheet
+        open={scanOpen}
+        onOpenChange={closeScan}
+        foods={list}
+        initialScan={restored}
+        onLocal={(food) => {
+          closeScan(false);
+          pickFood(food);
+        }}
+        onRemote={(r) => {
+          closeScan(false);
+          pickRemote(r);
+        }}
+        onCreate={scanToSearch}
+        onOffline={scanToSearch}
       />
       <CustomFoodSheet open={custom} onOpenChange={setCustom} onCreate={createFood} initialName={searching && !isBarcodeQuery(debounced) ? debounced : ""} />
     </div>

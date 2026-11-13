@@ -84,3 +84,31 @@ export async function scanBarcode(opts: ScanOptions = {}): Promise<ScanOutcome> 
     return { kind: "unavailable", reason: GENERIC };
   }
 }
+
+/**
+ * Android can stop IronLog while the system scanner is open. The scan then
+ * comes back when the app restarts instead of to `scanBarcode`. This passes
+ * that late result on (a failed one counts as cancelled). Returns an unsubscribe.
+ */
+export function onRestoredScan(cb: (outcome: ScanOutcome) => void): () => void {
+  if (!isNative()) return () => {};
+  let remove: (() => void) | null = null;
+  let stopped = false;
+  import("@capacitor/app")
+    .then(({ App }) =>
+      App.addListener("appRestoredResult", (e) => {
+        if (e.pluginId !== "BarcodeScanner" || e.methodName !== "scan") return;
+        const first = e.success ? (e.data as { barcodes?: { rawValue?: string; format?: string }[] } | undefined)?.barcodes?.[0] : undefined;
+        cb(first?.rawValue ? { kind: "code", raw: first.rawValue, format: first.format ?? null } : { kind: "cancelled" });
+      }),
+    )
+    .then((handle) => {
+      remove = () => void handle.remove().catch(() => undefined);
+      if (stopped) remove();
+    })
+    .catch(() => undefined);
+  return () => {
+    stopped = true;
+    remove?.();
+  };
+}
