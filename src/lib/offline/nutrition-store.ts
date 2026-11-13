@@ -18,6 +18,8 @@ import {
 } from "./nutrition-outbox.ts";
 import { schemaGate } from "./nutrition-schema.ts";
 import { createCollection, type Stored } from "./nutrition-collections.ts";
+import { afterPortion, batchToRow, rowToBatch, type Batch } from "../nutrition/batch.ts";
+import { decrement, pantryToRow, rowToPantry, type PantryItem } from "../nutrition/pantry.ts";
 import { recipeFood, recipeProblem, recipeToRow, rollup, rowToRecipe, type Recipe } from "../nutrition/recipe.ts";
 import { normalizePrefs } from "../nutrition/day.ts";
 import {
@@ -106,6 +108,8 @@ const FOODS_KEY = "nutrition-foods";
 const RECENTS_KEY = "nutrition-recents";
 const SCANS_KEY = "nutrition-scans";
 const RECIPES_KEY = "nutrition-recipes";
+const BATCHES_KEY = "nutrition-batches";
+const PANTRY_KEY = "nutrition-pantry";
 const dayKey = (day: string) => `nutrition-day:${day}`;
 
 export function createNutritionStore(deps: StoreDeps) {
@@ -224,12 +228,17 @@ export function createNutritionStore(deps: StoreDeps) {
     });
   }
 
+  /** Put a new entry on its day and return the change to send. Call inside `locked`. */
+  async function stageEntry(entry: DiaryEntry): Promise<NOp> {
+    const list = await dayMirror(entry.foodDay);
+    await kv.set(dayKey(entry.foodDay), [...list.filter((e) => e.id !== entry.id), entry].sort(byTime));
+    if (entry.unit !== "quick") await bumpRecent(entry);
+    return { kind: "insert", table: "food_entries", rows: await entryRows([entry]), days: [entry.foodDay] };
+  }
+
   async function addEntry(entry: DiaryEntry): Promise<void> {
     await locked(async () => {
-      const list = await dayMirror(entry.foodDay);
-      await kv.set(dayKey(entry.foodDay), [...list.filter((e) => e.id !== entry.id), entry].sort(byTime));
-      if (entry.unit !== "quick") await bumpRecent(entry);
-      await commit({ kind: "insert", table: "food_entries", rows: await entryRows([entry]), days: [entry.foodDay] });
+      await commit(await stageEntry(entry));
     });
   }
 
@@ -580,6 +589,63 @@ export function createNutritionStore(deps: StoreDeps) {
     });
   }
 
+  // ---------- Batches and pantry ----------
+
+  async function listBatches(): Promise<Stored<Batch>[]> {
+    return batches.list();
+  }
+
+  /**
+   * Log `count` portions of a batch: the entry and the smaller batch go out as one
+   * change. Over-logging still logs what you ate; the batch just stops at 0.
+   */
+  async function logBatchPortion(batchId: string, entry: DiaryEntry, count: number): Promise<Batch | null> {
+    const ready = await schema.probeTable("batches");
+    return locked(async () => {
+      const batch = await batches.get(batchId);
+      const entryOp = await stageEntry(entry);
+      if (!batch) {
+        await commit(entryOp);
+        return null;
+      }
+      const next = afterPortion(batch, count);
+      const batchOps = await batches.stageSave(next, ready);
+      await commit(entryOp, ...batchOps);
+      return next;
+    });
+  }
+
+  async function listPantry(): Promise<Stored<PantryItem>[]> {
+    return pantry.list();
+  }
+
+  /** Log some of a pantry item: the entry and the smaller amount go out as one change. */
+  async function logFromPantry(itemId: string, entry: DiaryEntry, food: Food): Promise<{ item: PantryItem | null; note: string | null }> {
+    const ready = await schema.probeTable("pantry_items");
+    return locked(async () => {
+      const item = await pantry.get(itemId);
+      const entryOp = await stageEntry(entry);
+      if (!item) {
+        await commit(entryOp);
+        return { item: null, note: null };
+      }
+      const res = decrement(item, entry.quantity, entry.unit, food);
+      const ops = res.ok ? await pantry.stageSave(res.item, ready) : [];
+      await commit(entryOp, ...ops);
+      return { item: res.item, note: res.ok ? null : res.reason };
+    });
+  }
+
+  /** Foods still only on this phone that phone-only rows point at: sent first, so the rows can point at them. */
+  async function promoteFoodsFor(foodIds: Iterable<string | null>): Promise<NOp[]> {
+    const ids = new Set([...foodIds].filter((x): x is string => !!x));
+    const foods = (await kv.get<Stored<Food>[]>(FOODS_KEY)) ?? [];
+    const waiting = foods.filter((f) => f.localOnly && ids.has(f.id));
+    if (!waiting.length) return [];
+    await kv.set(FOODS_KEY, foods.map((f) => (f.localOnly && ids.has(f.id) ? { ...f, localOnly: undefined } : f)));
+    return [{ kind: "insert", table: "foods", rows: waiting.map((f) => foodToRow(f)) }];
+  }
+
   const internals: StoreInternals = {
     locked,
     commit,
@@ -607,15 +673,27 @@ export function createNutritionStore(deps: StoreDeps) {
     internals,
     {
       // A recipe saved before the server was ready: its food goes first, so the recipe can point at it.
-      beforePromote: async (items) => {
-        const ids = new Set(items.map((r) => r.foodId).filter((x): x is string => !!x));
-        const foods = (await kv.get<Stored<Food>[]>(FOODS_KEY)) ?? [];
-        const waiting = foods.filter((f) => f.localOnly && ids.has(f.id));
-        if (!waiting.length) return [];
-        await kv.set(FOODS_KEY, foods.map((f) => (f.localOnly && ids.has(f.id) ? { ...f, localOnly: undefined } : f)));
-        return [{ kind: "insert", table: "foods", rows: waiting.map((f) => foodToRow(f)) }];
-      },
+      beforePromote: (items) => promoteFoodsFor(items.map((r) => r.foodId)),
     },
+  );
+
+  const batches = createCollection<Batch>(
+    {
+      table: "batches",
+      kvKey: BATCHES_KEY,
+      toRow: batchToRow,
+      fromRow: rowToBatch,
+      eq: { finished: false },
+      order: (a, b) => (a.madeOn < b.madeOn ? 1 : a.madeOn > b.madeOn ? -1 : 0),
+    },
+    internals,
+    { beforePromote: (items) => promoteFoodsFor(items.map((b) => b.foodId)) },
+  );
+
+  const pantry = createCollection<PantryItem>(
+    { table: "pantry_items", kvKey: PANTRY_KEY, toRow: pantryToRow, fromRow: rowToPantry },
+    internals,
+    { beforePromote: (items) => promoteFoodsFor(items.map((p) => p.foodId)) },
   );
 
   return {
@@ -641,6 +719,14 @@ export function createNutritionStore(deps: StoreDeps) {
     archiveRecipe,
     replaceEntry,
     getRecipe: (id: string) => recipes.get(id),
+    listBatches,
+    saveBatch: (b: Batch) => batches.save(b),
+    removeBatch: (id: string) => batches.remove(id),
+    logBatchPortion,
+    listPantry,
+    savePantryItem: (p: PantryItem) => pantry.save(p),
+    removePantryItem: (id: string) => pantry.remove(id),
+    logFromPantry,
   };
 }
 
@@ -741,3 +827,11 @@ export const saveRecipe = instance.saveRecipe;
 export const archiveRecipe = instance.archiveRecipe;
 export const replaceEntry = instance.replaceEntry;
 export const getRecipe = instance.getRecipe;
+export const listBatches = instance.listBatches;
+export const saveBatch = instance.saveBatch;
+export const removeBatch = instance.removeBatch;
+export const logBatchPortion = instance.logBatchPortion;
+export const listPantry = instance.listPantry;
+export const savePantryItem = instance.savePantryItem;
+export const removePantryItem = instance.removePantryItem;
+export const logFromPantry = instance.logFromPantry;

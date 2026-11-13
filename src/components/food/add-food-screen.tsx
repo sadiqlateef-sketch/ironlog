@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SkeletonList } from "@/components/ui/skeleton";
 import { AmountSheet } from "@/components/food/amount-sheet";
+import { BatchSheet } from "@/components/food/batch-sheet";
+import { newPantryItem, PantryItemSheet } from "@/components/food/pantry-item-sheet";
 import type { AmountTarget } from "@/components/food/amount-sheet";
 import { CustomFoodSheet } from "@/components/food/custom-food-sheet";
 import { FoodToast } from "@/components/food/food-toast";
@@ -21,7 +23,8 @@ import type { ScannedCode } from "@/components/food/scan-sheet";
 import { useMinuteClock } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { onRestoredScan } from "@/lib/barcode-scanner";
-import { addEntry, deleteEntry, listFoods, listRecents, NUTRITION_EVENT, saveFood } from "@/lib/offline/nutrition-store";
+import { addEntry, deleteEntry, listBatches, listFoods, listRecents, NUTRITION_EVENT, saveFood } from "@/lib/offline/nutrition-store";
+import { portionsLeftText, type Batch } from "@/lib/nutrition/batch";
 import type { RecentFood } from "@/lib/offline/nutrition-store";
 import { sameBarcode } from "@/lib/nutrition/barcode";
 import { dayLabel, defaultMealFor, foodDay } from "@/lib/nutrition/day";
@@ -87,7 +90,7 @@ export function AddFoodScreen() {
   const [params] = useState(() => {
     const sp = new URLSearchParams(window.location.search);
     const d = sp.get("d");
-    return { day: d && DAY.test(d) ? d : null, meal: sp.get("meal") };
+    return { day: d && DAY.test(d) ? d : null, meal: sp.get("meal"), pantry: sp.get("pantry") === "1" };
   });
 
   const current = foodDay(now, prefs.day_start);
@@ -98,6 +101,8 @@ export function AddFoodScreen() {
   const [debounced, setDebounced] = useState("");
   const [foods, setFoods] = useState<Food[] | null>(null);
   const [recents, setRecents] = useState<RecentFood[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [batchOpen, setBatchOpen] = useState<Batch | null>(null);
   const [remote, setRemote] = useState<Remote | null>(null);
   const [target, setTarget] = useState<AmountTarget | null>(null);
   const [custom, setCustom] = useState(false);
@@ -113,6 +118,9 @@ export function AddFoodScreen() {
       .catch(() => setFoods((f) => f ?? []));
     listRecents()
       .then(setRecents)
+      .catch(() => {});
+    listBatches()
+      .then((list) => setBatches(list.filter((b) => !b.finished && b.portionsLeft > 0)))
       .catch(() => {});
   }, []);
   useEffect(() => {
@@ -229,9 +237,16 @@ export function AddFoodScreen() {
     else setQuery(code);
   };
 
+  // In pantry mode a picked food opens the pantry sheet instead of the amount sheet.
+  const pantryTarget = useMemo(
+    () => (params.pantry && target ? { item: newPantryItem(target.food, new Date()), food: target.food, isNewFood: target.isNew, isNew: true } : null),
+    [params.pantry, target],
+  );
+
   const finish = () => {
     setTarget(null);
-    if (window.history.length > 1) router.back();
+    if (params.pantry) router.replace("/food/pantry/");
+    else if (window.history.length > 1) router.back();
     else router.replace(params.day ? `/food/?d=${params.day}` : "/food/");
   };
 
@@ -258,7 +273,7 @@ export function AddFoodScreen() {
           </Link>
         </Button>
         <div className="flex min-w-0 flex-col">
-          <h1 className="text-2xl leading-tight font-bold">Add food</h1>
+          <h1 className="text-2xl leading-tight font-bold">{params.pantry ? "Add to pantry" : "Add food"}</h1>
           <p className="text-muted-foreground text-xs">{prefsLoading ? "" : label}</p>
         </div>
       </header>
@@ -361,6 +376,21 @@ export function AddFoodScreen() {
         </>
       ) : (
         <>
+          {!params.pantry && batches.length > 0 && (
+            <Group title="From your batches">
+              {batches.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className="hover:bg-accent flex w-full flex-col rounded-xl px-3 py-2.5 text-left"
+                  onClick={() => setBatchOpen(b)}
+                >
+                  <span className="truncate text-base font-medium">{b.name}</span>
+                  <span className="text-muted-foreground text-xs">{portionsLeftText(b)}</span>
+                </button>
+              ))}
+            </Group>
+          )}
           {recentFoods.length > 0 && (
             <Group title="Recent">
               {recentFoods.slice(0, 15).map(({ food, last }) => (
@@ -390,8 +420,25 @@ export function AddFoodScreen() {
         <Plus /> Add your own food
       </Button>
 
+      <PantryItemSheet
+        target={pantryTarget}
+        onOpenChange={(o) => !o && setTarget(null)}
+        onDone={finish}
+        day={day}
+        meals={prefs.meals}
+        now={now}
+      />
+      <BatchSheet
+        mode={batchOpen ? { kind: "log", batch: batchOpen } : null}
+        onOpenChange={(o) => !o && setBatchOpen(null)}
+        onDone={finish}
+        day={day}
+        meals={prefs.meals}
+        mealId={params.meal}
+        now={now}
+      />
       <AmountSheet
-        target={target}
+        target={params.pantry ? null : target}
         onOpenChange={(o) => !o && setTarget(null)}
         day={day}
         dayLabel={label}

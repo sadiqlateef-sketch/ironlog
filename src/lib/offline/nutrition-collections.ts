@@ -104,7 +104,8 @@ export function createCollection<T extends { id: string }>(
     const items = await mirror();
     const prev = items.find((i) => i.id === item.id);
     const rest = items.filter((i) => i.id !== item.id);
-    if (!ready) {
+    // An item already on the server proves the table is there (a probe can fail just for being offline).
+    if (!ready && !(prev && !prev.localOnly)) {
       await kv.set(spec.kvKey, sort([{ ...clean(item), localOnly: true }, ...rest]));
       return [];
     }
@@ -134,8 +135,9 @@ export function createCollection<T extends { id: string }>(
   async function save(item: T): Promise<Stored<T>> {
     const ready = await internals.schema.probeTable(spec.table);
     return locked(async () => {
-      await finish(await stageSave(item, ready));
-      return ready ? clean(item) : { ...clean(item), localOnly: true };
+      const ops = await stageSave(item, ready);
+      await finish(ops);
+      return ops.length ? clean(item) : { ...clean(item), localOnly: true };
     });
   }
 

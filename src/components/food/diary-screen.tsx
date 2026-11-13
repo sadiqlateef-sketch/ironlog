@@ -5,7 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Apple, ChefHat, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Plus, Settings } from "lucide-react";
+import { Apple, ChefHat, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Plus, Settings } from "lucide-react";
 import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -186,6 +186,7 @@ export function DiaryScreen() {
         actions={[
           { label: "Quick add", icon: Plus, onSelect: () => setQuick(true) },
           { label: "Recipes", icon: ChefHat, onSelect: () => router.push("/food/recipes/") },
+          { label: "Pantry", icon: Refrigerator, onSelect: () => router.push("/food/pantry/") },
           { label: "Edit meals", icon: ListChecks, onSelect: () => setMeals(true) },
           { label: "Settings", icon: Settings, onSelect: () => router.push("/settings/#nutrition") },
         ]}
