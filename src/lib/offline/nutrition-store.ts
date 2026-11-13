@@ -27,6 +27,7 @@ import {
 } from "../nutrition/diary-types.ts";
 import { recomputeEntry } from "../nutrition/entry-math.ts";
 import { STAPLES, STAPLES_VERSION, stapleFoodsToSeed, type StapleSeed } from "../nutrition/staples.ts";
+import { pushRecentScan, type RecentScan } from "../nutrition/quick-log.ts";
 import type { Tables } from "../../types/database.ts";
 
 /** Fired on window whenever diary data changes (Home and the diary listen). */
@@ -78,6 +79,7 @@ export type EntryPatch = Partial<
 const PREFS_KEY = "nutrition-prefs";
 const FOODS_KEY = "nutrition-foods";
 const RECENTS_KEY = "nutrition-recents";
+const SCANS_KEY = "nutrition-scans";
 const dayKey = (day: string) => `nutrition-day:${day}`;
 
 export function createNutritionStore(deps: StoreDeps) {
@@ -233,6 +235,19 @@ export function createNutritionStore(deps: StoreDeps) {
         await commit({ kind: "update", table: "food_entries", ids: [id], patch: rowPatch, days });
       }
       return next;
+    });
+  }
+
+  /** Several new entries on one day (a copied meal), queued as one change. */
+  async function addEntries(day: string, entries: readonly DiaryEntry[]): Promise<void> {
+    const fresh = entries.filter((e) => e.foodDay === day);
+    if (!fresh.length) return;
+    await locked(async () => {
+      const ids = new Set(fresh.map((e) => e.id));
+      const list = await dayMirror(day);
+      await kv.set(dayKey(day), [...list.filter((e) => !ids.has(e.id)), ...fresh].sort(byTime));
+      for (const e of fresh) if (e.unit !== "quick") await bumpRecent(e);
+      await commit({ kind: "insert", table: "food_entries", rows: fresh.map(entryToRow), days: [day] });
     });
   }
 
@@ -404,6 +419,18 @@ export function createNutritionStore(deps: StoreDeps) {
     await kv.set(RECENTS_KEY, [item, ...list.filter((r) => r.key !== key)].slice(0, MAX_RECENTS));
   }
 
+  /** The last few products found by barcode on this phone, newest first. Never synced. */
+  async function listRecentScans(): Promise<RecentScan[]> {
+    const list = await kv.get<RecentScan[]>(SCANS_KEY);
+    return Array.isArray(list) ? list : [];
+  }
+
+  async function rememberScan(scan: RecentScan): Promise<void> {
+    await locked(async () => {
+      await kv.set(SCANS_KEY, pushRecentScan(await listRecentScans(), scan));
+    });
+  }
+
   async function listRecents(): Promise<RecentFood[]> {
     return (await kv.get<RecentFood[]>(RECENTS_KEY)) ?? [];
   }
@@ -446,6 +473,9 @@ export function createNutritionStore(deps: StoreDeps) {
     findFoodBySource,
     archiveFood,
     listRecents,
+    listRecentScans,
+    rememberScan,
+    addEntries,
     ensureStaples,
   };
 }
@@ -522,4 +552,7 @@ export const saveFood = instance.saveFood;
 export const findFoodBySource = instance.findFoodBySource;
 export const archiveFood = instance.archiveFood;
 export const listRecents = instance.listRecents;
+export const listRecentScans = instance.listRecentScans;
+export const rememberScan = instance.rememberScan;
+export const addEntries = instance.addEntries;
 export const ensureStaples = instance.ensureStaples;

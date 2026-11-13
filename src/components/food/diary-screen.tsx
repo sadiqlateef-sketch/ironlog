@@ -2,15 +2,17 @@
 
 // The food diary for one food day: totals, then one section per meal.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Apple, ChevronLeft, ChevronRight, EllipsisVertical, ListChecks, Plus, Settings } from "lucide-react";
+import { Apple, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Plus, Settings } from "lucide-react";
 import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonList } from "@/components/ui/skeleton";
 import { EntrySheet } from "@/components/food/entry-sheet";
+import { FoodToast } from "@/components/food/food-toast";
+import type { FoodToastState } from "@/components/food/food-toast";
 import { MealSection } from "@/components/food/meal-section";
 import { useBarcodeEnrichment } from "@/hooks/use-barcode-enrichment";
 import { MealSlotsSheet } from "@/components/food/meal-slots-sheet";
@@ -21,7 +23,9 @@ import { useMinuteClock, useNutritionDay } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { dayLabel, foodDay, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
 import { dayTotals } from "@/lib/nutrition/entry-math";
-import type { DiaryEntry } from "@/lib/nutrition/diary-types";
+import { copiedText, copyMealEntries, copyMealLabel } from "@/lib/nutrition/quick-log";
+import { addEntries, deleteEntry, listDay } from "@/lib/offline/nutrition-store";
+import type { DiaryEntry, MealSlot } from "@/lib/nutrition/diary-types";
 import { dayKey } from "@/lib/shifts";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -42,6 +46,10 @@ export function DiaryScreen() {
   const [quick, setQuick] = useState(false);
   const [meals, setMeals] = useState(false);
   const [open, setOpen] = useState<DiaryEntry | null>(null);
+  const [mealMenu, setMealMenu] = useState<Pick<MealSlot, "id" | "name"> | null>(null);
+  const [toast, setToast] = useState<FoodToastState | null>(null);
+  const toastSeq = useRef(0);
+  const clearToast = useCallback(() => setToast(null), []);
 
   const current = foodDay(now, prefs.day_start);
   const day = prefsLoading ? null : (picked ?? current);
@@ -77,6 +85,29 @@ export function DiaryScreen() {
       ...[...orphans].map(([key, o]) => ({ key, title: o.title, window: null, addMeal: null as string | null, entries: o.entries })),
     ];
   }, [prefs.meals, entries, isCurrent, now]);
+
+  // Copy yesterday's entries for one meal into this day, with Undo.
+  const copyYesterday = async (meal: Pick<MealSlot, "id" | "name">) => {
+    if (!day) return;
+    const show = (text: string, onUndo?: () => void) => setToast({ id: ++toastSeq.current, text, onUndo });
+    try {
+      const yesterday = await listDay(shiftDay(day, -1));
+      const copies = copyMealEntries(yesterday, meal.id, day, meal, new Date(), () => crypto.randomUUID());
+      if (copies.length) await addEntries(day, copies);
+      show(
+        copiedText(copies.length, meal.name),
+        copies.length
+          ? () => {
+              void (async () => {
+                for (const c of copies) await deleteEntry(c.id, day).catch(() => {});
+              })();
+            }
+          : undefined,
+      );
+    } catch {
+      show("Couldn't copy that. Try again.");
+    }
+  };
 
   const calendarToday = dayKey(now);
   const holdsOver = isCurrent && current !== calendarToday;
@@ -141,6 +172,7 @@ export function DiaryScreen() {
                 entries={s.entries}
                 addHref={s.addMeal ? `/food/add/?d=${day}&meal=${encodeURIComponent(s.addMeal)}` : null}
                 onOpen={setOpen}
+                onMenu={s.addMeal ? () => setMealMenu({ id: s.key, name: s.title }) : undefined}
               />
             ))}
           </div>
@@ -157,6 +189,17 @@ export function DiaryScreen() {
           { label: "Settings", icon: Settings, onSelect: () => router.push("/settings/#nutrition") },
         ]}
       />
+      <ActionSheet
+        open={mealMenu !== null}
+        onOpenChange={(o) => !o && setMealMenu(null)}
+        title={mealMenu?.name ?? ""}
+        actions={
+          mealMenu
+            ? [{ label: copyMealLabel(mealMenu.name), icon: Copy, onSelect: () => void copyYesterday(mealMenu) }]
+            : []
+        }
+      />
+      <FoodToast toast={toast} onDone={clearToast} />
       {day && <QuickAddSheet open={quick} onOpenChange={setQuick} day={day} dayLabel={label} meals={prefs.meals} now={now} />}
       <MealSlotsSheet open={meals} onOpenChange={setMeals} meals={prefs.meals} onSave={async (next) => void (await save({ ...prefs, meals: next }))} />
       <EntrySheet entry={open} onOpenChange={(o) => !o && setOpen(null)} meals={prefs.meals} />

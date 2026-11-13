@@ -260,3 +260,23 @@ test("touchedBy lists days, foods, settings and added ids; days metadata is neve
   assert.equal(t.foods, true);
   assert.equal(t.prefs, true);
 });
+
+test("addEntries puts a copied meal on the day as one queued insert; scans are remembered on the phone", async () => {
+  const r = rig();
+  const a = makeQuickEntry({ name: "A", values: { energy: 1 }, foodDay: DAY, meal, now: NOW, id: "a" });
+  const b = makeEntry({ food: fakeFood(), quantity: 1, unit: "serving", foodDay: DAY, meal, now: new Date(NOW.getTime() + 1), id: "b" });
+  await r.store.addEntries(DAY, [a, b]);
+  assert.deepEqual((await r.store.listDay(DAY)).map((e) => e.id), ["a", "b"]);
+  assert.equal(r.ops().length, 1);
+  assert.equal((r.ops()[0] as { rows: unknown[] }).rows.length, 2);
+  assert.equal((await r.store.listRecents())[0].foodId, "food-1");
+  await r.store.addEntries(DAY, []);
+  assert.equal(r.ops().length, 1);
+
+  assert.deepEqual(await r.store.listRecentScans(), []);
+  await r.store.rememberScan({ code: "3017620422003", name: "Nutella" });
+  await r.store.rememberScan({ code: "5000000000000", name: "Other" });
+  await r.store.rememberScan({ code: "3017620422003", name: "Nutella" });
+  assert.deepEqual((await r.store.listRecentScans()).map((s) => s.name), ["Nutella", "Other"]);
+  assert.equal(r.ops().length, 1, "scans are never synced");
+});

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { EllipsisVertical, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EntryRow } from "@/components/food/entry-row";
 import { mealTotals } from "@/lib/nutrition/entry-math";
@@ -14,9 +14,11 @@ interface Props {
   /** Where "Add" goes; null for a meal that no longer exists. */
   addHref: string | null;
   onOpen: (entry: DiaryEntry) => void;
+  /** Opens this meal's menu; shown only while the meal is empty. */
+  onMenu?: () => void;
 }
 
-export function MealSection({ title, window, entries, addHref, onOpen }: Props) {
+export function MealSection({ title, window, entries, addHref, onOpen, onMenu }: Props) {
   const totals = mealTotals(entries);
   return (
     <Card className="gap-1 p-3" data-testid="food-meal">
@@ -28,6 +30,17 @@ export function MealSection({ title, window, entries, addHref, onOpen }: Props) 
             {entries.length === 0 ? "Nothing yet" : `${showNutrient("energy", totals.energy)} kcal`}
           </p>
         </div>
+        <div className="flex shrink-0 items-center">
+        {onMenu && entries.length === 0 && (
+          <button
+            type="button"
+            onClick={onMenu}
+            className="text-muted-foreground hover:bg-accent flex size-9 items-center justify-center rounded-lg"
+            aria-label={`More options for ${title}`}
+          >
+            <EllipsisVertical className="size-4" aria-hidden />
+          </button>
+        )}
         {addHref && (
           <Link
             href={addHref}
@@ -37,6 +50,7 @@ export function MealSection({ title, window, entries, addHref, onOpen }: Props) 
             <Plus className="size-4" aria-hidden /> Add
           </Link>
         )}
+        </div>
       </div>
       {entries.length > 0 && (
         <ul className="flex flex-col">

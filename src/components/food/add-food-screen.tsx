@@ -12,6 +12,8 @@ import { SkeletonList } from "@/components/ui/skeleton";
 import { AmountSheet } from "@/components/food/amount-sheet";
 import type { AmountTarget } from "@/components/food/amount-sheet";
 import { CustomFoodSheet } from "@/components/food/custom-food-sheet";
+import { FoodToast } from "@/components/food/food-toast";
+import type { FoodToastState } from "@/components/food/food-toast";
 import { FoodResultRow, tagFor } from "@/components/food/food-result-row";
 import { NutritionSyncChip } from "@/components/food/nutrition-sync-chip";
 import { ScanSheet } from "@/components/food/scan-sheet";
@@ -19,13 +21,15 @@ import type { ScannedCode } from "@/components/food/scan-sheet";
 import { useMinuteClock } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { onRestoredScan } from "@/lib/barcode-scanner";
-import { listFoods, listRecents, NUTRITION_EVENT, saveFood } from "@/lib/offline/nutrition-store";
+import { addEntry, deleteEntry, listFoods, listRecents, NUTRITION_EVENT, saveFood } from "@/lib/offline/nutrition-store";
 import type { RecentFood } from "@/lib/offline/nutrition-store";
 import { sameBarcode } from "@/lib/nutrition/barcode";
-import { dayLabel, foodDay } from "@/lib/nutrition/day";
+import { dayLabel, defaultMealFor, foodDay } from "@/lib/nutrition/day";
 import { amountText } from "@/lib/nutrition/display";
 import type { Food } from "@/lib/nutrition/diary-types";
 import { makePendingFood } from "@/lib/nutrition/enrich";
+import { relogEntry } from "@/lib/nutrition/quick-log";
+import { tap } from "@/lib/native";
 import { isBarcodeQuery } from "@/lib/nutrition/search";
 import type { RemoteFood } from "@/lib/nutrition/search";
 import { runFoodSearch } from "@/lib/nutrition/search-service";
@@ -171,6 +175,40 @@ export function AddFoodScreen() {
     setTarget({ food, isNew: false, last: last ? { quantity: last.quantity, unit: last.unit } : null });
   const pickRemote = (r: RemoteFood) => setTarget({ food: remoteToFood(r), isNew: true });
 
+  // Press and hold a food you've logged before: log it again at that amount, with Undo.
+  const lastByFood = useMemo(() => new Map(recents.filter((r) => r.foodId).map((r) => [r.foodId as string, r])), [recents]);
+  const [toast, setToast] = useState<FoodToastState | null>(null);
+  const toastSeq = useRef(0);
+  const clearToast = useCallback(() => setToast(null), []);
+  const showToast = (text: string, onUndo?: () => void) => setToast({ id: ++toastSeq.current, text, onUndo });
+  const currentMeal = prefs.meals.find((m) => m.id === params.meal) ?? defaultMealFor(prefs.meals, now) ?? prefs.meals[0] ?? null;
+
+  const relog = async (food: Food, last: RecentFood) => {
+    const entry = currentMeal ? relogEntry(food, last, day, currentMeal, new Date(), crypto.randomUUID()) : null;
+    if (!entry || !currentMeal) {
+      pickFood(food, last);
+      return;
+    }
+    tap();
+    try {
+      await addEntry(entry);
+    } catch {
+      showToast("Couldn't log that. Try again.");
+      return;
+    }
+    showToast(`Logged ${amountText(entry.quantity, entry.unit)} ${food.name} to ${currentMeal.name}`, () => {
+      void deleteEntry(entry.id, day).catch(() => {});
+    });
+  };
+  const holdProps = (food: Food) => {
+    const last = lastByFood.get(food.id);
+    if (!last) return {};
+    return {
+      onLongPress: () => void relog(food, last),
+      longPressHint: `Press and hold to log ${amountText(last.quantity, last.unit)} again`,
+    };
+  };
+
   const closeScan = (open: boolean) => {
     setScanOpen(open);
     if (!open) setRestored(null);
@@ -287,7 +325,7 @@ export function AddFoodScreen() {
           {local.length > 0 && (
             <Group title="On this phone">
               {local.slice(0, LOCAL_SHOWN).map((f) => (
-                <FoodResultRow key={f.id} food={f} tag={tagFor(f)} onPick={() => pickFood(f)} />
+                <FoodResultRow key={f.id} food={f} tag={tagFor(f)} onPick={() => pickFood(f)} {...holdProps(f)} />
               ))}
             </Group>
           )}
@@ -332,6 +370,7 @@ export function AddFoodScreen() {
                   tag={tagFor(food)}
                   detail={`last ${amountText(last.quantity, last.unit)}`}
                   onPick={() => pickFood(food, last)}
+                  {...holdProps(food)}
                 />
               ))}
             </Group>
@@ -339,7 +378,7 @@ export function AddFoodScreen() {
           {list.length > 0 && (
             <Group title="My foods">
               {list.slice(0, LOCAL_SHOWN).map((f) => (
-                <FoodResultRow key={f.id} food={f} tag={tagFor(f)} onPick={() => pickFood(f)} />
+                <FoodResultRow key={f.id} food={f} tag={tagFor(f)} onPick={() => pickFood(f)} {...holdProps(f)} />
               ))}
             </Group>
           )}
@@ -378,6 +417,7 @@ export function AddFoodScreen() {
         onCreate={createFromScan}
         onOffline={saveOffline}
       />
+      <FoodToast toast={toast} onDone={clearToast} />
       <CustomFoodSheet
         open={custom}
         onOpenChange={setCustom}

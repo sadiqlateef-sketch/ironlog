@@ -4,7 +4,7 @@
 // the numbers. Looks on the phone first, then Open Food Facts.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Loader2, ScanBarcode, WifiOff } from "lucide-react";
+import { AlertTriangle, History, Loader2, ScanBarcode, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,9 @@ import { hintFromFormat, lookupBarcode } from "@/lib/nutrition/barcode-lookup";
 import type { Food } from "@/lib/nutrition/diary-types";
 import type { RemoteFood } from "@/lib/nutrition/search";
 import { createOffClient } from "@/lib/nutrition/sources/off";
+import type { RecentScan } from "@/lib/nutrition/quick-log";
+import { listRecentScans, rememberScan } from "@/lib/offline/nutrition-store";
+import { tap } from "@/lib/native";
 
 export type ScannedCode = { raw: string; format: string | null };
 
@@ -64,6 +67,7 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
   const [warning, setWarning] = useState(false);
   const [typed, setTyped] = useState("");
   const [canScan, setCanScan] = useState<boolean | null>(null);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const alive = useRef(true);
   const foodsRef = useRef(foods);
   useEffect(() => {
@@ -72,6 +76,11 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
 
   useEffect(() => {
     alive.current = true;
+    listRecentScans()
+      .then((list) => {
+        if (alive.current) setRecentScans(list);
+      })
+      .catch(() => {});
     scannerAvailable()
       .then((ok) => {
         if (alive.current) setCanScan(ok);
@@ -85,7 +94,7 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
   }, []);
 
   const lookup = useCallback(
-    async (raw: string, format: string | null = null) => {
+    async (raw: string, format: string | null = null, fromCamera = false) => {
       setWarning(false);
       setView({ kind: "looking", code: raw.replace(/\D/g, "") });
       off ??= createOffClient();
@@ -107,8 +116,12 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
         return;
       }
       setWarning(res.warning);
-      if (res.kind === "local") onLocal(res.food);
-      else if (res.kind === "remote") onRemote(res.food);
+      if (res.kind === "local" || res.kind === "remote") void rememberScan({ code: res.code, name: res.food.name }).catch(() => {});
+      if (res.kind === "local") {
+        // A short buzz: the scan found a food already on this phone.
+        if (fromCamera) tap();
+        onLocal(res.food);
+      } else if (res.kind === "remote") onRemote(res.food);
       else if (res.kind === "failed") setView({ kind: "failed", code: res.code, message: res.message });
       else setView({ kind: res.kind, code: res.code });
     },
@@ -119,7 +132,7 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
   useEffect(() => {
     if (started.current || !initialScan) return;
     started.current = true;
-    void lookup(initialScan.raw, initialScan.format);
+    void lookup(initialScan.raw, initialScan.format, true);
   }, [initialScan, lookup]);
 
   const scan = async () => {
@@ -130,7 +143,7 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
       },
     });
     if (!alive.current) return;
-    if (out.kind === "code") void lookup(out.raw, out.format);
+    if (out.kind === "code") void lookup(out.raw, out.format, true);
     else if (out.kind === "cancelled") setView({ kind: "idle" });
     else setView({ kind: "idle", error: out.reason === "web" ? undefined : out.reason });
   };
@@ -174,6 +187,26 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
 
       {view.kind === "idle" && (
         <div className="flex flex-col gap-4">
+          {recentScans.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+                <History className="size-3.5" aria-hidden /> Recent scans
+              </p>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {recentScans.map((r) => (
+                  <button
+                    key={r.code}
+                    type="button"
+                    onClick={() => void lookup(r.code)}
+                    className="bg-secondary/60 border-border/50 hover:bg-accent max-w-[11rem] shrink-0 truncate rounded-full border px-3 py-2 text-sm font-medium"
+                    aria-label={`Look up ${r.name} again`}
+                  >
+                    {r.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {canScan && (
             <Button type="button" size="lg" className="h-auto min-h-14 whitespace-normal" onClick={() => void scan()}>
               <ScanBarcode aria-hidden /> Scan with camera
