@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit", "smoke": "node scripts/smoke-test.mjs",
+    "typecheck": "next typegen && tsc --noEmit",
+    "smoke": "node scripts/smoke-test.mjs",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
@@ -22,6 +23,7 @@
   "dependencies": {
     "@capacitor-community/keep-awake": "8.0.1",
     "@capacitor-community/speech-recognition": "7.0.1",
+    "@capacitor-mlkit/barcode-scanning": "8.2.1",
     "@capacitor/android": "8.5.3",
     "@capacitor/app": "8.1.2",
     "@capacitor/browser": "8.0.5",

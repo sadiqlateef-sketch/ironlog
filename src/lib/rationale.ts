@@ -1,7 +1,7 @@
 // Explain why before Android asks for a permission. The app shows its own
 // short explanation first; only "Continue" goes on to the system prompt.
 
-export type RationaleKind = "location" | "microphone";
+export type RationaleKind = "location" | "microphone" | "camera";
 
 export const RATIONALES: Record<RationaleKind, { title: string; body: string; action: string }> = {
   location: {
@@ -12,6 +12,11 @@ export const RATIONALES: Record<RationaleKind, { title: string; body: string; ac
   microphone: {
     title: "Say your workout",
     body: "Ironlog listens only while the mic button is on, and your phone turns your words into text. Nothing is recorded or kept. Android will ask you to allow the microphone next.",
+    action: "Continue",
+  },
+  camera: {
+    title: "Scan a barcode",
+    body: "Ironlog uses the camera only while the scanner is open, to read the barcode on a food package. Nothing is recorded, photographed or kept. Android will ask you to allow the camera next.",
     action: "Continue",
   },
 };
