@@ -23,7 +23,8 @@ interface Props {
   onLocal: (food: Food) => void;
   onRemote: (food: RemoteFood) => void;
   onCreate: (code: string) => void;
-  onOffline: (code: string) => void;
+  /** Save a placeholder food for this code; `logNow` also opens the amount sheet. */
+  onOffline: (code: string, logNow: boolean) => Promise<void>;
   /** A scan that arrived some other way (Android restarted the app mid-scan); looked up on open. */
   initialScan?: ScannedCode | null;
 }
@@ -124,6 +125,18 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
     void lookup(typed);
   };
 
+  const [saving, setSaving] = useState(false);
+  const saveOffline = async (code: string, logNow: boolean) => {
+    setSaving(true);
+    try {
+      await onOffline(code, logNow);
+    } catch {
+      if (alive.current) setView({ kind: "failed", code, message: "Couldn't save it on this phone. Try again" });
+    } finally {
+      if (alive.current) setSaving(false);
+    }
+  };
+
   const reset = () => {
     setWarning(false);
     setView({ kind: "idle" });
@@ -210,11 +223,18 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
             <WifiOff className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
             You&apos;re offline. Save this barcode now and fill in the details later?
           </p>
+          <p className="text-muted-foreground text-xs">
+            It&apos;s saved as &quot;Unknown product ({view.code})&quot; with no nutrition yet. When you&apos;re back online the name and
+            nutrition fill in. Earlier log entries keep the amounts they had.
+          </p>
+          <Button type="button" disabled={saving} onClick={() => void saveOffline(view.code, true)}>
+            Save and log it
+          </Button>
           <div className="flex gap-2">
-            <Button type="button" className="flex-1" onClick={() => onOffline(view.code)}>
-              Save for later
+            <Button type="button" variant="outline" className="flex-1" disabled={saving} onClick={() => void saveOffline(view.code, false)}>
+              Save only
             </Button>
-            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" className="flex-1" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
           </div>

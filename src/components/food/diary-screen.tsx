@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonList } from "@/components/ui/skeleton";
 import { EntrySheet } from "@/components/food/entry-sheet";
 import { MealSection } from "@/components/food/meal-section";
+import { useBarcodeEnrichment } from "@/hooks/use-barcode-enrichment";
 import { MealSlotsSheet } from "@/components/food/meal-slots-sheet";
 import { NutritionSyncChip } from "@/components/food/nutrition-sync-chip";
 import { QuickAddSheet } from "@/components/food/quick-add-sheet";
@@ -32,6 +33,7 @@ function dayFromUrl(): string | null {
 
 export function DiaryScreen() {
   const router = useRouter();
+  useBarcodeEnrichment();
   const { prefs, loading: prefsLoading, save } = useNutritionPrefs();
   const now = useMinuteClock();
   // Rendered only after sign-in is known (AppShell), so reading the URL here is safe.

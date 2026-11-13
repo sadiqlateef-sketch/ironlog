@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { cleanBarcode } from "@/lib/nutrition/barcode";
 import { nutrientsFromPartial } from "@/lib/nutrition/entry-math";
 import type { Food } from "@/lib/nutrition/diary-types";
 import type { NutrientKey } from "@/lib/nutrition/nutrients";
@@ -15,6 +16,8 @@ interface Props {
   /** Called with the new food; the sheet closes when it resolves. */
   onCreate: (food: Food) => Promise<void>;
   initialName?: string;
+  /** Pre-fills the Barcode field (a scan that found nothing). */
+  initialBarcode?: string;
 }
 
 type Field = { key: NutrientKey; label: string; unit: string; perGram: number };
@@ -52,8 +55,9 @@ function num(text: string): number | null {
 
 const isNum = (n: number | null): n is number => n !== null && !Number.isNaN(n);
 
-function Form({ onCreate, onOpenChange, initialName }: Props) {
+function Form({ onCreate, onOpenChange, initialName, initialBarcode }: Props) {
   const [name, setName] = useState(initialName ?? "");
+  const [barcode, setBarcode] = useState(initialBarcode ?? "");
   const [brand, setBrand] = useState("");
   const [liquid, setLiquid] = useState(false);
   const [vals, setVals] = useState<Partial<Record<NutrientKey, string>>>({});
@@ -87,7 +91,7 @@ function Form({ onCreate, onOpenChange, initialName }: Props) {
         id: crypto.randomUUID(),
         name: name.trim().slice(0, 200),
         brand: brand.trim() === "" ? null : brand.trim().slice(0, 200),
-        barcode: null,
+        barcode: cleanBarcode(barcode) || null,
         liquid,
         servingAmount: isNum(s) ? s : null,
         packageAmount: isNum(p) ? p : null,
@@ -132,6 +136,10 @@ function Form({ onCreate, onOpenChange, initialName }: Props) {
       <label className="flex flex-col gap-1.5 text-sm font-medium">
         Brand (optional)
         <Input value={brand} maxLength={200} onChange={(e) => setBrand(e.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1.5 text-sm font-medium">
+        Barcode (optional)
+        <Input value={barcode} inputMode="numeric" maxLength={20} autoComplete="off" onChange={(e) => setBarcode(e.target.value)} />
       </label>
 
       <div className="flex gap-2" role="radiogroup" aria-label="Kind of food">

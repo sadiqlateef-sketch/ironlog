@@ -24,6 +24,7 @@ import type { RecentFood } from "@/lib/offline/nutrition-store";
 import { dayLabel, foodDay } from "@/lib/nutrition/day";
 import { amountText } from "@/lib/nutrition/display";
 import type { Food } from "@/lib/nutrition/diary-types";
+import { makePendingFood } from "@/lib/nutrition/enrich";
 import { isBarcodeQuery } from "@/lib/nutrition/search";
 import type { RemoteFood } from "@/lib/nutrition/search";
 import { runFoodSearch } from "@/lib/nutrition/search-service";
@@ -94,6 +95,8 @@ export function AddFoodScreen() {
   const [remote, setRemote] = useState<Remote | null>(null);
   const [target, setTarget] = useState<AmountTarget | null>(null);
   const [custom, setCustom] = useState(false);
+  // Barcode for the next new food (from a scan or a typed code that found nothing).
+  const [customBarcode, setCustomBarcode] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
   const [restored, setRestored] = useState<ScannedCode | null>(null);
 
@@ -169,10 +172,20 @@ export function AddFoodScreen() {
     setScanOpen(open);
     if (!open) setRestored(null);
   };
-  // Not found or offline: put the code in the search box. Creating from a barcode comes next.
-  const scanToSearch = (code: string) => {
+  const openCustom = (barcode = "") => {
+    setCustomBarcode(barcode);
+    setCustom(true);
+  };
+  const createFromScan = (code: string) => {
     closeScan(false);
-    setQuery(code);
+    openCustom(code);
+  };
+  // Offline: keep the barcode as a placeholder food that fills in later.
+  const saveOffline = async (code: string, logNow: boolean) => {
+    const saved = await saveFood(makePendingFood(code, crypto.randomUUID()));
+    closeScan(false);
+    if (logNow) setTarget({ food: saved, isNew: false });
+    else setQuery(code);
   };
 
   const finish = () => {
@@ -294,7 +307,7 @@ export function AddFoodScreen() {
           {barcodeMiss && (
             <div className="flex flex-col gap-2">
               <p className="text-muted-foreground text-sm">No food with that barcode yet. Scan it, or create the food.</p>
-              <Button type="button" onClick={() => setCustom(true)}>
+              <Button type="button" onClick={() => openCustom(debounced)}>
                 <Plus /> Create food
               </Button>
             </div>
@@ -331,7 +344,7 @@ export function AddFoodScreen() {
         </>
       )}
 
-      <Button type="button" variant="outline" onClick={() => setCustom(true)}>
+      <Button type="button" variant="outline" onClick={() => openCustom(isBarcodeQuery(debounced) ? debounced : "")}>
         <Plus /> Add your own food
       </Button>
 
@@ -358,10 +371,16 @@ export function AddFoodScreen() {
           closeScan(false);
           pickRemote(r);
         }}
-        onCreate={scanToSearch}
-        onOffline={scanToSearch}
+        onCreate={createFromScan}
+        onOffline={saveOffline}
       />
-      <CustomFoodSheet open={custom} onOpenChange={setCustom} onCreate={createFood} initialName={searching && !isBarcodeQuery(debounced) ? debounced : ""} />
+      <CustomFoodSheet
+        open={custom}
+        onOpenChange={setCustom}
+        onCreate={createFood}
+        initialName={searching && !isBarcodeQuery(debounced) ? debounced : ""}
+        initialBarcode={customBarcode}
+      />
     </div>
   );
 }
