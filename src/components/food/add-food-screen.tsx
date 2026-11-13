@@ -39,7 +39,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DEBOUNCE_MS = 350;
 const LOCAL_SHOWN = 50;
 
-function remoteToFood(r: RemoteFood): Food {
+export function remoteToFood(r: RemoteFood): Food {
   return {
     id: crypto.randomUUID(),
     name: r.name,

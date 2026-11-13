@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Minus, Plus, Split } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MealChips } from "@/components/food/meal-chips";
-import { deleteEntry, updateEntry } from "@/lib/offline/nutrition-store";
+import { deleteEntry, listRecipes, replaceEntry, updateEntry } from "@/lib/offline/nutrition-store";
+import { unpackEntry, type Recipe } from "@/lib/nutrition/recipe";
 import { allowedUnits, DISPLAY_NUTRIENTS, recomputeEntry } from "@/lib/nutrition/entry-math";
 import { amountText, NUTRIENT_DISPLAY, parseAmount, showNutrient, unitChoiceLabel } from "@/lib/nutrition/display";
 import type { DiaryEntry, EntryUnit, MealSlot } from "@/lib/nutrition/diary-types";
@@ -36,6 +37,30 @@ function Editor({ entry, meals, onClose }: { entry: DiaryEntry; meals: readonly 
   const [note, setNote] = useState(entry.note ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
+
+  // A logged recipe can be split back into its ingredients.
+  useEffect(() => {
+    if (entry.food?.source !== "recipe" || !entry.foodId) return;
+    let live = true;
+    listRecipes()
+      .then((list) => live && setRecipe(list.find((r) => r.foodId === entry.foodId) ?? null))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [entry.food?.source, entry.foodId]);
+
+  const split = async () => {
+    if (!recipe) return;
+    setBusy(true);
+    try {
+      await replaceEntry(entry, unpackEntry(entry, recipe, () => crypto.randomUUID()));
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const quantity = parseAmount(text);
   let preview: DiaryEntry | null = entry;
@@ -161,6 +186,11 @@ function Editor({ entry, meals, onClose }: { entry: DiaryEntry; meals: readonly 
       <Button type="button" onClick={save} disabled={!preview || busy}>
         Save
       </Button>
+      {recipe && (
+        <Button type="button" variant="outline" onClick={split} disabled={busy}>
+          <Split /> Split into ingredients
+        </Button>
+      )}
       {confirmDelete ? (
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirmDelete(false)} disabled={busy}>

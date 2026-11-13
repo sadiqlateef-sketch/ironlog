@@ -17,6 +17,8 @@ import {
   type Table,
 } from "./nutrition-outbox.ts";
 import { schemaGate } from "./nutrition-schema.ts";
+import { createCollection, type Stored } from "./nutrition-collections.ts";
+import { recipeFood, recipeProblem, recipeToRow, rollup, rowToRecipe, type Recipe } from "../nutrition/recipe.ts";
 import { normalizePrefs } from "../nutrition/day.ts";
 import {
   entryToRow,
@@ -103,6 +105,7 @@ const PREFS_KEY = "nutrition-prefs";
 const FOODS_KEY = "nutrition-foods";
 const RECENTS_KEY = "nutrition-recents";
 const SCANS_KEY = "nutrition-scans";
+const RECIPES_KEY = "nutrition-recipes";
 const dayKey = (day: string) => `nutrition-day:${day}`;
 
 export function createNutritionStore(deps: StoreDeps) {
@@ -176,6 +179,16 @@ export function createNutritionStore(deps: StoreDeps) {
     });
   }
 
+  /** Entry rows to send. An entry whose food is still only on this phone is sent without the link. */
+  async function entryRows(entries: readonly DiaryEntry[]) {
+    const foods = (await kv.get<Stored<Food>[]>(FOODS_KEY)) ?? [];
+    const phoneOnly = new Set(foods.filter((f) => f.localOnly).map((f) => f.id));
+    return entries.map((e) => {
+      const row = entryToRow(e);
+      return row.food_id !== null && phoneOnly.has(row.food_id) ? { ...row, food_id: null } : row;
+    });
+  }
+
   // ---------- Diary days ----------
 
   async function fetchDay(day: string): Promise<DiaryEntry[] | undefined> {
@@ -216,7 +229,7 @@ export function createNutritionStore(deps: StoreDeps) {
       const list = await dayMirror(entry.foodDay);
       await kv.set(dayKey(entry.foodDay), [...list.filter((e) => e.id !== entry.id), entry].sort(byTime));
       if (entry.unit !== "quick") await bumpRecent(entry);
-      await commit({ kind: "insert", table: "food_entries", rows: [entryToRow(entry)], days: [entry.foodDay] });
+      await commit({ kind: "insert", table: "food_entries", rows: await entryRows([entry]), days: [entry.foodDay] });
     });
   }
 
@@ -272,7 +285,7 @@ export function createNutritionStore(deps: StoreDeps) {
       const list = await dayMirror(day);
       await kv.set(dayKey(day), [...list.filter((e) => !ids.has(e.id)), ...fresh].sort(byTime));
       for (const e of fresh) if (e.unit !== "quick") await bumpRecent(e);
-      await commit({ kind: "insert", table: "food_entries", rows: fresh.map(entryToRow), days: [day] });
+      await commit({ kind: "insert", table: "food_entries", rows: await entryRows(fresh), days: [day] });
     });
   }
 
@@ -307,7 +320,7 @@ export function createNutritionStore(deps: StoreDeps) {
       }
       if (t.foods) {
         const server = await fetchFoods();
-        if (server) await kv.set(FOODS_KEY, server);
+        if (server) await kv.set(FOODS_KEY, keepPhoneOnly(server, (await kv.get<Stored<Food>[]>(FOODS_KEY)) ?? []));
         else {
           const local = await kv.get<Food[]>(FOODS_KEY);
           if (local) await kv.set(FOODS_KEY, local.filter((f) => !t.addedFoods.has(f.id)));
@@ -355,10 +368,18 @@ export function createNutritionStore(deps: StoreDeps) {
     const server = await fetchFoods();
     if (!server) return local ?? [];
     return locked(async () => {
-      if (writes !== before || (await outbox.hasPending())) return (await kv.get<Food[]>(FOODS_KEY)) ?? [];
-      await kv.set(FOODS_KEY, server);
-      return server;
+      const now = (await kv.get<Stored<Food>[]>(FOODS_KEY)) ?? [];
+      if (writes !== before || (await outbox.hasPending())) return now;
+      const merged = keepPhoneOnly(server, now);
+      await kv.set(FOODS_KEY, merged);
+      return merged;
     });
+  }
+
+  /** Server foods, plus foods that are still only on this phone (a recipe saved before the server was ready). */
+  function keepPhoneOnly(server: Food[], local: readonly Stored<Food>[]): Stored<Food>[] {
+    const ids = new Set(server.map((f) => f.id));
+    return [...local.filter((f) => f.localOnly && !ids.has(f.id)), ...server].slice(0, MAX_FOODS);
   }
 
   /** Insert or update a food. A remote food picked twice (same source and source id) reuses the first row. */
@@ -486,6 +507,79 @@ export function createNutritionStore(deps: StoreDeps) {
     });
   }
 
+  // ---------- Recipes ----------
+
+  /** Put a recipe's food on the phone; returns the change to send (none while the server isn't ready). */
+  async function stageFood(food: Food, ready: boolean, onServer: boolean): Promise<NOp[]> {
+    const list = await foodsMirror();
+    const rest = list.filter((f) => f.id !== food.id);
+    await kv.set(FOODS_KEY, [ready ? food : { ...food, localOnly: true }, ...rest].slice(0, MAX_FOODS));
+    if (!ready) return [];
+    if (onServer) {
+      const { id: _id, ...patch } = foodToRow(food);
+      void _id;
+      return [{ kind: "update", table: "foods", ids: [food.id], patch }];
+    }
+    return [{ kind: "insert", table: "foods", rows: [foodToRow(food)] }];
+  }
+
+  async function listRecipes(): Promise<Stored<Recipe>[]> {
+    return (await recipes.list()).filter((r) => !r.archived);
+  }
+
+  /**
+   * Save a recipe and the food it is logged as, in one change. Throws with a
+   * plain reason when the recipe isn't valid.
+   */
+  async function saveRecipe(input: Recipe): Promise<{ recipe: Stored<Recipe>; food: Food }> {
+    const problem = recipeProblem(input);
+    if (problem) throw new Error(problem);
+    const ready = await schema.probeTable("recipes");
+    return locked(async () => {
+      const recipe: Recipe = { ...input, name: input.name.trim(), foodId: input.foodId ?? newId() };
+      const prev = await recipes.get(recipe.id);
+      const food = recipeFood(recipe, rollup(recipe.items, recipe), recipe.foodId as string);
+      const foodOps = await stageFood(food, ready, !!prev && !prev.localOnly);
+      const recipeOps = await recipes.stageSave(recipe, ready);
+      if (foodOps.length || recipeOps.length) await commit(...foodOps, ...recipeOps);
+      else changed();
+      return { recipe: ready ? recipe : { ...recipe, localOnly: true }, food };
+    });
+  }
+
+  /** Hide a recipe and its food. Past entries keep their own copy of the numbers. */
+  async function archiveRecipe(id: string): Promise<void> {
+    await locked(async () => {
+      const recipe = await recipes.get(id);
+      if (!recipe) return;
+      const foods = await foodsMirror();
+      await kv.set(FOODS_KEY, foods.filter((f) => f.id !== recipe.foodId));
+      if (recipe.localOnly) {
+        await recipes.stageRemove(id);
+        changed();
+        return;
+      }
+      const ops = await recipes.stageSave({ ...recipe, archived: true }, true);
+      const foodOps: NOp[] = recipe.foodId ? [{ kind: "update", table: "foods", ids: [recipe.foodId], patch: { archived: true } }] : [];
+      await commit(...ops, ...foodOps);
+    });
+  }
+
+  /** Replace one diary entry by several (a recipe split into its ingredients), as one change. */
+  async function replaceEntry(old: DiaryEntry, parts: readonly DiaryEntry[]): Promise<void> {
+    const day = old.foodDay;
+    const fresh = parts.filter((e) => e.foodDay === day);
+    if (!fresh.length) return;
+    await locked(async () => {
+      const list = await dayMirror(day);
+      await kv.set(dayKey(day), [...list.filter((e) => e.id !== old.id), ...fresh].sort(byTime));
+      await commit(
+        { kind: "delete", table: "food_entries", ids: [old.id], days: [day] },
+        { kind: "insert", table: "food_entries", rows: await entryRows(fresh), days: [day] },
+      );
+    });
+  }
+
   const internals: StoreInternals = {
     locked,
     commit,
@@ -499,6 +593,30 @@ export function createNutritionStore(deps: StoreDeps) {
     schema,
     onDiscard: (table, reload) => void reloaders.set(table, reload),
   };
+
+  // Built after `internals`; the functions above only use it once the store is made.
+  const recipes = createCollection<Recipe>(
+    {
+      table: "recipes",
+      kvKey: RECIPES_KEY,
+      toRow: recipeToRow,
+      fromRow: rowToRecipe,
+      eq: { archived: false },
+      order: (a, b) => a.name.localeCompare(b.name),
+    },
+    internals,
+    {
+      // A recipe saved before the server was ready: its food goes first, so the recipe can point at it.
+      beforePromote: async (items) => {
+        const ids = new Set(items.map((r) => r.foodId).filter((x): x is string => !!x));
+        const foods = (await kv.get<Stored<Food>[]>(FOODS_KEY)) ?? [];
+        const waiting = foods.filter((f) => f.localOnly && ids.has(f.id));
+        if (!waiting.length) return [];
+        await kv.set(FOODS_KEY, foods.map((f) => (f.localOnly && ids.has(f.id) ? { ...f, localOnly: undefined } : f)));
+        return [{ kind: "insert", table: "foods", rows: waiting.map((f) => foodToRow(f)) }];
+      },
+    },
+  );
 
   return {
     internals,
@@ -518,6 +636,11 @@ export function createNutritionStore(deps: StoreDeps) {
     rememberScan,
     addEntries,
     ensureStaples,
+    listRecipes,
+    saveRecipe,
+    archiveRecipe,
+    replaceEntry,
+    getRecipe: (id: string) => recipes.get(id),
   };
 }
 
@@ -613,3 +736,8 @@ export const listRecentScans = instance.listRecentScans;
 export const rememberScan = instance.rememberScan;
 export const addEntries = instance.addEntries;
 export const ensureStaples = instance.ensureStaples;
+export const listRecipes = instance.listRecipes;
+export const saveRecipe = instance.saveRecipe;
+export const archiveRecipe = instance.archiveRecipe;
+export const replaceEntry = instance.replaceEntry;
+export const getRecipe = instance.getRecipe;

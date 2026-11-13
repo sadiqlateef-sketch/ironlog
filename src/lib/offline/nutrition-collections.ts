@@ -36,7 +36,16 @@ function clean<T>(item: Stored<T>): T {
   return rest as T;
 }
 
-export function createCollection<T extends { id: string }>(spec: CollectionSpec<T>, internals: StoreInternals) {
+export interface CollectionHooks<T> {
+  /** Changes to send just before phone-only items are promoted (e.g. the foods they point at). Runs inside the lock. */
+  beforePromote?: (items: T[]) => Promise<NOp[]>;
+}
+
+export function createCollection<T extends { id: string }>(
+  spec: CollectionSpec<T>,
+  internals: StoreInternals,
+  hooks: CollectionHooks<T> = {},
+) {
   const { kv, locked, commit, changed, outbox } = internals;
   const sort = (list: Stored<T>[]): Stored<T>[] => (spec.order ? [...list].sort(spec.order) : list);
 
@@ -142,7 +151,8 @@ export function createCollection<T extends { id: string }>(spec: CollectionSpec<
       const waiting = items.filter((i) => i.localOnly);
       if (!waiting.length) return 0;
       await kv.set(spec.kvKey, items.map((i) => (i.localOnly ? clean(i) : i)));
-      await commit({ kind: "insert", table: spec.table, rows: waiting.map((i) => spec.toRow(clean(i))) });
+      const before = hooks.beforePromote ? await hooks.beforePromote(waiting.map(clean)) : [];
+      await commit(...before, { kind: "insert", table: spec.table, rows: waiting.map((i) => spec.toRow(clean(i))) });
       return waiting.length;
     });
   }
