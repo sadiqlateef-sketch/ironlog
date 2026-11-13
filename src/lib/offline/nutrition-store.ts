@@ -257,6 +257,11 @@ export function createNutritionStore(deps: StoreDeps) {
     return (await fetchDay(day)) ?? [];
   }
 
+  /** The day as this phone has it, without asking the server (null when the phone never saw it). */
+  async function phoneDay(day: string): Promise<DiaryEntry[] | null> {
+    return (await kv.get<DiaryEntry[]>(dayKey(day))) ?? null;
+  }
+
   const byTime = (a: DiaryEntry, b: DiaryEntry) => (a.eatenAt < b.eatenAt ? -1 : a.eatenAt > b.eatenAt ? 1 : 0);
 
   async function listDay(day: string): Promise<DiaryEntry[]> {
@@ -817,6 +822,7 @@ export function createNutritionStore(deps: StoreDeps) {
     loadGoals,
     saveGoals,
     listDay,
+    phoneDay,
     addEntry,
     updateEntry,
     deleteEntry,
@@ -940,6 +946,7 @@ export const savePrefs = instance.savePrefs;
 export const loadGoals = instance.loadGoals;
 export const saveGoals = instance.saveGoals;
 export const listDay = instance.listDay;
+export const phoneDay = instance.phoneDay;
 export const addEntry = instance.addEntry;
 export const updateEntry = instance.updateEntry;
 export const deleteEntry = instance.deleteEntry;

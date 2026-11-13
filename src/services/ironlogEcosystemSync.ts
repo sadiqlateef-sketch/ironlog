@@ -27,8 +27,21 @@ export interface TodayPlan {
   exercises: TodayPlanExercise[];
 }
 
+/** One food day for other apps (content://com.ironlog.app.provider/nutrition). Null = unknown or no goal. */
+export interface NutritionDaySummary {
+  date: string;
+  kcal: number;
+  protein: number;
+  goalKcal: number | null;
+  goalProtein: number | null;
+  waterMl: number;
+  entries: number;
+  streak: number;
+}
+
 interface IronLogEcosystemPlugin {
   upsertTodayPlan?: (plan: TodayPlan) => Promise<void>;
+  upsertNutritionDay?: (day: NutritionDaySummary) => Promise<void>;
   upsertWorkoutRecord?: (summary: CompletedWorkoutSummary) => Promise<void>;
   completeBujoWorkoutAndWaterOak?: (data: {
     date: string;
@@ -60,6 +73,8 @@ function getEcosystemPlugin(): IronLogEcosystemPlugin | undefined {
   };
   return win.Capacitor?.Plugins?.IronLogEcosystem;
 }
+
+let nutritionTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const IronLogEcosystemSync = {
   /**
@@ -123,6 +138,20 @@ export const IronLogEcosystemSync = {
     } catch (e) {
       console.warn("Ecosystem: Failed to publish today's plan", e);
     }
+  },
+
+  /**
+   * IronLog -> other apps: today's food totals (read-only, via the nutrition table).
+   * Debounced, so a burst of diary changes publishes once. Android app only.
+   */
+  syncNutritionDay(day: NutritionDaySummary, delayMs = 2000) {
+    const plugin = getEcosystemPlugin();
+    if (!plugin?.upsertNutritionDay) return;
+    if (nutritionTimer) clearTimeout(nutritionTimer);
+    nutritionTimer = setTimeout(() => {
+      nutritionTimer = null;
+      plugin.upsertNutritionDay?.(day).catch((e: unknown) => console.warn("Ecosystem: Failed to publish today's food", e));
+    }, delayMs);
   },
 
   /**

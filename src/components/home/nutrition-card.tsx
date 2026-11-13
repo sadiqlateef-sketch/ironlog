@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { Apple, ChevronRight, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import { waterMl } from "@/lib/nutrition/hydration";
 import { useNutritionSync } from "@/hooks/use-nutrition-sync";
 import { foodDayFor } from "@/lib/nutrition/day";
 import { useWorkShifts } from "@/hooks/use-work-shifts";
+import { useLoggingStreak } from "@/hooks/use-logging-streak";
+import { IronLogEcosystemSync } from "@/services/ironlogEcosystemSync";
 import { dayTotals } from "@/lib/nutrition/entry-math";
 import { showNutrient } from "@/lib/nutrition/display";
 
@@ -31,6 +34,19 @@ export function NutritionCard() {
   const water = day ? waterMl(logs, entries, day, dg.goals.hydration.countDrinks) : 0;
   const waterGoal = dg.goals.micros.water ?? null;
   const left = ready && target !== undefined ? Math.round(target - t.energy.value) : null;
+  const streak = useLoggingStreak(day);
+  const logged = entries.filter((e) => e.status !== "planned").length;
+
+  // Publish today's food to the phone's content provider (Android only; debounced).
+  const goalKcal = target ?? null;
+  const goalProtein = dg.goal?.protein ?? null;
+  const kcal = Math.round(t.energy.value);
+  const protein = Math.round(t.protein.value);
+  const streakDays = streak?.days ?? 0;
+  useEffect(() => {
+    if (!ready || !day) return;
+    IronLogEcosystemSync.syncNutritionDay({ date: day, kcal, protein, goalKcal, goalProtein, waterMl: water, entries: logged, streak: streakDays });
+  }, [ready, day, kcal, protein, goalKcal, goalProtein, water, logged, streakDays]);
 
   return (
     <Card className="gap-3 p-4" data-testid="home-nutrition">
@@ -51,6 +67,11 @@ export function NutritionCard() {
             </p>
           ) : (
             <p className="text-2xl font-bold">&nbsp;</p>
+          )}
+          {streak && streak.days > 1 && (
+            <p className="text-muted-foreground text-xs" data-testid="home-food-streak">
+              {streak.days}-day logging streak{streak.todayLogged ? "" : " · log today to keep it"}
+            </p>
           )}
           {left !== null && (
             <p className="text-sm font-medium tabular-nums" data-testid="home-nutrition-left">

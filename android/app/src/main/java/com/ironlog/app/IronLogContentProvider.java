@@ -19,6 +19,7 @@ public class IronLogContentProvider extends ContentProvider {
     private static final int RECOVERY = 200;
     private static final int PRS = 300;
     private static final int TODAY_PLAN = 400;
+    private static final int NUTRITION = 500;
     private static final UriMatcher URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
 
     static {
@@ -26,13 +27,14 @@ public class IronLogContentProvider extends ContentProvider {
         URI_MATCHER.addURI(AUTHORITY, "recovery", RECOVERY);
         URI_MATCHER.addURI(AUTHORITY, "prs", PRS);
         URI_MATCHER.addURI(AUTHORITY, "today_plan", TODAY_PLAN);
+        URI_MATCHER.addURI(AUTHORITY, "nutrition", NUTRITION);
     }
 
     private IronLogDbHelper dbHelper;
 
     public static class IronLogDbHelper extends SQLiteOpenHelper {
         private static final String DB_NAME = "ironlog_ecosystem.db";
-        private static final int DB_VERSION = 2;
+        private static final int DB_VERSION = 3;
 
         public IronLogDbHelper(Context context) {
             super(context, DB_NAME, null, DB_VERSION);
@@ -55,6 +57,11 @@ public class IronLogContentProvider extends ContentProvider {
             db.execSQL("CREATE TABLE IF NOT EXISTS today_plan (" +
                 "date TEXT PRIMARY KEY, routineName TEXT, programName TEXT, week INTEGER, day INTEGER, " +
                 "exercisesJson TEXT, updatedAt TEXT)");
+            // Added in DB version 3. Read-only for other apps; one row per food day.
+            // goalKcal/goalProtein are null when no goal is set.
+            db.execSQL("CREATE TABLE IF NOT EXISTS nutrition_day (" +
+                "date TEXT PRIMARY KEY, kcal REAL, protein REAL, goalKcal REAL, goalProtein REAL, " +
+                "waterMl REAL, entries INTEGER, streak INTEGER, updatedAt TEXT)");
         }
 
         @Override
@@ -110,6 +117,7 @@ public class IronLogContentProvider extends ContentProvider {
             case RECOVERY: return "recovery";
             case PRS: return "prs";
             case TODAY_PLAN: return "today_plan";
+            case NUTRITION: return "nutrition_day";
             case WORKOUTS:
             default: return "workouts";
         }

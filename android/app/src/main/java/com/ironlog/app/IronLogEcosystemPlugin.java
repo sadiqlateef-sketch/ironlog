@@ -99,6 +99,35 @@ public class IronLogEcosystemPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void upsertNutritionDay(PluginCall call) {
+        String date = call.getString("date");
+        if (date == null || date.isEmpty()) {
+            call.reject("date is required");
+            return;
+        }
+        try {
+            ContentValues cv = new ContentValues();
+            cv.put("date", date);
+            cv.put("kcal", call.getDouble("kcal", 0.0));
+            cv.put("protein", call.getDouble("protein", 0.0));
+            cv.put("goalKcal", call.getDouble("goalKcal"));
+            cv.put("goalProtein", call.getDouble("goalProtein"));
+            cv.put("waterMl", call.getDouble("waterMl", 0.0));
+            cv.put("entries", call.getInt("entries", 0));
+            cv.put("streak", call.getInt("streak", 0));
+            cv.put("updatedAt", getNowIso());
+            getContext().getContentResolver().insert(Uri.parse("content://com.ironlog.app.provider/nutrition"), cv);
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to upsert today's food", e);
+            call.reject("Failed: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void completeBujoWorkoutAndWaterOak(PluginCall call) {
         String date = call.getString("date", getNowIso());
         String workoutTitle = call.getString("workoutTitle", "Strength Training");
