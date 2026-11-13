@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, CheckCircle2, ChevronRight, Play, Sparkles } from "lucide-react";
+import { Activity, CalendarClock, CheckCircle2, ChevronRight, Play, Sparkles } from "lucide-react";
 import { formatElapsed } from "@/components/active-workout-bar";
 import { UpNext } from "@/components/up-next";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,9 @@ export function TodayCard({
       )}
 
       <RecoveryStrip reloadKey={reloadKey} />
+      <Link href="/food/day/" className="text-primary-text -mt-1 flex items-center gap-1.5 self-start text-sm font-semibold" data-testid="today-your-day">
+        <CalendarClock className="size-4" aria-hidden /> Your day
+      </Link>
     </Card>
   );
 }

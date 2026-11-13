@@ -27,6 +27,16 @@ export function NutritionSettings() {
     }
   };
 
+  const [typedNight, setTypedNight] = useState<string | null>(null);
+  const nightStart = typedNight ?? prefs.post_night_start ?? "15:00";
+  const changeNightStart = async (v: string) => {
+    setTypedNight(v);
+    if (parseHm(v) !== null) {
+      await save({ ...prefs, post_night_start: v });
+      setTypedNight(null);
+    }
+  };
+
   const saveKey = () => {
     if (keyText.trim() === "") return;
     const ok = setUsdaKey(keyText);
@@ -52,6 +62,35 @@ export function NutritionSettings() {
           Leave 00:00 for a normal day. After night shifts, set 04:00 so a 3 a.m. snack counts for the day before.
         </span>
       </label>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={prefs.follow_shifts === true}
+            disabled={loading}
+            onChange={(e) => void save({ ...prefs, follow_shifts: e.target.checked })}
+            className="size-4"
+            data-testid="food-follow-shifts"
+          />
+          <span className="font-semibold">Follow my shifts</span>
+        </label>
+        <span className="text-muted-foreground text-xs">
+          After a night shift, food until the time below still counts for the shift&apos;s day. Uses the shifts you add under Training. Entries already logged don&apos;t move.
+        </span>
+        {prefs.follow_shifts && (
+          <label className="flex items-center gap-2 text-sm">
+            New food day after a night shift starts at
+            <Input
+              type="time"
+              value={nightStart}
+              onChange={(e) => void changeNightStart(e.target.value)}
+              className="max-w-32"
+              data-testid="food-post-night-start"
+            />
+          </label>
+        )}
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <span className="font-semibold">Meals</span>

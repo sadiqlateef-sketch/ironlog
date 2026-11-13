@@ -5,7 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Apple, Bookmark, BookmarkPlus, ChefHat, Dumbbell, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Moon, Plus, RotateCcw, Settings, Target } from "lucide-react";
+import { Apple, Bookmark, CalendarClock, BookmarkPlus, ChefHat, Dumbbell, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Moon, Plus, RotateCcw, Settings, Target } from "lucide-react";
 import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -28,7 +28,8 @@ import { WaterCard } from "@/components/food/water-card";
 import { SupplementsCard } from "@/components/food/supplements-card";
 import { CaffeineFastingCard } from "@/components/food/caffeine-fasting-card";
 import { proteinSplit } from "@/lib/nutrition/goals";
-import { dayLabel, foodDay, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
+import { dayLabel, foodDay, foodDayFor, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
+import { useWorkShifts } from "@/hooks/use-work-shifts";
 import { dayTotals, isPlanned, plannedTotals } from "@/lib/nutrition/entry-math";
 import { showNutrient } from "@/lib/nutrition/display";
 import { copiedText, copyMealEntries, copyMealLabel } from "@/lib/nutrition/quick-log";
@@ -48,6 +49,7 @@ export function DiaryScreen() {
   useBarcodeEnrichment();
   const { prefs, loading: prefsLoading, save } = useNutritionPrefs();
   const now = useMinuteClock();
+  const shifts = useWorkShifts();
   // Rendered only after sign-in is known (AppShell), so reading the URL here is safe.
   const [picked, setPicked] = useState<string | null>(() => dayFromUrl());
   const [menu, setMenu] = useState(false);
@@ -60,7 +62,7 @@ export function DiaryScreen() {
   const toastSeq = useRef(0);
   const clearToast = useCallback(() => setToast(null), []);
 
-  const current = foodDay(now, prefs.day_start);
+  const current = foodDayFor(now, prefs, shifts);
   const day = prefsLoading ? null : (picked ?? current);
   const { entries, loading } = useNutritionDay(day);
   const isCurrent = day === current;
@@ -170,7 +172,7 @@ export function DiaryScreen() {
           </p>
           {holdsOver && (
             <p className="text-muted-foreground text-xs">
-              Still counting as {dayLabel(current, calendarToday)} until {prefs.day_start}
+              Still counting as {dayLabel(current, calendarToday)} until {current !== foodDay(now, prefs.day_start) ? prefs.post_night_start : prefs.day_start}
             </p>
           )}
         </div>
@@ -249,6 +251,7 @@ export function DiaryScreen() {
         title="Food"
         actions={[
           { label: "Quick add", icon: Plus, onSelect: () => setQuick(true) },
+          { label: "Your day", icon: CalendarClock, onSelect: () => router.push(day && !isCurrent ? `/food/day/?d=${day}` : "/food/day/") },
           { label: "Goals", icon: Target, onSelect: () => router.push("/food/goals/") },
           { label: "Recipes", icon: ChefHat, onSelect: () => router.push("/food/recipes/") },
           { label: "Pantry", icon: Refrigerator, onSelect: () => router.push("/food/pantry/") },

@@ -17,7 +17,8 @@ import { useMinuteClock } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { listFoods, listPantry, NUTRITION_EVENT } from "@/lib/offline/nutrition-store";
 import type { Stored } from "@/lib/offline/nutrition-collections";
-import { foodDay } from "@/lib/nutrition/day";
+import { foodDayFor } from "@/lib/nutrition/day";
+import { useWorkShifts } from "@/hooks/use-work-shifts";
 import { amountText } from "@/lib/nutrition/display";
 import type { Food } from "@/lib/nutrition/diary-types";
 import { expiringSoon, LOCATION_LABEL, PANTRY_LOCATIONS, sortPantry, type PantryItem } from "@/lib/nutrition/pantry";
@@ -29,6 +30,7 @@ const SOON_DAYS = 2;
 export function PantryScreen() {
   const { prefs } = useNutritionPrefs();
   const now = useMinuteClock();
+  const shifts = useWorkShifts();
   const [items, setItems] = useState<Stored<PantryItem>[] | null>(null);
   const [foods, setFoods] = useState<Map<string, Food>>(new Map());
   const [target, setTarget] = useState<PantryTarget | null>(null);
@@ -137,7 +139,7 @@ export function PantryScreen() {
         target={target}
         onOpenChange={(o) => !o && setTarget(null)}
         onDone={(text) => setToast({ id: ++toastSeq.current, text })}
-        day={foodDay(now, prefs.day_start)}
+        day={foodDayFor(now, prefs, shifts)}
         meals={prefs.meals}
         now={now}
       />

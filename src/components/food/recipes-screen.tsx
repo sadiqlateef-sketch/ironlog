@@ -20,7 +20,8 @@ import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { listBatches, listRecipes, NUTRITION_EVENT } from "@/lib/offline/nutrition-store";
 import { portionsLeftText, type Batch } from "@/lib/nutrition/batch";
 import type { Stored } from "@/lib/offline/nutrition-collections";
-import { dayLabel, foodDay } from "@/lib/nutrition/day";
+import { dayLabel, foodDayFor } from "@/lib/nutrition/day";
+import { useWorkShifts } from "@/hooks/use-work-shifts";
 import { showNutrient } from "@/lib/nutrition/display";
 import { recipeFood, rollup, type Recipe } from "@/lib/nutrition/recipe";
 
@@ -37,6 +38,7 @@ function perServing(r: Recipe): string {
 export function RecipesScreen() {
   const { prefs, loading: prefsLoading } = useNutritionPrefs();
   const now = useMinuteClock();
+  const shifts = useWorkShifts();
   const [recipes, setRecipes] = useState<Stored<Recipe>[] | null>(null);
   const [editing, setEditing] = useState<Recipe | null>(null);
   const [target, setTarget] = useState<AmountTarget | null>(null);
@@ -60,7 +62,7 @@ export function RecipesScreen() {
     return () => window.removeEventListener(NUTRITION_EVENT, load);
   }, [load]);
 
-  const day = foodDay(now, prefs.day_start);
+  const day = foodDayFor(now, prefs, shifts);
   const log = (r: Recipe) => {
     try {
       setTarget({ food: recipeFood(r, rollup(r.items, r), r.foodId ?? r.id), isNew: false });

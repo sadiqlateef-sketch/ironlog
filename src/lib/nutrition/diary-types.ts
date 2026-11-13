@@ -24,6 +24,10 @@ export interface NutritionPrefs {
   day_start: string;
   meals: MealSlot[];
   staples_version: number;
+  /** Shift-driven food day: the morning after a night shift counts for the shift's day. Off unless set. */
+  follow_shifts?: boolean;
+  /** "HH:MM" on the day after a night shift when the new food day starts (with follow_shifts). */
+  post_night_start?: string;
 }
 
 /** A food in the user's library. Nutrients are per 100 g, or per 100 ml when liquid. */

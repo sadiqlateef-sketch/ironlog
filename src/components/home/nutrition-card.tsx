@@ -10,7 +10,8 @@ import { useDayGoal } from "@/hooks/use-day-goal";
 import { useNutritionLogs } from "@/hooks/use-nutrition-logs";
 import { waterMl } from "@/lib/nutrition/hydration";
 import { useNutritionSync } from "@/hooks/use-nutrition-sync";
-import { foodDay } from "@/lib/nutrition/day";
+import { foodDayFor } from "@/lib/nutrition/day";
+import { useWorkShifts } from "@/hooks/use-work-shifts";
 import { dayTotals } from "@/lib/nutrition/entry-math";
 import { showNutrient } from "@/lib/nutrition/display";
 
@@ -18,7 +19,8 @@ import { showNutrient } from "@/lib/nutrition/display";
 export function NutritionCard() {
   const { prefs, loading: prefsLoading } = useNutritionPrefs();
   const now = useMinuteClock();
-  const day = prefsLoading ? null : foodDay(now, prefs.day_start);
+  const shifts = useWorkShifts();
+  const day = prefsLoading ? null : foodDayFor(now, prefs, shifts);
   const { entries, loading } = useNutritionDay(day);
   const sync = useNutritionSync();
   const t = dayTotals(entries);

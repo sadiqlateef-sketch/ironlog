@@ -46,6 +46,19 @@ export function loadSavedReadinessMetrics(): ReadinessMetrics {
   return { sleepHours: 7.5, sleepQuality: 85, restingHr: 58, baselineRestingHr: 60 };
 }
 
+/** Sleep hours the user typed in themselves, or null when they never did (the defaults don't count). */
+export function loadManualSleepHours(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(READINESS_PREF);
+    if (!raw) return null;
+    const h = (JSON.parse(raw) as ReadinessMetrics).sleepHours;
+    return typeof h === "number" && h > 0 ? h : null;
+  } catch {
+    return null;
+  }
+}
+
 export function saveReadinessMetrics(metrics: ReadinessMetrics): void {
   if (typeof window === "undefined") return;
   try {

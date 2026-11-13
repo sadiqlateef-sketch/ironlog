@@ -27,7 +27,8 @@ import { addEntry, deleteEntry, listBatches, listFoods, listRecents, NUTRITION_E
 import { portionsLeftText, type Batch } from "@/lib/nutrition/batch";
 import type { RecentFood } from "@/lib/offline/nutrition-store";
 import { sameBarcode } from "@/lib/nutrition/barcode";
-import { dayLabel, defaultMealFor, foodDay } from "@/lib/nutrition/day";
+import { dayLabel, defaultMealFor, foodDayFor } from "@/lib/nutrition/day";
+import { useWorkShifts } from "@/hooks/use-work-shifts";
 import { amountText } from "@/lib/nutrition/display";
 import type { Food } from "@/lib/nutrition/diary-types";
 import { makePendingFood } from "@/lib/nutrition/enrich";
@@ -85,6 +86,7 @@ export function AddFoodScreen() {
   const router = useRouter();
   const { prefs, loading: prefsLoading } = useNutritionPrefs();
   const now = useMinuteClock();
+  const shifts = useWorkShifts();
   const online = useSyncExternalStore(subscribeOnline, getOnline, getOnlineServer);
   // Rendered only after sign-in is known (AppShell), so reading the URL here is safe.
   const [params] = useState(() => {
@@ -93,7 +95,7 @@ export function AddFoodScreen() {
     return { day: d && DAY.test(d) ? d : null, meal: sp.get("meal"), pantry: sp.get("pantry") === "1" };
   });
 
-  const current = foodDay(now, prefs.day_start);
+  const current = foodDayFor(now, prefs, shifts);
   const day = params.day ?? current;
   const label = dayLabel(day, current);
 

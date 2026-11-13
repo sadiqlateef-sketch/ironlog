@@ -3,7 +3,9 @@
 // day you are in. Pure, no app imports beyond the date helpers.
 
 import { addDays, dayKey } from "../shifts.ts";
+import type { Shift } from "../shifts.ts";
 import type { MealSlot, NutritionPrefs } from "./diary-types.ts";
+import { DEFAULT_POST_NIGHT_START, postNightFoodDay } from "./shift-day.ts";
 
 export const shiftDay = addDays;
 
@@ -29,6 +31,22 @@ export function foodDay(now: Date, dayStart: string): string {
   const key = dayKey(now);
   const start = parseHm(normalizeDayStart(dayStart)) ?? 0;
   return minutesOf(now) < start ? addDays(key, -1) : key;
+}
+
+/**
+ * The food day for `now` under the user's settings: with "follow my shifts" on,
+ * the morning after a night shift stays on the shift's day until
+ * `post_night_start`; otherwise (and on every other day) the day-start rule.
+ */
+export function foodDayFor(
+  now: Date,
+  prefs: Pick<NutritionPrefs, "day_start" | "follow_shifts" | "post_night_start">,
+  shifts: readonly Shift[],
+): string {
+  const plain = foodDay(now, prefs.day_start);
+  if (!prefs.follow_shifts) return plain;
+  const night = postNightFoodDay(now, shifts, prefs.post_night_start ?? DEFAULT_POST_NIGHT_START);
+  return night !== null && night < plain ? night : plain;
 }
 
 export function isFoodDayToday(day: string, now: Date, dayStart: string): boolean {
@@ -97,6 +115,8 @@ export const DEFAULT_PREFS: Readonly<NutritionPrefs> = {
   day_start: "00:00",
   meals: DEFAULT_MEALS as MealSlot[],
   staples_version: 0,
+  follow_shifts: false,
+  post_night_start: DEFAULT_POST_NIGHT_START,
 };
 
 function defaultMealsCopy(): MealSlot[] {
@@ -128,6 +148,8 @@ export function normalizePrefs(raw: unknown): NutritionPrefs {
     day_start: normalizeDayStart(r.day_start),
     meals: final,
     staples_version: typeof sv === "number" && Number.isInteger(sv) && sv >= 0 ? sv : 0,
+    follow_shifts: r.follow_shifts === true,
+    post_night_start: parseHm(r.post_night_start) === null ? DEFAULT_POST_NIGHT_START : (r.post_night_start as string),
   };
 }
 
