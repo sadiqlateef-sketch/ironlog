@@ -24,6 +24,8 @@ const HOME_PREF = "ironlog:home-reminder";
 const RECAP_NOTIFICATION_ID = 1004;
 const CAFFEINE_NOTIFICATION_ID = 1006;
 const CAFFEINE_PREF = "ironlog:caffeine-cutoff-alert";
+const FOOD_NUDGE_NOTIFICATION_ID = 1005;
+const FOOD_NUDGE_PREF = "ironlog:food-nudge-time";
 
 /** Light tap when a set is ticked off. */
 export function tap(): void {
@@ -268,6 +270,56 @@ export async function scheduleCaffeineCutoff(at: Date | null): Promise<void> {
     });
   } catch {
     // The cutoff still shows on the food diary.
+  }
+}
+
+/** The evening food nudge time ("HH:MM") on this phone, or null when off (the default). */
+export function foodNudgeTime(): string | null {
+  try {
+    const v = localStorage.getItem(FOOD_NUDGE_PREF);
+    return v && /^([01]\d|2[0-3]):([0-5]\d)$/.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Turn the food nudge on at `time` (asks Android for notifications) or off (null). Returns the time kept. */
+export async function setFoodNudgeTime(time: string | null): Promise<string | null> {
+  if (time !== null && isNative() && !(await requestNotifications())) time = null;
+  try {
+    if (time === null) localStorage.removeItem(FOOD_NUDGE_PREF);
+    else localStorage.setItem(FOOD_NUDGE_PREF, time);
+  } catch {}
+  if (time === null) await cancelFoodNudge();
+  return time;
+}
+
+export async function cancelFoodNudge(): Promise<void> {
+  if (!isNative()) return;
+  await LocalNotifications.cancel({ notifications: [{ id: FOOD_NUDGE_NOTIFICATION_ID }] }).catch(() => {});
+}
+
+/** "Log today's food" at `at` (from nudge.ts). Replaces any earlier one; null clears. Never asks for permission itself. */
+export async function scheduleFoodNudge(at: Date | null): Promise<void> {
+  if (!isNative()) return;
+  await cancelFoodNudge();
+  if (!at || at.getTime() <= Date.now() + 60_000 || foodNudgeTime() === null) return;
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: FOOD_NUDGE_NOTIFICATION_ID,
+          title: "Food log",
+          body: "Nothing logged for today yet. Open IronLog to add what you ate.",
+          channelId: REMINDER_CHANNEL,
+          schedule: { at, allowWhileIdle: true },
+          autoCancel: true,
+        },
+      ],
+    });
+  } catch {
+    // The diary still works without it.
   }
 }
 

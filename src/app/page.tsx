@@ -2,13 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  ChevronRight,
-  Heart,
-  History,
-  Search,
-  Sparkles,
-} from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { AdjustmentList } from "@/components/adjustment-list";
 import { AppShell } from "@/components/app-shell";
 import { DeloadOffer, DeloadTag } from "@/components/deload-offer";
@@ -16,6 +10,8 @@ import { CenterStartButton } from "@/components/home/center-start-button";
 import { LastSessionCard } from "@/components/home/last-session-card";
 import { NextSessionCard } from "@/components/home/next-session-card";
 import { NutritionCard } from "@/components/home/nutrition-card";
+import { PreLiftFuel } from "@/components/food/post-workout-fuel";
+import { useFoodNudge } from "@/hooks/use-food-nudge";
 import { ReadinessCard } from "@/components/home/readiness-card";
 import { SessionStack } from "@/components/home/session-stack";
 import { TodayPlanSync } from "@/components/home/today-plan-sync";
@@ -24,12 +20,7 @@ import { WeekStrip } from "@/components/home/week-strip";
 import { SessionSheet } from "@/components/session-sheet";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useActiveProgram } from "@/components/up-next";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { SkeletonList } from "@/components/ui/skeleton";
 import { useActiveWorkout } from "@/hooks/use-active-workout";
-import { formatWeight } from "@/lib/units";
 import {
   listPendingAdjustments,
   listRecentSessions,
@@ -61,6 +52,7 @@ function Dashboard() {
   const program = useActiveProgram(reload);
   // Fixed at mount so the week strip stays pure during render.
   const [now] = useState(() => new Date());
+  useFoodNudge();
 
   useEffect(() => {
     listRecentSessions(14).then(setRecent).catch(() => setRecent([]));
@@ -99,6 +91,9 @@ function Dashboard() {
           <NextSessionCard program={program} unit={unit} />
           <TodayPlanSync program={program} />
           <NutritionCard />
+          {!workout && program?.next_routine_id && recent !== null && !recent.some((s) => s.end_time && new Date(s.start_time).toDateString() === now.toDateString()) && (
+            <PreLiftFuel />
+          )}
           {program?.deload_suggestion && (
             <DeloadOffer programId={program.program_id} reason={program.deload_suggestion} onChange={() => setReload((r) => r + 1)} />
           )}

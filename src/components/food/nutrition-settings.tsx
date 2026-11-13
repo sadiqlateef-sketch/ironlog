@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { MealSlotsSheet } from "@/components/food/meal-slots-sheet";
 import { NutritionSyncChip } from "@/components/food/nutrition-sync-chip";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
+import { useWorkShifts } from "@/hooks/use-work-shifts";
+import { refreshFoodNudge } from "@/hooks/use-food-nudge";
+import { foodNudgeTime, setFoodNudgeTime } from "@/lib/native";
 import { parseHm } from "@/lib/nutrition/day";
 import { clearUsdaKey, getUsdaKey, maskKey, setUsdaKey } from "@/lib/nutrition/key-store";
 
@@ -35,6 +38,17 @@ export function NutritionSettings() {
       await save({ ...prefs, post_night_start: v });
       setTypedNight(null);
     }
+  };
+
+  const shifts = useWorkShifts();
+  const [nudge, setNudge] = useState<string | null>(foodNudgeTime);
+  const [nudgeNote, setNudgeNote] = useState<string | null>(null);
+  const changeNudge = async (v: string | null) => {
+    if (v !== null && parseHm(v) === null) return;
+    const kept = await setFoodNudgeTime(v);
+    setNudge(kept);
+    setNudgeNote(v !== null && kept === null ? "Notifications are off for IronLog, so the reminder can't show." : null);
+    if (kept !== null) await refreshFoodNudge(prefs, shifts);
   };
 
   const saveKey = () => {
@@ -90,6 +104,29 @@ export function NutritionSettings() {
             />
           </label>
         )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={nudge !== null}
+            onChange={(e) => void changeNudge(e.target.checked ? "20:00" : null)}
+            className="size-4"
+            data-testid="food-nudge-on"
+          />
+          <span className="font-semibold">Remind me to log food</span>
+        </label>
+        {nudge !== null && (
+          <label className="flex items-center gap-2 text-sm">
+            If nothing is logged by
+            <Input type="time" value={nudge} onChange={(e) => void changeNudge(e.target.value)} className="max-w-32" data-testid="food-nudge-time" />
+          </label>
+        )}
+        <span className="text-muted-foreground text-xs">
+          Off unless you turn it on. Skipped on days you&apos;ve logged; after a night shift it comes at the shift&apos;s end. This phone only.
+        </span>
+        {nudgeNote && <p className="text-sm">{nudgeNote}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">

@@ -44,6 +44,7 @@ import { InstantTab } from "@/components/workout/instant-tab";
 import { PlannedTab } from "@/components/workout/planned-tab";
 import { RecordCelebration } from "@/components/workout/record";
 import { FinishSummary } from "@/components/workout/finish-summary";
+import { PostWorkoutFuel } from "@/components/food/post-workout-fuel";
 import { useWorkout, type Block, type UiSet } from "@/hooks/use-workout";
 import {
   listPendingAdjustments,
@@ -181,6 +182,7 @@ export function WorkoutScreen() {
                   </p>
                 )}
                 {summary.routineId && summary.synced && <NextTime sessionId={summary.sessionId} />}
+                <PostWorkoutFuel />
                 {summary.addToCalendar != null && (
                   <Switch
                     on={summary.addToCalendar}

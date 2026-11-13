@@ -9,6 +9,7 @@ import { BedDouble, Briefcase, ChevronLeft, ChevronRight, Coffee, Droplet, Dumbb
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SkeletonList } from "@/components/ui/skeleton";
+import { FuelPlanCard } from "@/components/food/fuel-plan-card";
 import { useMinuteClock, useNutritionDay } from "@/hooks/use-nutrition-day";
 import { useNutritionGoals } from "@/hooks/use-nutrition-goals";
 import { useNutritionLogs } from "@/hooks/use-nutrition-logs";
@@ -127,6 +128,8 @@ export function DayViewScreen() {
           {rest.length === 1 && <p className="text-muted-foreground px-4 pb-4 text-sm">Nothing logged on this day yet.</p>}
         </Card>
       )}
+
+      {day && <FuelPlanCard day={day} shifts={shifts} meals={prefs.meals} showOffDay />}
 
       {caffeine.length > 0 && (
         <Card className="gap-2 p-4" data-testid="day-caffeine">

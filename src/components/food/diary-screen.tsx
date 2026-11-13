@@ -27,6 +27,7 @@ import { useNutritionLogs } from "@/hooks/use-nutrition-logs";
 import { WaterCard } from "@/components/food/water-card";
 import { SupplementsCard } from "@/components/food/supplements-card";
 import { CaffeineFastingCard } from "@/components/food/caffeine-fasting-card";
+import { FuelPlanCard } from "@/components/food/fuel-plan-card";
 import { proteinSplit } from "@/lib/nutrition/goals";
 import { dayLabel, foodDay, foodDayFor, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
 import { useWorkShifts } from "@/hooks/use-work-shifts";
@@ -239,6 +240,7 @@ export function DiaryScreen() {
               />
             ))}
           </div>
+          {isCurrent && <FuelPlanCard day={day} shifts={shifts} meals={prefs.meals} onPlan={(meal) => setUsualsMode({ kind: "log", meal, day })} />}
           <WaterCard day={day} entries={entries} logs={logs} goals={dayGoal.goals} />
           <SupplementsCard day={day} logs={logs} goals={dayGoal.goals} now={now} isToday={isCurrent} />
           {isCurrent && <CaffeineFastingCard day={day} entries={entries} goals={dayGoal.goals} now={now} />}
