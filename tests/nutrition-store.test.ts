@@ -6,7 +6,7 @@ import { STAPLES } from "../src/lib/nutrition/staples.ts";
 import { complete, emptyNutrients } from "../src/lib/nutrition/nutrients.ts";
 import { makeEntry, makeQuickEntry } from "../src/lib/nutrition/entry-math.ts";
 import { DEFAULT_MEALS } from "../src/lib/nutrition/day.ts";
-import type { Food } from "../src/lib/nutrition/diary-types.ts";
+import { foodToRow, type Food } from "../src/lib/nutrition/diary-types.ts";
 
 // Everything below is a made-up food with made-up numbers.
 function fakeFood(over: Partial<Food> = {}): Food {
@@ -34,7 +34,7 @@ const meal = DEFAULT_MEALS[0];
 const NOW = new Date("2026-11-12T08:00:00Z");
 const DAY = "2026-11-12";
 
-function rig(opts: { serverDays?: Record<string, unknown[]>; staples?: StoreDeps["staples"] } = {}) {
+function rig(opts: { serverDays?: Record<string, unknown[]>; serverFoods?: Food[]; staples?: StoreDeps["staples"] } = {}) {
   const kv = new Map<string, unknown>();
   const outboxState = { value: undefined as unknown };
   const serverDays = opts.serverDays ?? {};
@@ -61,6 +61,12 @@ function rig(opts: { serverDays?: Record<string, unknown[]>; staples?: StoreDeps
       read: async (q: ReadQuery) => {
         if (!online) return { data: null, error: { message: "Failed to fetch" } };
         if (q.table === "food_entries") return { data: serverDays[String(q.eq?.food_day)] ?? [], error: null };
+        if (q.table === "foods" && opts.serverFoods) {
+          const rows = opts.serverFoods.map(foodToRow).filter((row) =>
+            Object.entries(q.eq ?? {}).every(([k, v]) => (row as Record<string, unknown>)[k] === v),
+          );
+          return { data: rows, error: null };
+        }
         return { data: q.single ? null : [], error: null };
       },
     },
@@ -183,4 +189,30 @@ test("prefs: save is queued as a users update; load returns normalized prefs", a
   const op = r.ops()[0];
   assert.equal(op.kind, "update");
   assert.deepEqual((op as { ids: string[] }).ids, ["user-1"]);
+});
+
+// N3.4: a pending food filled in from a product that is saved only on the server.
+test("findFoodBySource finds a food that is only on the server and keeps a phone copy", async () => {
+  const onServer = fakeFood({ id: "srv-off", source: "off", sourceId: "fake-77" });
+  const r = rig({ serverFoods: [onServer] });
+  // The phone already has its own (capped) list, without the server's OFF food.
+  await r.store.saveFood(fakeFood({ id: "mine" }));
+  r.setOnline(true);
+  const found = await r.store.findFoodBySource("off", "fake-77", "pending-1");
+  assert.equal(found?.id, "srv-off");
+  r.setOnline(false);
+  // Now answered from the phone, with no server.
+  assert.equal((await r.store.findFoodBySource("off", "fake-77", "pending-1"))?.id, "srv-off");
+});
+
+test("findFoodBySource: none is null, offline is unknown, the food itself is ignored", async () => {
+  const self = fakeFood({ id: "p1", source: "off", sourceId: "fake-88" });
+  const r = rig({ serverFoods: [self] });
+  r.setOnline(true);
+  assert.equal(await r.store.findFoodBySource("off", "fake-88", "p1"), null);
+  assert.equal(await r.store.findFoodBySource("off", "fake-99", "p1"), null);
+  r.setOnline(false);
+  assert.equal(await r.store.findFoodBySource("off", "fake-99", "p1"), undefined);
+  await r.store.saveFood(fakeFood({ id: "local-off", source: "off", sourceId: "fake-99" }));
+  assert.equal((await r.store.findFoodBySource("off", "fake-99", "p1"))?.id, "local-off");
 });

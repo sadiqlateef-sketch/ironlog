@@ -5,7 +5,7 @@
 // the front. Quiet: saving the food refreshes the screens that show it.
 
 import { useEffect } from "react";
-import { listFoods, saveFood } from "@/lib/offline/nutrition-store";
+import { findFoodBySource, listFoods, saveFood } from "@/lib/offline/nutrition-store";
 import { offLookupCodes } from "@/lib/nutrition/barcode";
 import { decideEnrichment, pendingFoods, pickBatch } from "@/lib/nutrition/enrich";
 import type { RemoteFood } from "@/lib/nutrition/search";
@@ -50,7 +50,15 @@ async function pass(): Promise<void> {
       if (!product) continue;
       // Check the freshest copy: the person may have renamed or filled it in meanwhile.
       const decision = decideEnrichment(await listFoods(), food.id, product);
-      if (decision.kind === "apply") await saveFood(decision.food);
+      if (decision.kind !== "apply" || decision.food.sourceId === null) continue;
+      // The phone's list is capped: the same product may be saved only on the
+      // server. Changing this food into a second copy would be refused there.
+      const other = await findFoodBySource(decision.food.source, decision.food.sourceId, food.id);
+      if (other === undefined) {
+        tried.delete(food.id); // Couldn't ask the server: try again next pass.
+        return;
+      }
+      if (other === null) await saveFood(decision.food);
     }
   } catch {
     // Reading or saving foods failed; leave the rest for the next pass.

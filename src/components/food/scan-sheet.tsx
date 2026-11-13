@@ -27,15 +27,25 @@ interface Props {
   onOffline: (code: string, logNow: boolean) => Promise<void>;
   /** A scan that arrived some other way (Android restarted the app mid-scan); looked up on open. */
   initialScan?: ScannedCode | null;
+  /** Gets focus back when the sheet closes (unless another sheet opened in its place). */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 let off: ReturnType<typeof createOffClient> | null = null;
 
 export function ScanSheet(props: Props) {
-  const { open, onOpenChange } = props;
+  const { open, onOpenChange, returnFocusRef } = props;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>{open && <Body {...props} />}</DialogContent>
+      {/* Safe-area padding keeps the buttons above the gesture bar; the sheet scrolls when the keyboard is up. */}
+      <DialogContent
+        className="pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        onCloseAutoFocus={(e) => {
+          if (!returnFocusRef?.current || document.querySelector('[role="dialog"][data-state="open"]')) return;
+          e.preventDefault();
+          returnFocusRef.current.focus();
+        }}
+      >{open && <Body {...props} />}</DialogContent>
     </Dialog>
   );
 }
@@ -80,11 +90,17 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
       setView({ kind: "looking", code: raw.replace(/\D/g, "") });
       off ??= createOffClient();
       const client = off;
-      const res = await lookupBarcode(
-        raw,
-        { foods: foodsRef.current, getProduct: (c) => client.getProduct(c), isOnline: () => navigator.onLine },
-        hintFromFormat(format),
-      );
+      let res: Awaited<ReturnType<typeof lookupBarcode>>;
+      try {
+        res = await lookupBarcode(
+          raw,
+          { foods: foodsRef.current, getProduct: (c) => client.getProduct(c), isOnline: () => navigator.onLine },
+          hintFromFormat(format),
+        );
+      } catch {
+        if (alive.current) setView({ kind: "failed", code: raw.replace(/\D/g, ""), message: "Couldn't look that up. Try again" });
+        return;
+      }
       if (!alive.current) return;
       if (res.kind === "invalid") {
         setView({ kind: "idle", error: "That doesn't look like a barcode. Type the 8 to 14 numbers under the bars." });
@@ -159,16 +175,17 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
       {view.kind === "idle" && (
         <div className="flex flex-col gap-4">
           {canScan && (
-            <Button type="button" size="lg" onClick={() => void scan()}>
-              <ScanBarcode /> Scan with camera
+            <Button type="button" size="lg" className="h-auto min-h-14 whitespace-normal" onClick={() => void scan()}>
+              <ScanBarcode aria-hidden /> Scan with camera
             </Button>
           )}
           <form onSubmit={submitTyped} className="flex flex-col gap-2">
             <label htmlFor="scan-sheet-code" className="text-sm font-medium">
               Barcode numbers
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Input
+                className="min-w-[10rem] flex-1"
                 id="scan-sheet-code"
                 inputMode="numeric"
                 autoComplete="off"
@@ -178,7 +195,7 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
                 aria-invalid={view.error ? true : undefined}
                 aria-describedby={view.error ? "scan-sheet-error" : undefined}
               />
-              <Button type="submit" variant="outline" disabled={typed.trim() === ""}>
+              <Button type="submit" variant="outline" className="flex-none" disabled={typed.trim() === ""}>
                 Look up
               </Button>
             </div>
@@ -193,7 +210,7 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
       )}
 
       {(view.kind === "preparing" || view.kind === "scanning" || view.kind === "looking") && (
-        <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+        <p role="status" aria-live="polite" className="text-muted-foreground flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           {view.kind === "preparing"
             ? "Getting the scanner ready. This happens once and needs the internet."
@@ -205,8 +222,10 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
 
       {view.kind === "not-found" && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm">No product found for {view.code}.</p>
-          <div className="flex gap-2">
+          <p role="status" className="text-sm">
+            No product found for {view.code}. You can create the food with this barcode, so the next scan finds it.
+          </p>
+          <div className="flex flex-wrap gap-2">
             <Button type="button" className="flex-1" onClick={() => onCreate(view.code)}>
               Create food
             </Button>
@@ -230,7 +249,7 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
           <Button type="button" disabled={saving} onClick={() => void saveOffline(view.code, true)}>
             Save and log it
           </Button>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" className="flex-1" disabled={saving} onClick={() => void saveOffline(view.code, false)}>
               Save only
             </Button>
@@ -243,7 +262,9 @@ function Body({ foods, onLocal, onRemote, onCreate, onOffline, onOpenChange, ini
 
       {view.kind === "failed" && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm">{view.message}.</p>
+          <p role="alert" className="text-sm">
+            {view.message}.
+          </p>
           <Button type="button" variant="outline" onClick={() => void lookup(view.code)}>
             Try again
           </Button>

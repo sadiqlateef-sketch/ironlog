@@ -21,6 +21,7 @@ import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { onRestoredScan } from "@/lib/barcode-scanner";
 import { listFoods, listRecents, NUTRITION_EVENT, saveFood } from "@/lib/offline/nutrition-store";
 import type { RecentFood } from "@/lib/offline/nutrition-store";
+import { sameBarcode } from "@/lib/nutrition/barcode";
 import { dayLabel, foodDay } from "@/lib/nutrition/day";
 import { amountText } from "@/lib/nutrition/display";
 import type { Food } from "@/lib/nutrition/diary-types";
@@ -66,7 +67,8 @@ const getOnlineServer = () => true;
 function matches(f: Food, q: string): boolean {
   const needle = q.trim().toLowerCase();
   if (needle === "") return true;
-  if (isBarcodeQuery(needle)) return f.barcode === needle;
+  // A typed UPC-A finds the same product saved as EAN-13 (leading zero), and back.
+  if (isBarcodeQuery(needle)) return sameBarcode(f.barcode, needle);
   return f.name.toLowerCase().includes(needle) || (f.brand ?? "").toLowerCase().includes(needle);
 }
 
@@ -99,6 +101,7 @@ export function AddFoodScreen() {
   const [customBarcode, setCustomBarcode] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
   const [restored, setRestored] = useState<ScannedCode | null>(null);
+  const scanButton = useRef<HTMLButtonElement>(null);
 
   const loadLocal = useCallback(() => {
     listFoods()
@@ -206,7 +209,7 @@ export function AddFoodScreen() {
     isBarcodeQuery(debounced) &&
     local.length === 0 &&
     !waitingRemote &&
-    !shownRemote.some((r) => r.barcode === debounced || r.source === "off");
+    !shownRemote.some((r) => sameBarcode(r.barcode, debounced) || r.source === "off");
 
   return (
     <div className="flex flex-col gap-4">
@@ -237,8 +240,8 @@ export function AddFoodScreen() {
             autoComplete="off"
           />
         </div>
-        <Button type="button" variant="outline" size="icon" aria-label="Scan a barcode" onClick={() => setScanOpen(true)}>
-          <ScanBarcode className="size-5" />
+        <Button ref={scanButton} type="button" variant="outline" size="icon" aria-label="Scan a barcode" onClick={() => setScanOpen(true)}>
+          <ScanBarcode className="size-5" aria-hidden />
         </Button>
       </div>
 
@@ -340,7 +343,7 @@ export function AddFoodScreen() {
               ))}
             </Group>
           )}
-          {list.length === 0 && <p className="text-muted-foreground text-sm">No foods saved yet. Search above, or add your own.</p>}
+          {list.length === 0 && <p className="text-muted-foreground text-sm">No foods saved yet. Search above, scan a barcode, or add your own.</p>}
         </>
       )}
 
@@ -363,6 +366,7 @@ export function AddFoodScreen() {
         onOpenChange={closeScan}
         foods={list}
         initialScan={restored}
+        returnFocusRef={scanButton}
         onLocal={(food) => {
           closeScan(false);
           pickFood(food);

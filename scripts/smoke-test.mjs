@@ -47,6 +47,8 @@ const base = `http://localhost:${PORT}`;
 
 async function run(label, viewport) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  // No real Open Food Facts calls: every product lookup answers "not found".
+  await ctx.route(/openfoodfacts\.org/, (r) => r.fulfill({ status: 404, contentType: "application/json", body: '{"status":0}' }));
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -163,6 +165,64 @@ async function run(label, viewport) {
   await page.waitForTimeout(2500);
   check(`${label}: custom food lands in the diary`, (await text()).includes("Smoke oats"));
   check(`${label}: diary total adds the custom food (250 + 200 = 450)`, (await page.getByTestId("food-total-energy").innerText()).includes("450"));
+
+  // Barcode on the web: no camera button, typed codes work. Codes 20... are in-store
+  // numbers, never real products. 2000000000008 and 2000000000015 have valid check digits.
+  const openScan = async () => {
+    await page.goto(`${base}/food/add/`);
+    await page.waitForTimeout(1500);
+    await page.getByRole("button", { name: "Scan a barcode" }).click();
+    await page.waitForTimeout(500);
+  };
+  const typeCode = async (code) => {
+    await page.getByLabel("Barcode numbers").fill(code);
+    await page.getByRole("button", { name: "Look up" }).click();
+    await page.waitForTimeout(1200);
+  };
+  await openScan();
+  const sheet = page.getByRole("dialog");
+  check(`${label}: scan sheet has no camera button on the web`, (await sheet.getByRole("button", { name: /Scan with camera/ }).count()) === 0);
+  check(`${label}: scan sheet says camera scanning is in the app`, (await sheet.innerText()).includes("Camera scanning works in the Android app"));
+  await shot("scan-sheet");
+  await typeCode("12ab");
+  check(`${label}: a junk code shows the barcode hint`, (await sheet.innerText()).includes("doesn't look like a barcode"));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(500);
+  check(`${label}: focus returns to the scan button`, (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "Scan a barcode");
+  await openScan();
+  await typeCode("2000000000008");
+  check(`${label}: an unknown code offers Create food`, (await sheet.innerText()).includes("No product found for 2000000000008"));
+  await shot("scan-not-found");
+  await sheet.getByRole("button", { name: "Create food" }).click();
+  await page.waitForTimeout(600);
+  check(`${label}: Create food prefills the barcode`, (await page.getByLabel("Barcode (optional)").inputValue()) === "2000000000008");
+  await page.getByPlaceholder("What is it?").fill("Smoke bar");
+  for (const [lbl, v] of [["Calories (kcal)", "300"], ["Protein (g)", "5"], ["Carbs (g)", "40"], ["Fat (g)", "10"]]) await page.getByLabel(lbl).first().fill(v);
+  await page.getByRole("button", { name: /Save and choose amount/ }).click();
+  await page.waitForTimeout(1000);
+  await page.getByLabel("Amount").fill("20");
+  await page.getByRole("button", { name: /^Add to / }).click();
+  await page.waitForTimeout(2500);
+  check(`${label}: food created from a barcode lands in the diary`, (await text()).includes("Smoke bar"));
+  await openScan();
+  await typeCode("02000000000008");
+  check(`${label}: the same code (GTIN-14 form) finds it on the phone`, (await page.getByLabel("Amount").count()) > 0 && (await text()).includes("Smoke bar"));
+  await shot("scan-local-hit");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  await ctx.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await page.getByRole("button", { name: "Scan a barcode" }).click();
+  await page.waitForTimeout(500);
+  await typeCode("2000000000015");
+  check(`${label}: offline lookup offers to save for later`, (await sheet.innerText()).includes("You're offline"));
+  await shot("scan-offline");
+  await sheet.getByRole("button", { name: "Save only" }).click();
+  await page.waitForTimeout(1200);
+  check(`${label}: the pending food is saved on the phone`, (await text()).includes("Unknown product (2000000000015)"));
+  await ctx.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await page.waitForTimeout(2500);
 
   await page.goto(`${base}/`);
   await page.waitForTimeout(2000);

@@ -306,6 +306,31 @@ export function createNutritionStore(deps: StoreDeps) {
     });
   }
 
+  /**
+   * Another food (not `exceptId`) already saved for this source and id, on the
+   * phone or only on the server. Null when there is none; undefined when the
+   * server couldn't be asked (offline or an error), so the answer is unknown.
+   * The server keeps one food per source and id, so a food must not be changed
+   * into a copy of one it already has.
+   */
+  async function findFoodBySource(source: Food["source"], sourceId: string, exceptId: string): Promise<Food | null | undefined> {
+    const list = await foodsMirror();
+    const local = list.find((f) => f.id !== exceptId && f.source === source && f.sourceId === sourceId);
+    if (local) return local;
+    const data = await tryRead({ table: "foods", columns: "*", eq: { source, source_id: sourceId }, limit: 2 });
+    if (!Array.isArray(data)) return undefined;
+    const row = (data as Tables<"foods">[]).map(rowToFood).find((f) => f.id !== exceptId);
+    if (!row) return null;
+    // Keep the phone's copy, so the next scan finds it without asking the server.
+    await locked(async () => {
+      const stored = await kv.get<Food[]>(FOODS_KEY);
+      if (stored?.some((f) => f.id === row.id)) return;
+      const now = stored ?? (await foodsMirror());
+      await kv.set(FOODS_KEY, [row, ...now.filter((f) => f.id !== row.id)].slice(0, MAX_FOODS));
+    });
+    return row;
+  }
+
   async function archiveFood(id: string): Promise<void> {
     await locked(async () => {
       const list = await foodsMirror();
@@ -368,6 +393,7 @@ export function createNutritionStore(deps: StoreDeps) {
     deleteEntry,
     listFoods,
     saveFood,
+    findFoodBySource,
     archiveFood,
     listRecents,
     ensureStaples,
@@ -411,6 +437,7 @@ export const updateEntry = instance.updateEntry;
 export const deleteEntry = instance.deleteEntry;
 export const listFoods = instance.listFoods;
 export const saveFood = instance.saveFood;
+export const findFoodBySource = instance.findFoodBySource;
 export const archiveFood = instance.archiveFood;
 export const listRecents = instance.listRecents;
 export const ensureStaples = instance.ensureStaples;
