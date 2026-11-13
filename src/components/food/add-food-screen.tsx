@@ -355,7 +355,7 @@ export function AddFoodScreen() {
           )}
           {!waitingRemote && local.length === 0 && shownRemote.length === 0 && !barcodeMiss && (
             <p className="text-muted-foreground text-sm">
-              {online && !remoteFailed ? "Nothing found." : "Nothing on this phone matches."} You can add it yourself.
+              {online && !remoteFailed && notes.length === 0 ? "Nothing found." : "Nothing on this phone matches."} You can add it yourself.
             </p>
           )}
         </>

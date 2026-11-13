@@ -20,5 +20,6 @@ export function scanErrorMessage(e: unknown): string {
 export function isScanCancel(e: unknown): boolean {
   const message = scanErrorMessage(e).trim();
   if (message === "") return true;
-  return /cancel|result was lost/i.test(message);
+  // Google's code scanner rejects a back-out with "Failed to scan code." on Galaxy phones (seen on the Fold8).
+  return /cancel|result was lost|failed to scan code/i.test(message);
 }

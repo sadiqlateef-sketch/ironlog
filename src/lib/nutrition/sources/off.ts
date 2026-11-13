@@ -186,8 +186,11 @@ function checkStatus(res: HttpResponse): void {
   throw new NutritionError("bad-response", `HTTP ${res.status}`);
 }
 
-export function createOffClient(opts: { get?: HttpGet; now?: () => number } = {}): OffClient {
+export function createOffClient(
+  opts: { get?: HttpGet; now?: () => number; retryDelayMs?: number } = {},
+): OffClient {
   const get = opts.get ?? capacitorGet;
+  const retryDelayMs = opts.retryDelayMs ?? 1500;
   const productLimiter = createRateLimiter(100, 60_000, opts.now);
   const searchLimiter = createRateLimiter(10, 60_000, opts.now);
 
@@ -205,7 +208,7 @@ export function createOffClient(opts: { get?: HttpGet; now?: () => number } = {}
 
     async search(query, page = 1) {
       if (!searchLimiter.take()) throw new NutritionError("rate-limited", "local search limit");
-      const res = await get(`${OFF_BASE}/cgi/search.pl`, {
+      const params = {
         search_simple: "1",
         json: "1",
         search_terms: query,
@@ -214,7 +217,13 @@ export function createOffClient(opts: { get?: HttpGet; now?: () => number } = {}
         // Most-scanned first, so the 50 we rank are the products people actually buy.
         sort_by: "unique_scans_n",
         fields: OFF_FIELDS,
-      });
+      };
+      let res = await get(`${OFF_BASE}/cgi/search.pl`, params);
+      // OFF's search server often answers 503 when busy; one quiet retry usually gets through.
+      if (res.status === 503) {
+        await new Promise((r) => setTimeout(r, retryDelayMs));
+        res = await get(`${OFF_BASE}/cgi/search.pl`, params);
+      }
       checkStatus(res);
       if (!isRecord(res.data) || !Array.isArray(res.data.products)) {
         throw new NutritionError("bad-response", "no products array");

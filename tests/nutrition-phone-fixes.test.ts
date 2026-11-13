@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { isScanCancel, scanErrorMessage } from "../src/lib/nutrition/scan-error.ts";
 import { decodeEntities } from "../src/lib/nutrition/entities.ts";
-import { mapOffProduct, quantityFromText } from "../src/lib/nutrition/sources/off.ts";
+import { createOffClient, mapOffProduct, quantityFromText } from "../src/lib/nutrition/sources/off.ts";
 import { matchLevel, normalizeName, rankFoods } from "../src/lib/nutrition/rank.ts";
 import { searchFoods } from "../src/lib/nutrition/search.ts";
 import { complete, emptyNutrients } from "../src/lib/nutrition/nutrients.ts";
@@ -200,4 +200,37 @@ test("discardPrompt names how many changes go and that the phone loses them too"
   assert.equal(discardPrompt(1), "Discard 1 waiting food change? They'll be removed from this phone too.");
   assert.equal(discardPrompt(3), "Discard 3 waiting food changes? They'll be removed from this phone too.");
   assert.equal(discardPrompt(0), "Discard 1 waiting food change? They'll be removed from this phone too.");
+});
+
+test("Galaxy scanner back-out message counts as a cancel", () => {
+  assert.equal(isScanCancel(new Error("Failed to scan code.")), true);
+  assert.equal(isScanCancel({ message: "Google Play services unavailable" }), false);
+});
+
+test("OFF search retries once after a 503, then succeeds", async () => {
+  let calls = 0;
+  const client = createOffClient({
+    retryDelayMs: 0,
+    get: async () => {
+      calls += 1;
+      if (calls === 1) return { status: 503, data: "<html>busy</html>" };
+      return { status: 200, data: { count: 0, products: [] } };
+    },
+  });
+  const res = await client.search("banana");
+  assert.equal(calls, 2);
+  assert.equal(res.foods.length, 0);
+});
+
+test("OFF search gives up as unavailable after two 503s", async () => {
+  let calls = 0;
+  const client = createOffClient({
+    retryDelayMs: 0,
+    get: async () => {
+      calls += 1;
+      return { status: 503, data: "" };
+    },
+  });
+  await assert.rejects(client.search("banana"), (e: { code?: string }) => e.code === "unavailable");
+  assert.equal(calls, 2);
 });
