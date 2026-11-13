@@ -5,7 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Apple, ChefHat, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Plus, Settings } from "lucide-react";
+import { Apple, Bookmark, BookmarkPlus, ChefHat, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Plus, Settings } from "lucide-react";
 import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,13 +18,15 @@ import { useBarcodeEnrichment } from "@/hooks/use-barcode-enrichment";
 import { MealSlotsSheet } from "@/components/food/meal-slots-sheet";
 import { NutritionSyncChip } from "@/components/food/nutrition-sync-chip";
 import { QuickAddSheet } from "@/components/food/quick-add-sheet";
+import { UsualsSheet, type UsualsMode } from "@/components/food/usuals-sheet";
 import { TotalsCard } from "@/components/food/totals-card";
 import { useMinuteClock, useNutritionDay } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
 import { dayLabel, foodDay, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
-import { dayTotals } from "@/lib/nutrition/entry-math";
+import { dayTotals, isPlanned, plannedTotals } from "@/lib/nutrition/entry-math";
+import { showNutrient } from "@/lib/nutrition/display";
 import { copiedText, copyMealEntries, copyMealLabel } from "@/lib/nutrition/quick-log";
-import { addEntries, deleteEntry, listDay } from "@/lib/offline/nutrition-store";
+import { addEntries, confirmPlanned, deleteEntry, listDay } from "@/lib/offline/nutrition-store";
 import type { DiaryEntry, MealSlot } from "@/lib/nutrition/diary-types";
 import { dayKey } from "@/lib/shifts";
 
@@ -48,6 +50,7 @@ export function DiaryScreen() {
   const [open, setOpen] = useState<DiaryEntry | null>(null);
   const [mealMenu, setMealMenu] = useState<Pick<MealSlot, "id" | "name"> | null>(null);
   const [toast, setToast] = useState<FoodToastState | null>(null);
+  const [usualsMode, setUsualsMode] = useState<UsualsMode | null>(null);
   const toastSeq = useRef(0);
   const clearToast = useCallback(() => setToast(null), []);
 
@@ -109,6 +112,25 @@ export function DiaryScreen() {
     }
   };
 
+  const showToast = (text: string, onUndo?: () => void) => setToast({ id: ++toastSeq.current, text, onUndo });
+  const confirmEntry = async (e: DiaryEntry) => {
+    try {
+      const done = await confirmPlanned(e, prefs.day_start);
+      showToast(done && done.foodDay !== e.foodDay ? `Counted on ${dayLabel(done.foodDay, current)}` : `${e.name} counted`);
+    } catch {
+      showToast("Couldn't update that. Try again.");
+    }
+  };
+  const removePlanned = async (e: DiaryEntry) => {
+    try {
+      await deleteEntry(e.id, e.foodDay);
+    } catch {
+      showToast("Couldn't remove that. Try again.");
+    }
+  };
+  const plannedKcal = entries.some(isPlanned) ? plannedTotals(entries).energy : null;
+  const mealEntries = (id: string) => entries.filter((e) => e.mealId === id && !isPlanned(e));
+
   const calendarToday = dayKey(now);
   const holdsOver = isCurrent && current !== calendarToday;
   const label = day ? dayLabel(day, current) : "";
@@ -148,6 +170,11 @@ export function DiaryScreen() {
       ) : (
         <>
           <TotalsCard totals={dayTotals(entries)} />
+          {plannedKcal && (
+            <p className="text-muted-foreground -mt-2 px-1 text-xs" data-testid="food-planned">
+              Planned, not counted yet: {showNutrient("energy", plannedKcal)} kcal
+            </p>
+          )}
           {entries.length === 0 && (
             <EmptyState
               icon={Apple}
@@ -173,6 +200,8 @@ export function DiaryScreen() {
                 addHref={s.addMeal ? `/food/add/?d=${day}&meal=${encodeURIComponent(s.addMeal)}` : null}
                 onOpen={setOpen}
                 onMenu={s.addMeal ? () => setMealMenu({ id: s.key, name: s.title }) : undefined}
+                onConfirm={(e) => void confirmEntry(e)}
+                onRemove={(e) => void removePlanned(e)}
               />
             ))}
           </div>
@@ -197,11 +226,18 @@ export function DiaryScreen() {
         title={mealMenu?.name ?? ""}
         actions={
           mealMenu
-            ? [{ label: copyMealLabel(mealMenu.name), icon: Copy, onSelect: () => void copyYesterday(mealMenu) }]
+            ? [
+                ...(day ? [{ label: "Log a usual", icon: Bookmark, onSelect: () => setUsualsMode({ kind: "log", meal: mealMenu, day }) }] : []),
+                ...(mealEntries(mealMenu.id).length
+                  ? [{ label: "Save meal as usual", icon: BookmarkPlus, onSelect: () => setUsualsMode({ kind: "save", meal: mealMenu, entries: mealEntries(mealMenu.id) }) }]
+                  : []),
+                { label: copyMealLabel(mealMenu.name), icon: Copy, onSelect: () => void copyYesterday(mealMenu) },
+              ]
             : []
         }
       />
       <FoodToast toast={toast} onDone={clearToast} />
+      <UsualsSheet mode={usualsMode} onOpenChange={(o) => !o && setUsualsMode(null)} onDone={(text) => showToast(text)} />
       {day && <QuickAddSheet open={quick} onOpenChange={setQuick} day={day} dayLabel={label} meals={prefs.meals} now={now} />}
       <MealSlotsSheet open={meals} onOpenChange={setMeals} meals={prefs.meals} onSave={async (next) => void (await save({ ...prefs, meals: next }))} />
       <EntrySheet entry={open} onOpenChange={(o) => !o && setOpen(null)} meals={prefs.meals} />

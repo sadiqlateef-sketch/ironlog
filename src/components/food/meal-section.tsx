@@ -14,11 +14,13 @@ interface Props {
   /** Where "Add" goes; null for a meal that no longer exists. */
   addHref: string | null;
   onOpen: (entry: DiaryEntry) => void;
-  /** Opens this meal's menu; shown only while the meal is empty. */
+  /** Opens this meal's menu. */
   onMenu?: () => void;
+  onConfirm?: (entry: DiaryEntry) => void;
+  onRemove?: (entry: DiaryEntry) => void;
 }
 
-export function MealSection({ title, window, entries, addHref, onOpen, onMenu }: Props) {
+export function MealSection({ title, window, entries, addHref, onOpen, onMenu, onConfirm, onRemove }: Props) {
   const totals = mealTotals(entries);
   return (
     <Card className="gap-1 p-3" data-testid="food-meal">
@@ -31,7 +33,7 @@ export function MealSection({ title, window, entries, addHref, onOpen, onMenu }:
           </p>
         </div>
         <div className="flex shrink-0 items-center">
-        {onMenu && entries.length === 0 && (
+        {onMenu && (
           <button
             type="button"
             onClick={onMenu}
@@ -56,7 +58,12 @@ export function MealSection({ title, window, entries, addHref, onOpen, onMenu }:
         <ul className="flex flex-col">
           {entries.map((e) => (
             <li key={e.id}>
-              <EntryRow entry={e} onOpen={() => onOpen(e)} />
+              <EntryRow
+                entry={e}
+                onOpen={() => onOpen(e)}
+                onConfirm={onConfirm ? () => onConfirm(e) : undefined}
+                onRemove={onRemove ? () => onRemove(e) : undefined}
+              />
             </li>
           ))}
         </ul>

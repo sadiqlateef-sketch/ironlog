@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MealChips } from "@/components/food/meal-chips";
-import { addEntry, saveFood } from "@/lib/offline/nutrition-store";
+import { addEntry, canPlan, saveFood } from "@/lib/offline/nutrition-store";
 import { defaultMealFor } from "@/lib/nutrition/day";
 import { allowedUnits, DISPLAY_NUTRIENTS, makeEntry } from "@/lib/nutrition/entry-math";
 import { amountText, NUTRIENT_DISPLAY, parseAmount, showNutrient, unitChoiceLabel } from "@/lib/nutrition/display";
@@ -57,6 +57,17 @@ function Form({ target, day, dayLabel, meals, mealId, now, onSaved }: Props & { 
   const [meal, setMeal] = useState<Pick<MealSlot, "id" | "name"> | null>(picked);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [planOk, setPlanOk] = useState(false);
+  const [plan, setPlan] = useState(false);
+  useEffect(() => {
+    let live = true;
+    canPlan()
+      .then((ok) => live && setPlanOk(ok))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const quantity = parseAmount(text);
   let preview: DiaryEntry | null = null;
@@ -84,7 +95,8 @@ function Form({ target, day, dayLabel, meals, mealId, now, onSaved }: Props & { 
     setError(null);
     try {
       const saved = target.isNew ? await saveFood(food) : food;
-      await addEntry(makeEntry({ food: saved, quantity, unit, foodDay: day, meal, now: new Date(), id: crypto.randomUUID() }));
+      const entry = makeEntry({ food: saved, quantity, unit, foodDay: day, meal, now: new Date(), id: crypto.randomUUID() });
+      await addEntry(plan ? { ...entry, status: "planned" } : entry);
       onSaved();
     } catch {
       setError("Couldn't save this. Try again.");
@@ -174,8 +186,14 @@ function Form({ target, day, dayLabel, meals, mealId, now, onSaved }: Props & { 
           {error}
         </p>
       )}
+      {planOk && (
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={plan} onChange={(e) => setPlan(e.target.checked)} className="size-4" />
+          Plan it: don&apos;t count it until I confirm I ate it
+        </label>
+      )}
       <Button type="button" onClick={save} disabled={!preview || busy}>
-        Add to {meal?.name ?? "diary"}
+        {plan ? "Plan for" : "Add to"} {meal?.name ?? "diary"}
       </Button>
     </>
   );

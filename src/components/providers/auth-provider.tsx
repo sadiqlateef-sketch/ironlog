@@ -6,6 +6,7 @@ import { getSupabase, isLocalBackend } from "@/lib/supabase/client";
 import { listenForGoogleSignIn } from "@/lib/google-sign-in";
 import { cachedRead } from "@/lib/offline/cache";
 import { kvClear, kvSet } from "@/lib/offline/kv";
+import { clearPlaces } from "@/lib/nutrition-places";
 import { discardPending, flush, getSyncStatus } from "@/lib/offline/queue";
 import { flushNutrition, getNutritionSyncStatus, resetNutritionOutbox } from "@/lib/offline/nutrition-outbox";
 import type { Tables, UnitSystem } from "@/types/database";
@@ -122,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Forget the food outbox in memory too, or the next person to sign in could send this one's food.
     await resetNutritionOutbox();
     await kvClear();
+    clearPlaces();
   }, []);
 
   return (

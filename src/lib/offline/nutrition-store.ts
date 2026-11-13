@@ -20,6 +20,8 @@ import { schemaGate } from "./nutrition-schema.ts";
 import { createCollection, type Stored } from "./nutrition-collections.ts";
 import { afterPortion, batchToRow, rowToBatch, type Batch } from "../nutrition/batch.ts";
 import { decrement, pantryToRow, rowToPantry, type PantryItem } from "../nutrition/pantry.ts";
+import { rowToUsual, usedNow, usualToRow, type Usual } from "../nutrition/usuals.ts";
+import { confirm as confirmEntry } from "../nutrition/planned.ts";
 import { recipeFood, recipeProblem, recipeToRow, rollup, rowToRecipe, type Recipe } from "../nutrition/recipe.ts";
 import { normalizePrefs } from "../nutrition/day.ts";
 import {
@@ -100,7 +102,7 @@ export interface StoreInternals {
 }
 
 export type EntryPatch = Partial<
-  Pick<DiaryEntry, "quantity" | "unit" | "mealId" | "mealName" | "note" | "eatenAt" | "foodDay">
+  Pick<DiaryEntry, "quantity" | "unit" | "mealId" | "mealName" | "note" | "eatenAt" | "foodDay" | "status">
 >;
 
 const PREFS_KEY = "nutrition-prefs";
@@ -110,6 +112,7 @@ const SCANS_KEY = "nutrition-scans";
 const RECIPES_KEY = "nutrition-recipes";
 const BATCHES_KEY = "nutrition-batches";
 const PANTRY_KEY = "nutrition-pantry";
+const USUALS_KEY = "nutrition-usuals";
 const dayKey = (day: string) => `nutrition-day:${day}`;
 
 export function createNutritionStore(deps: StoreDeps) {
@@ -267,6 +270,7 @@ export function createNutritionStore(deps: StoreDeps) {
       if (next.note !== current.note) columns.push("note");
       if (next.eatenAt !== current.eatenAt) columns.push("eaten_at");
       if (next.foodDay !== current.foodDay) columns.push("food_day");
+      if ((next.status ?? "logged") !== (current.status ?? "logged")) columns.push("status");
       const rowPatch: Record<string, unknown> = {};
       for (const c of columns) rowPatch[c] = full[c];
 
@@ -636,6 +640,41 @@ export function createNutritionStore(deps: StoreDeps) {
     });
   }
 
+  // ---------- Usual meals and planned entries ----------
+
+  async function listUsuals(): Promise<Stored<Usual>[]> {
+    return usuals.list();
+  }
+
+  /** Log a usual meal: the new entries and the usual's use count go out as one change. */
+  async function logUsual(usualId: string, entries: readonly DiaryEntry[]): Promise<void> {
+    if (!entries.length) return;
+    const day = entries[0].foodDay;
+    const fresh = entries.filter((e) => e.foodDay === day);
+    const ready = await schema.probeTable("usuals");
+    await locked(async () => {
+      const ids = new Set(fresh.map((e) => e.id));
+      const list = await dayMirror(day);
+      await kv.set(dayKey(day), [...list.filter((e) => !ids.has(e.id)), ...fresh].sort(byTime));
+      for (const e of fresh) if (e.unit !== "quick") await bumpRecent(e);
+      const entryOp: NOp = { kind: "insert", table: "food_entries", rows: await entryRows(fresh), days: [day] };
+      const usual = await usuals.get(usualId);
+      const usualOps = usual ? await usuals.stageSave(usedNow(usual, internals.now()), ready) : [];
+      await commit(entryOp, ...usualOps);
+    });
+  }
+
+  /** Can entries be planned yet? (The server needs the entry status column first.) */
+  async function canPlan(): Promise<boolean> {
+    return schema.probeColumn("food_entries", "status");
+  }
+
+  /** Ate a planned entry: it counts from now, on the food day now falls on. */
+  async function confirmPlanned(entry: DiaryEntry, dayStart: string): Promise<DiaryEntry | null> {
+    const next = confirmEntry(entry, internals.now(), dayStart);
+    return updateEntry(entry.id, { status: "logged", eatenAt: next.eatenAt, foodDay: next.foodDay }, entry.foodDay);
+  }
+
   /** Foods still only on this phone that phone-only rows point at: sent first, so the rows can point at them. */
   async function promoteFoodsFor(foodIds: Iterable<string | null>): Promise<NOp[]> {
     const ids = new Set([...foodIds].filter((x): x is string => !!x));
@@ -690,6 +729,17 @@ export function createNutritionStore(deps: StoreDeps) {
     { beforePromote: (items) => promoteFoodsFor(items.map((b) => b.foodId)) },
   );
 
+  const usuals = createCollection<Usual>(
+    {
+      table: "usuals",
+      kvKey: USUALS_KEY,
+      toRow: usualToRow,
+      fromRow: rowToUsual,
+      order: (a, b) => b.useCount - a.useCount || a.name.localeCompare(b.name),
+    },
+    internals,
+  );
+
   const pantry = createCollection<PantryItem>(
     { table: "pantry_items", kvKey: PANTRY_KEY, toRow: pantryToRow, fromRow: rowToPantry },
     internals,
@@ -727,6 +777,12 @@ export function createNutritionStore(deps: StoreDeps) {
     savePantryItem: (p: PantryItem) => pantry.save(p),
     removePantryItem: (id: string) => pantry.remove(id),
     logFromPantry,
+    listUsuals,
+    saveUsual: (u: Usual) => usuals.save(u),
+    removeUsual: (id: string) => usuals.remove(id),
+    logUsual,
+    canPlan,
+    confirmPlanned,
   };
 }
 
@@ -835,3 +891,9 @@ export const listPantry = instance.listPantry;
 export const savePantryItem = instance.savePantryItem;
 export const removePantryItem = instance.removePantryItem;
 export const logFromPantry = instance.logFromPantry;
+export const listUsuals = instance.listUsuals;
+export const saveUsual = instance.saveUsual;
+export const removeUsual = instance.removeUsual;
+export const logUsual = instance.logUsual;
+export const canPlan = instance.canPlan;
+export const confirmPlanned = instance.confirmPlanned;
