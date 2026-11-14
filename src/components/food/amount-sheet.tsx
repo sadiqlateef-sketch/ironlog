@@ -29,6 +29,8 @@ interface Props {
   meals: readonly MealSlot[];
   mealId: string | null;
   now: Date;
+  /** Eaten at this time instead of now (a meal captured in the inbox). */
+  eatenAt?: Date | null;
   onSaved: () => void;
 }
 
@@ -45,7 +47,7 @@ const MAX_QUANTITY = 100000;
 const stepFor = (unit: EntryUnit) => (unit === "serving" || unit === "package" ? 0.5 : unit === "oz" || unit === "fl_oz" ? 1 : 10);
 const startFor = (unit: EntryUnit) => (unit === "serving" || unit === "package" || unit === "oz" || unit === "fl_oz" ? 1 : 100);
 
-function Form({ target, day, dayLabel, meals, mealId, now, onSaved }: Props & { target: AmountTarget }) {
+function Form({ target, day, dayLabel, meals, mealId, now, eatenAt, onSaved }: Props & { target: AmountTarget }) {
   const { food } = target;
   const units = allowedUnits(food);
   const lastOk = target.last && units.includes(target.last.unit) ? target.last : null;
@@ -95,7 +97,7 @@ function Form({ target, day, dayLabel, meals, mealId, now, onSaved }: Props & { 
     setError(null);
     try {
       const saved = target.isNew ? await saveFood(food) : food;
-      const entry = makeEntry({ food: saved, quantity, unit, foodDay: day, meal, now: new Date(), id: crypto.randomUUID() });
+      const entry = makeEntry({ food: saved, quantity, unit, foodDay: day, meal, now: eatenAt ?? new Date(), id: crypto.randomUUID() });
       await addEntry(plan ? { ...entry, status: "planned" } : entry);
       onSaved();
     } catch {

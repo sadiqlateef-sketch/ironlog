@@ -5,7 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Apple, BarChart3, Bookmark, CalendarClock, FileDown, BookmarkPlus, ChefHat, Dumbbell, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, ListChecks, Moon, Plus, RotateCcw, Settings, Target } from "lucide-react";
+import { Apple, BarChart3, Bookmark, CalendarClock, FileDown, BookmarkPlus, ChefHat, Dumbbell, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, Inbox, ListChecks, Moon, Plus, RotateCcw, Settings, Target } from "lucide-react";
 import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -31,6 +31,7 @@ import { FuelPlanCard } from "@/components/food/fuel-plan-card";
 import { proteinSplit } from "@/lib/nutrition/goals";
 import { dayLabel, foodDay, foodDayFor, isAllDay, orderMeals, shiftDay } from "@/lib/nutrition/day";
 import { useWorkShifts } from "@/hooks/use-work-shifts";
+import { useFoodInbox } from "@/hooks/use-food-inbox";
 import { dayTotals, isPlanned, plannedTotals } from "@/lib/nutrition/entry-math";
 import { showNutrient } from "@/lib/nutrition/display";
 import { copiedText, copyMealEntries, copyMealLabel } from "@/lib/nutrition/quick-log";
@@ -54,6 +55,7 @@ export function DiaryScreen() {
   // Rendered only after sign-in is known (AppShell), so reading the URL here is safe.
   const [picked, setPicked] = useState<string | null>(() => dayFromUrl());
   const [menu, setMenu] = useState(false);
+  const inboxCount = useFoodInbox().items?.length ?? 0;
   const [quick, setQuick] = useState(false);
   const [meals, setMeals] = useState(false);
   const [open, setOpen] = useState<DiaryEntry | null>(null);
@@ -163,6 +165,17 @@ export function DiaryScreen() {
 
       <NutritionSyncChip />
 
+      {inboxCount > 0 && (
+        <Link
+          href="/food/inbox/"
+          className="bg-secondary text-foreground flex items-center gap-2 self-start rounded-full px-3 py-1 text-xs font-medium"
+          data-testid="food-inbox-badge"
+        >
+          <Inbox className="size-3.5" aria-hidden />
+          {inboxCount} {inboxCount === 1 ? "meal" : "meals"} waiting in your inbox
+        </Link>
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <Button type="button" variant="outline" size="icon" aria-label="Previous day" disabled={!day} onClick={() => day && go(shiftDay(day, -1))}>
           <ChevronLeft />
@@ -254,6 +267,7 @@ export function DiaryScreen() {
         actions={[
           { label: "Quick add", icon: Plus, onSelect: () => setQuick(true) },
           { label: "Your day", icon: CalendarClock, onSelect: () => router.push(day && !isCurrent ? `/food/day/?d=${day}` : "/food/day/") },
+          { label: inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox", icon: Inbox, onSelect: () => router.push("/food/inbox/") },
           { label: "Week", icon: BarChart3, onSelect: () => router.push("/food/week/") },
           { label: "Export", icon: FileDown, onSelect: () => router.push("/food/week/#export") },
           { label: "Goals", icon: Target, onSelect: () => router.push("/food/goals/") },

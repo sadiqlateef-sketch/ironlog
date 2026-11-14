@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Plus, ScanBarcode, Search } from "lucide-react";
+import { Camera, ChevronLeft, Inbox, Mic, Plus, ScanBarcode, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SkeletonList } from "@/components/ui/skeleton";
@@ -19,6 +19,10 @@ import type { FoodToastState } from "@/components/food/food-toast";
 import { FoodResultRow, tagFor } from "@/components/food/food-result-row";
 import { NutritionSyncChip } from "@/components/food/nutrition-sync-chip";
 import { ScanSheet } from "@/components/food/scan-sheet";
+import { VoiceLogSheet } from "@/components/food/voice-log-sheet";
+import { addToInbox, inboxPhotoUrl, listInbox, removeFromInbox } from "@/lib/nutrition-inbox-store";
+import type { InboxItem } from "@/lib/nutrition/inbox";
+import { canDictate } from "@/lib/speech";
 import type { ScannedCode } from "@/components/food/scan-sheet";
 import { useMinuteClock } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
@@ -92,7 +96,7 @@ export function AddFoodScreen() {
   const [params] = useState(() => {
     const sp = new URLSearchParams(window.location.search);
     const d = sp.get("d");
-    return { day: d && DAY.test(d) ? d : null, meal: sp.get("meal"), pantry: sp.get("pantry") === "1" };
+    return { day: d && DAY.test(d) ? d : null, meal: sp.get("meal"), pantry: sp.get("pantry") === "1", inbox: sp.get("inbox") };
   });
 
   const current = foodDayFor(now, prefs, shifts);
@@ -113,6 +117,32 @@ export function AddFoodScreen() {
   const [scanOpen, setScanOpen] = useState(false);
   const [restored, setRestored] = useState<ScannedCode | null>(null);
   const scanButton = useRef<HTMLButtonElement>(null);
+  const [voiceOk, setVoiceOk] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+  // Logging a meal captured in the inbox: it keeps the capture time and is removed once logged.
+  const [inboxItem, setInboxItem] = useState<InboxItem | null>(null);
+  const [inboxPhoto, setInboxPhoto] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    canDictate()
+      .then((ok) => live && setVoiceOk(ok))
+      .catch(() => {});
+    if (params.inbox) {
+      listInbox()
+        .then((list) => {
+          const item = list.find((i) => i.id === params.inbox) ?? null;
+          if (!live || !item) return;
+          setInboxItem(item);
+          void inboxPhotoUrl(item).then((u) => live && setInboxPhoto(u));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      live = false;
+    };
+  }, [params.inbox]);
+  const eatenAt = inboxItem ? new Date(inboxItem.takenAt) : null;
 
   const loadLocal = useCallback(() => {
     listFoods()
@@ -247,6 +277,11 @@ export function AddFoodScreen() {
 
   const finish = () => {
     setTarget(null);
+    if (inboxItem) {
+      void removeFromInbox(inboxItem.id).catch(() => {});
+      router.replace("/food/inbox/");
+      return;
+    }
     if (params.pantry) router.replace("/food/pantry/");
     else if (window.history.length > 1) router.back();
     else router.replace(params.day ? `/food/?d=${params.day}` : "/food/");
@@ -295,10 +330,61 @@ export function AddFoodScreen() {
             autoComplete="off"
           />
         </div>
+        {voiceOk && !params.pantry && (
+          <Button type="button" variant="outline" size="icon" aria-label="Say what you ate" onClick={() => setVoiceOpen(true)}>
+            <Mic className="size-5" aria-hidden />
+          </Button>
+        )}
         <Button ref={scanButton} type="button" variant="outline" size="icon" aria-label="Scan a barcode" onClick={() => setScanOpen(true)}>
           <ScanBarcode className="size-5" aria-hidden />
         </Button>
       </div>
+
+      {inboxItem ? (
+        <div className="glass flex items-center gap-3 rounded-2xl p-2" data-testid="inbox-capture">
+          {inboxPhoto ? (
+            // A local data: URL of the inbox photo.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={inboxPhoto} alt="Meal photo" className="size-16 shrink-0 rounded-xl object-cover" />
+          ) : (
+            <Inbox className="text-muted-foreground size-6 shrink-0" aria-hidden />
+          )}
+          <p className="min-w-0 flex-1 text-sm">
+            {inboxItem.note ?? "From your food inbox"}
+            <span className="text-muted-foreground block text-xs">
+              Eaten {new Date(inboxItem.takenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Removed from the inbox once logged.
+            </span>
+          </p>
+        </div>
+      ) : (
+        !params.pantry && (
+          <div className="-mt-2 flex items-center gap-3 px-1 text-sm">
+            <button type="button" className="text-primary-text flex items-center gap-1.5 underline-offset-2 hover:underline" onClick={() => photoInput.current?.click()}>
+              <Camera className="size-4" aria-hidden /> Snap now, log later
+            </button>
+            <Link href="/food/inbox/" className="text-muted-foreground underline-offset-2 hover:underline">
+              Inbox
+            </Link>
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              aria-hidden
+              tabIndex={-1}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                if (!file) return;
+                addToInbox({ photo: file, note: null, prefs, shifts })
+                  .then(() => showToast("Saved to your food inbox. Log it when you have a minute."))
+                  .catch(() => showToast("Couldn't save that photo. Try again."));
+              }}
+            />
+          </div>
+        )
+      )}
 
       {!online && (
         <p role="status" className="text-muted-foreground text-sm">
@@ -447,8 +533,34 @@ export function AddFoodScreen() {
         meals={prefs.meals}
         mealId={params.meal}
         now={now}
+        eatenAt={eatenAt}
         onSaved={finish}
       />
+      {voiceOpen && (
+        <VoiceLogSheet
+          open={voiceOpen}
+          onOpenChange={setVoiceOpen}
+          foods={list}
+          recents={recents}
+          day={day}
+          meals={prefs.meals}
+          mealId={params.meal}
+          now={now}
+          eatenAt={eatenAt}
+          onSearch={(text) => {
+            setVoiceOpen(false);
+            setQuery(text);
+          }}
+          onPick={(food) => {
+            setVoiceOpen(false);
+            pickFood(food);
+          }}
+          onLogged={(text) => {
+            if (inboxItem) finish();
+            else showToast(text);
+          }}
+        />
+      )}
       <ScanSheet
         open={scanOpen}
         onOpenChange={closeScan}
