@@ -19,7 +19,7 @@ set variation_group = case
   -- Deadlift variants
   when name ~* '\ydeadlift\y' or 'Deadlift' = any(aliases) then 'deadlift'
   -- Overhead press variants (shoulders)
-  when primary_muscle = 'shoulders' and (name ~* '\y(overhead press|shoulder press|military press)\y' or 'Overhead Press' = any(aliases)) then 'overhead-press'
+  when primary_muscle in ('front_delts', 'side_delts', 'rear_delts') and (name ~* '\y(overhead press|shoulder press|military press)\y' or 'Overhead Press' = any(aliases)) then 'overhead-press'
   -- Row variants (upper back / lats)
   when (primary_muscle = 'upper_back' or primary_muscle = 'lats') and (name ~* '\y(bent[ -]over row|barbell row|dumbbell row|cable row|t-bar row|pendlay row|seated row|inverted row|row)\y' or 'Row' = any(aliases)) then 'row'
   -- Pull-up / chin-up variants (lats)
@@ -35,7 +35,7 @@ set variation_group = case
   -- Triceps extension / pushdown variants (triceps)
   when primary_muscle = 'triceps' and (name ~* '\y(triceps? extension|pushdown|skull[ -]?crusher|kickback)\y' or 'Triceps Pushdown' = any(aliases)) then 'triceps-extension'
   -- Lateral raise variants (shoulders)
-  when primary_muscle = 'shoulders' and (name ~* '\y(lateral raise|side raise)\y' or 'Lateral Raise' = any(aliases)) then 'lateral-raise'
+  when primary_muscle = 'side_delts' and (name ~* '\y(lateral raise|side raise)\y' or 'Lateral Raise' = any(aliases)) then 'lateral-raise'
   -- Chest fly variants (chest)
   when primary_muscle = 'chest' and (name ~* '\y(chest fly|pec fly|cable fly|dumbbell fly|flyes?)\y' or 'Chest Fly' = any(aliases)) then 'chest-fly'
   -- Calf raise variants (calves)
