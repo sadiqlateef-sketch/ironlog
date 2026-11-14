@@ -11,6 +11,7 @@ import { LocalNotifications, Weekday } from "@capacitor/local-notifications";
 import { Share } from "@capacitor/share";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { KeepAwake } from "@capacitor-community/keep-awake";
+import { deepLinkPath } from "@/services/ironlogEcosystemSync";
 
 export const isNative = () => Capacitor.isNativePlatform();
 
@@ -64,6 +65,15 @@ export async function initNative(): Promise<void> {
     importance: 3,
     visibility: 1,
   }).catch(() => {});
+  // ironlog://food (the home-screen widget) opens Add food, at launch or while running.
+  const openLink = (url: string | undefined) => {
+    const path = deepLinkPath(url);
+    if (path && window.location.pathname !== path) window.location.assign(path);
+  };
+  App.getLaunchUrl()
+    .then((r) => openLink(r?.url))
+    .catch(() => {});
+  App.addListener("appUrlOpen", ({ url }) => openLink(url)).catch(() => {});
 }
 
 /**

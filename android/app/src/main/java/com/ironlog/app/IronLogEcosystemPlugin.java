@@ -117,6 +117,13 @@ public class IronLogEcosystemPlugin extends Plugin {
             cv.put("streak", call.getInt("streak", 0));
             cv.put("updatedAt", getNowIso());
             getContext().getContentResolver().insert(Uri.parse("content://com.ironlog.app.provider/nutrition"), cv);
+            // Redraw the home-screen widget with the text the app worked out.
+            NutritionWidgetProvider.publish(
+                    getContext(),
+                    date,
+                    call.getString("widgetTitle", "Food today"),
+                    call.getString("widgetLine1", ""),
+                    call.getString("widgetLine2", ""));
 
             JSObject ret = new JSObject();
             ret.put("success", true);

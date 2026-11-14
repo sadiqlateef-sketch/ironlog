@@ -39,9 +39,39 @@ export interface NutritionDaySummary {
   streak: number;
 }
 
+/** Text for the home-screen food widget (F29). Numbers only, from the day itself; no goal means no "left". */
+export interface WidgetPayload {
+  widgetTitle: string;
+  widgetLine1: string;
+  widgetLine2: string;
+}
+
+export function widgetPayload(day: NutritionDaySummary | null): WidgetPayload {
+  if (!day) return { widgetTitle: "Food today", widgetLine1: "Nothing logged yet", widgetLine2: "Tap Log food to add a meal" };
+  const kcal = Math.max(0, Math.round(day.kcal));
+  const protein = Math.max(0, Math.round(day.protein));
+  const water = Math.max(0, Math.round(day.waterMl));
+  let line1: string;
+  if (day.entries === 0 && kcal === 0) line1 = "Nothing logged yet";
+  else if (day.goalKcal !== null && day.goalKcal > 0) {
+    const left = Math.round(day.goalKcal - kcal);
+    line1 = left >= 0 ? `${left} kcal left` : `${-left} kcal over`;
+  } else line1 = `${kcal} kcal`;
+  const p = day.goalProtein !== null && day.goalProtein > 0 ? `${protein}/${Math.round(day.goalProtein)} g protein` : `${protein} g protein`;
+  const w = water > 0 ? ` · ${water >= 1000 ? `${Math.round(water / 100) / 10} L` : `${water} ml`} water` : "";
+  return { widgetTitle: "Food today", widgetLine1: line1, widgetLine2: p + w };
+}
+
+/** Where an ironlog:// link opens in the app, or null if it isn't one of ours. */
+export function deepLinkPath(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = /^ironlog:\/\/food(?:\/add)?\/?(?:[?#].*)?$/i.exec(url.trim());
+  return m ? "/food/add/" : null;
+}
+
 interface IronLogEcosystemPlugin {
   upsertTodayPlan?: (plan: TodayPlan) => Promise<void>;
-  upsertNutritionDay?: (day: NutritionDaySummary) => Promise<void>;
+  upsertNutritionDay?: (day: NutritionDaySummary & WidgetPayload) => Promise<void>;
   upsertWorkoutRecord?: (summary: CompletedWorkoutSummary) => Promise<void>;
   completeBujoWorkoutAndWaterOak?: (data: {
     date: string;
@@ -148,9 +178,10 @@ export const IronLogEcosystemSync = {
     const plugin = getEcosystemPlugin();
     if (!plugin?.upsertNutritionDay) return;
     if (nutritionTimer) clearTimeout(nutritionTimer);
+    // The plugin also refreshes the home-screen widget from the widget fields.
     nutritionTimer = setTimeout(() => {
       nutritionTimer = null;
-      plugin.upsertNutritionDay?.(day).catch((e: unknown) => console.warn("Ecosystem: Failed to publish today's food", e));
+      plugin.upsertNutritionDay?.({ ...day, ...widgetPayload(day) }).catch((e: unknown) => console.warn("Ecosystem: Failed to publish today's food", e));
     }, delayMs);
   },
 

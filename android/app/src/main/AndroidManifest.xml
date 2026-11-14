@@ -98,7 +98,27 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="ironlog" android:host="workout" />
             </intent-filter>
+            <!-- The food widget's "Log food" button opens Add food. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ironlog" android:host="food" />
+            </intent-filter>
         </activity>
+
+        <!-- Home-screen food widget: shows what the app last published; no network, no permission. -->
+        <receiver
+            android:name="com.ironlog.app.NutritionWidgetProvider"
+            android:exported="false"
+            android:label="IronLog food">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_nutrition_info" />
+        </receiver>
 
         <!-- Locked-Down IronLogContentProvider for Bujo Tasks, Braindump, Budget & SD Maid Glass -->
         <provider
