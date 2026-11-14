@@ -14,6 +14,7 @@ import type { AmountTarget } from "@/components/food/amount-sheet";
 import { FoodToast } from "@/components/food/food-toast";
 import type { FoodToastState } from "@/components/food/food-toast";
 import { NutritionSyncChip } from "@/components/food/nutrition-sync-chip";
+import { UseSoonCard } from "@/components/food/use-soon-card";
 import { newRecipe, PHONE_ONLY_TEXT, RecipeEditorSheet } from "@/components/food/recipe-editor-sheet";
 import { useMinuteClock } from "@/hooks/use-nutrition-day";
 import { useNutritionPrefs } from "@/hooks/use-nutrition-prefs";
@@ -86,6 +87,8 @@ export function RecipesScreen() {
       </header>
 
       <NutritionSyncChip />
+
+      {!prefsLoading && <UseSoonCard today={day} />}
 
       {batches.length > 0 && (
         <section className="flex flex-col gap-1">

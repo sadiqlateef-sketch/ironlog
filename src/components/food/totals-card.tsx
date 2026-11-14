@@ -48,6 +48,9 @@ export function TotalsCard({
             {showNutrient("energy", totals.energy)}
           </span>
           <span className="text-muted-foreground text-sm font-medium">kcal</span>
+          <Link href="/food/learn/#lens-energy" aria-label="About energy" className="text-muted-foreground text-xs underline-offset-2 hover:underline">
+            ⓘ
+          </Link>
         </div>
         {goal && left !== null && (
           <span className="text-muted-foreground text-sm tabular-nums" data-testid="food-kcal-left">
@@ -74,7 +77,11 @@ export function TotalsCard({
             const d = NUTRIENT_DISPLAY[key]!;
             return (
               <div key={key} className="flex flex-col">
-                <dt className="text-muted-foreground text-xs font-medium">{d.label}</dt>
+                <dt className="text-muted-foreground text-xs font-medium">
+                  <Link href={`/food/learn/#lens-${key}`} aria-label={`About ${d.label}`} className="underline-offset-2 hover:underline">
+                    {d.label} ⓘ
+                  </Link>
+                </dt>
                 <dd className="text-base font-semibold tabular-nums">
                   {showNutrient(key, totals[key])} <span className="text-muted-foreground text-xs font-normal">{d.unit}</span>
                 </dd>

@@ -323,6 +323,53 @@ export async function scheduleFoodNudge(at: Date | null): Promise<void> {
   }
 }
 
+const LEFTOVER_PREF = "ironlog-leftover-reminders";
+const LEFTOVER_FIRST_ID = 1100;
+const LEFTOVER_IDS = 20;
+
+/** Whether "use your leftovers" reminders are on (off until turned on). */
+export function leftoverRemindersOn(): boolean {
+  try {
+    return localStorage.getItem(LEFTOVER_PREF) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Turn leftover reminders on (asks Android for notifications) or off. Returns the state kept. */
+export async function setLeftoverReminders(on: boolean): Promise<boolean> {
+  if (on && isNative() && !(await requestNotifications())) on = false;
+  try {
+    if (on) localStorage.setItem(LEFTOVER_PREF, "1");
+    else localStorage.removeItem(LEFTOVER_PREF);
+  } catch {}
+  if (!on) await scheduleLeftoverReminders([]);
+  return on;
+}
+
+/** Replace all leftover reminders (ids 1100-1119) with `list` (from leftovers.ts reminderTimes). Never asks for permission itself. */
+export async function scheduleLeftoverReminders(list: readonly { at: Date; labels: string[] }[]): Promise<void> {
+  if (!isNative()) return;
+  const ids = Array.from({ length: LEFTOVER_IDS }, (_, i) => ({ id: LEFTOVER_FIRST_ID + i }));
+  await LocalNotifications.cancel({ notifications: ids }).catch(() => {});
+  if (list.length === 0 || !leftoverRemindersOn()) return;
+  try {
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await LocalNotifications.schedule({
+      notifications: list.slice(0, LEFTOVER_IDS).map((r, i) => ({
+        id: LEFTOVER_FIRST_ID + i,
+        title: "Use soon",
+        body: `${r.labels.slice(0, 3).join(", ")}${r.labels.length > 3 ? ` and ${r.labels.length - 3} more` : ""} reaches its use-by date soon.`,
+        channelId: REMINDER_CHANNEL,
+        schedule: { at: r.at, allowWhileIdle: true },
+        autoCancel: true,
+      })),
+    });
+  } catch {
+    // The use-soon list still shows on the recipes and pantry screens.
+  }
+}
+
 /** Our own Android plugin (android/.../RestCountdownPlugin.java). */
 const RestCountdown = registerPlugin<{
   show(o: { endsAt: number; label: string }): Promise<void>;

@@ -5,7 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Apple, BarChart3, Bookmark, CalendarClock, FileDown, BookmarkPlus, ChefHat, Dumbbell, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, Inbox, ListChecks, Moon, Plus, RotateCcw, Settings, Target } from "lucide-react";
+import { Apple, BarChart3, Bookmark, CalendarClock, FileDown, BookmarkPlus, ChefHat, Dumbbell, Refrigerator, ChevronLeft, ChevronRight, Copy, EllipsisVertical, Inbox, GraduationCap, ListChecks, Moon, Plus, RotateCcw, Settings, Target } from "lucide-react";
 import { ActionSheet } from "@/components/ui/action-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -270,6 +270,7 @@ export function DiaryScreen() {
           { label: inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox", icon: Inbox, onSelect: () => router.push("/food/inbox/") },
           { label: "Week", icon: BarChart3, onSelect: () => router.push("/food/week/") },
           { label: "Export", icon: FileDown, onSelect: () => router.push("/food/week/#export") },
+          { label: "Student lens", icon: GraduationCap, onSelect: () => router.push("/food/learn/") },
           { label: "Goals", icon: Target, onSelect: () => router.push("/food/goals/") },
           { label: "Recipes", icon: ChefHat, onSelect: () => router.push("/food/recipes/") },
           { label: "Pantry", icon: Refrigerator, onSelect: () => router.push("/food/pantry/") },

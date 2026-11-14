@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { cleanBarcode } from "@/lib/nutrition/barcode";
 import { nutrientsFromPartial } from "@/lib/nutrition/entry-math";
+import { parsePriceCents } from "@/lib/nutrition/value";
 import type { Food } from "@/lib/nutrition/diary-types";
 import type { NutrientKey } from "@/lib/nutrition/nutrients";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,8 @@ function Form({ onCreate, onOpenChange, initialName, initialBarcode }: Props) {
   const [vals, setVals] = useState<Partial<Record<NutrientKey, string>>>({});
   const [serving, setServing] = useState("");
   const [pack, setPack] = useState("");
+  const [price, setPrice] = useState("");
+  const [priceFor, setPriceFor] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +76,10 @@ function Form({ onCreate, onOpenChange, initialName, initialBarcode }: Props) {
     const n = num(t);
     return n !== null && (Number.isNaN(n) || n <= 0);
   };
-  const valid = name.trim().length > 0 && requiredOk && !optionalBad && !badSize(serving) && !badSize(pack);
+  const cents = parsePriceCents(price);
+  // A price needs the amount it buys, and the other way round.
+  const priceBad = Number.isNaN(cents) || badSize(priceFor) || (cents === null) !== (num(priceFor) === null);
+  const valid = name.trim().length > 0 && requiredOk && !optionalBad && !badSize(serving) && !badSize(pack) && !priceBad;
 
   const save = async () => {
     if (!valid) return;
@@ -101,6 +107,7 @@ function Form({ onCreate, onOpenChange, initialName, initialBarcode }: Props) {
         sourceUrl: null,
         note: null,
         archived: false,
+        ...(cents !== null && !Number.isNaN(cents) && isNum(num(priceFor)) ? { priceCents: cents, priceAmount: num(priceFor) } : {}),
       });
       onOpenChange(false);
     } catch {
@@ -185,6 +192,21 @@ function Form({ onCreate, onOpenChange, initialName, initialBarcode }: Props) {
             <Input inputMode="decimal" value={pack} aria-invalid={badSize(pack) || undefined} onChange={(e) => setPack(e.target.value)} />
           </label>
         </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">Price (optional)</legend>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
+            Price paid
+            <Input inputMode="decimal" value={price} placeholder="3.49" aria-invalid={Number.isNaN(cents) || undefined} onChange={(e) => setPrice(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
+            For this much ({base})
+            <Input inputMode="decimal" value={priceFor} aria-invalid={priceBad || undefined} onChange={(e) => setPriceFor(e.target.value)} />
+          </label>
+        </div>
+        <p className="text-muted-foreground text-xs">Stays with this food to rank protein per dollar in the student lens.</p>
       </fieldset>
 
       {error && (
